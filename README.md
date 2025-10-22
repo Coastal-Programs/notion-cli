@@ -12,8 +12,16 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
 - ✅ **Latest API**: Notion API v5.2.1 with data sources support
 - 🔄 **Enhanced Reliability**: Automatic retry with exponential backoff
 - ⚡ **High Performance**: In-memory caching for faster operations
+- 🔍 **Schema Discovery**: AI-friendly database schema extraction
 
-## What's New in v5.1.0
+## What's New in v5.2.0
+
+### NEW: Schema Discovery Command
+- **`db schema` command** - Extract clean, AI-parseable database schemas
+- **Property type detection** - Automatic identification of all Notion property types
+- **Option enumeration** - Get valid values for select/multi-select properties
+- **Multiple formats** - JSON, YAML, table, or markdown output
+- **Filtered extraction** - Get only the properties you need
 
 ### Enhanced Retry Logic
 - **Exponential backoff** with jitter to prevent thundering herd
@@ -29,7 +37,7 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
 - **Cache statistics** for monitoring performance
 - **Up to 100x faster** for repeated reads
 
-[📖 Full Enhancement Documentation](./ENHANCEMENTS.md) | [📊 Output Formats Guide](./OUTPUT_FORMATS.md)
+[📖 Full Enhancement Documentation](./ENHANCEMENTS.md) | [📊 Output Formats Guide](./OUTPUT_FORMATS.md) | [👨‍💻 AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md)
 
 ## Quick Start for AI Agents
 
@@ -63,9 +71,16 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
    notion-cli user retrieve bot --output json
    ```
 
-4. **All commands support** `--output json` for machine-readable responses.
+4. **Discover database schema** (new!):
+   ```bash
+   notion-cli db schema <DATA_SOURCE_ID> --output json
+   ```
+
+5. **All commands support** `--output json` for machine-readable responses.
 
 **Get your API token**: https://developers.notion.com/docs/create-a-notion-integration
+
+**Learn by example**: See [AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md) for 12+ practical recipes
 
 ---
 
@@ -218,6 +233,62 @@ In Notion API v5.2.1 (2025-09-03), terminology changed:
 **Commands use data source IDs** for querying/updating tables.
 
 ## Common Commands
+
+### Discover Database Schema (NEW!)
+Understand database structure before creating/updating pages:
+```bash
+# Get schema in JSON format (best for AI agents)
+notion-cli db schema <DATA_SOURCE_ID> --output json
+
+# Get schema as formatted table
+notion-cli db schema <DATA_SOURCE_ID>
+
+# Get only specific properties
+notion-cli db schema <DATA_SOURCE_ID> --properties Name,Status,Tags --output json
+
+# Export as markdown documentation
+notion-cli db schema <DATA_SOURCE_ID> --markdown
+```
+
+**Example output:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "abc123...",
+    "title": "Tasks",
+    "properties": [
+      {
+        "name": "Name",
+        "type": "title",
+        "required": true,
+        "description": "Title (required)"
+      },
+      {
+        "name": "Status",
+        "type": "select",
+        "options": ["Not Started", "In Progress", "Done"],
+        "description": "Select one: Not Started, In Progress, Done"
+      },
+      {
+        "name": "Tags",
+        "type": "multi_select",
+        "options": ["urgent", "bug", "feature", "docs"]
+      }
+    ]
+  }
+}
+```
+
+**Use with jq:**
+```bash
+# Get all property names
+notion-cli db schema <DATA_SOURCE_ID> --output json | jq -r '.data.properties[].name'
+
+# Get properties with options (select/multi-select)
+notion-cli db schema <DATA_SOURCE_ID> --output json | \
+  jq '.data.properties[] | select(.options) | {name, options}'
+```
 
 ### Query a Data Source (Table)
 Get pages/rows from a table with optional filters:
@@ -375,7 +446,7 @@ $ notion-cli page retrieve c77dbaf240174ea1ac1e93a87269f3ea
 ```sh
 $ notion-cli page retrieve c77dbaf240174ea1ac1e93a87269f3ea --output csv
 Title,Object,Id,Url
-Page title,page,c77dbaf2-4017-4ea1-ac1e-93a87269f3ea,https://www.notion.so/Page-title-c77dbaf240174ea1ac1e93a87269f3ea
+Page title,page,c77dbaf2-4017-4ea1-ac1e93a87269f3ea,https://www.notion.so/Page-title-c77dbaf240174ea1ac1e93a87269f3ea
 ```
 
 ### JSON (Formatted)
@@ -423,11 +494,13 @@ $ notion-cli page retrieve c77dbaf240174ea1ac1e93a87269f3ea --raw | jq
 - `notion-cli db create <PAGE_ID>` - Create database with initial data source
 - `notion-cli db query <DATA_SOURCE_ID>` - Query data source (table) for pages
 - `notion-cli db retrieve <DATA_SOURCE_ID>` - Get data source schema (cached)
+- `notion-cli db schema <DATA_SOURCE_ID>` - **NEW:** Extract AI-friendly schema
 - `notion-cli db update <DATA_SOURCE_ID>` - Update data source title/properties
 
 **Aliases:**
 - `db:*` commands also available as `ds:*` (data-source)
 - `db:r` = `db:retrieve` = `ds:r` = `ds:retrieve`
+- `db:s` = `db:schema` = `ds:s` = `ds:schema` (new!)
 - `db:u` = `db:update` = `ds:u` = `ds:update`
 
 ### Page Commands
@@ -455,33 +528,46 @@ $ notion-cli page retrieve c77dbaf240174ea1ac1e93a87269f3ea --raw | jq
 
 ## Use Cases for AI Agents
 
-### 1. Knowledge Base Queries
+### 1. Schema Discovery (NEW!)
+AI agents can understand database structure instantly:
+```bash
+# Discover what properties exist and their types
+notion-cli db schema <DATA_SOURCE_ID> --output json | jq '.data.properties'
+
+# Find valid options for select fields
+notion-cli db schema <DATA_SOURCE_ID> --output json | \
+  jq '.data.properties[] | select(.type=="select") | {name, options}'
+```
+
+See [AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md) for complete recipes.
+
+### 2. Knowledge Base Queries
 AI agents can query your Notion workspace:
 ```bash
 notion-cli search --query "API documentation" --json
 ```
 
-### 2. Task Management
+### 3. Task Management
 Create and update tasks programmatically:
 ```bash
 notion-cli page create -d <TASKS_DATA_SOURCE_ID> --json
 notion-cli page update <TASK_PAGE_ID> --archive --json
 ```
 
-### 3. Content Generation
+### 4. Content Generation
 Generate content with AI, save to Notion:
 ```bash
 echo "# Generated Content" > output.md
 notion-cli page create -f output.md -p <PARENT_PAGE_ID> --json
 ```
 
-### 4. Data Extraction
+### 5. Data Extraction
 Extract structured data for AI processing:
 ```bash
 notion-cli db query <DATA_SOURCE_ID> --json | jq '.data.results'
 ```
 
-### 5. Workflow Automation
+### 6. Workflow Automation
 Chain commands in scripts:
 ```bash
 #!/bin/bash
@@ -490,6 +576,8 @@ if [ $? -eq 0 ]; then
   echo "$RESULT" | jq '.data.results[] | .properties'
 fi
 ```
+
+**See complete examples:** [AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md) has 12+ practical automation recipes.
 
 ## Performance Benchmarks
 
@@ -519,6 +607,7 @@ Update page | ✅ | ✅ | -
 **Data Sources** |  |  |
 Create database | ✅ | ✅ | -
 Retrieve data source | ✅ | ✅ | ✅ (10m)
+**Extract schema (NEW!)** | ✅ | ✅ | ✅ (10m)
 Update data source | ✅ | ✅ | -
 Query data source | ✅ | ✅ | -
 **Users** |  |  |
@@ -561,6 +650,7 @@ See [.env.example](./.env.example) for complete configuration options.
 
 ## Documentation
 
+- [AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md) - **NEW:** Practical recipes for AI automation
 - [Enhancement Documentation](./ENHANCEMENTS.md) - Complete reference for retry & caching
 - [Output Formats Guide](./OUTPUT_FORMATS.md) - All available output formats
 - [Configuration Examples](.env.example) - Environment variable templates
@@ -572,6 +662,7 @@ See [.env.example](./.env.example) for complete configuration options.
 
 **Key Features:**
 - ✅ Notion API v5.2.1 with data sources support
+- ✅ **NEW: Schema discovery for AI agents**
 - ✅ Non-interactive CLI for automation and AI agents
 - ✅ JSON output mode with structured responses
 - ✅ Advanced error handling with exit codes

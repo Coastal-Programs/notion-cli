@@ -1,7 +1,7 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "5.1.0",
-  "description": "Notion CLI optimized for automation and AI agents (API v5.2.1)",
+  "version": "5.2.0",
+  "description": "Notion CLI optimized for automation and AI agents (API v5.2.1) with schema discovery",
   "author": "Jake Schepis",
   "bin": {
     "notion-cli": "./bin/run"
@@ -70,7 +70,12 @@
   },
   "bugs": "https://github.com/Coastal-Programs/notion-cli/issues",
   "keywords": [
-    "oclif"
+    "oclif",
+    "notion",
+    "cli",
+    "ai-agents",
+    "automation",
+    "schema-discovery"
   ],
   "types": "dist/index.d.ts"
 }
