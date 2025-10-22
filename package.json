@@ -20,7 +20,6 @@
     "@notionhq/client": "^5.2.1",
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
-    "@oclif/plugin-plugins": "^2.4.7",
     "@tryfabric/martian": "^1.2.4",
     "dayjs": "^1.11.13",
     "notion-to-md": "^3.1.6"
