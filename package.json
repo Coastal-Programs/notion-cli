@@ -1,0 +1,78 @@
+{
+  "name": "@jakeschepis/notion-cli",
+  "version": "5.0.0",
+  "description": "Notion CLI optimized for automation and AI agents (API v5.2.1)",
+  "author": "Jake Schepis",
+  "bin": {
+    "notion-cli": "./bin/run"
+  },
+  "homepage": "https://github.com/jakeschepis/notion-cli",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "repository": "jakeschepis/notion-cli",
+  "files": [
+    "/bin",
+    "/dist",
+    "/npm-shrinkwrap.json",
+    "/oclif.manifest.json"
+  ],
+  "dependencies": {
+    "@notionhq/client": "^5.2.1",
+    "@oclif/core": "^2",
+    "@oclif/plugin-help": "^5",
+    "@oclif/plugin-plugins": "^2.4.7",
+    "@tryfabric/martian": "^1.2.4",
+    "dayjs": "^1.11.13",
+    "notion-to-md": "^3.1.6"
+  },
+  "devDependencies": {
+    "@oclif/test": "^2",
+    "@types/chai": "^4",
+    "@types/mocha": "^9.1.0",
+    "@types/node": "^16.18.126",
+    "chai": "^4",
+    "eslint": "^8.57.1",
+    "eslint-config-oclif": "^4",
+    "eslint-config-oclif-typescript": "^1.0.3",
+    "eslint-config-prettier": "^8.10.0",
+    "eslint-plugin-unicorn": "^46.0.1",
+    "globby": "^11",
+    "mocha": "^9",
+    "oclif": "^3",
+    "prettier": "^2.8.8",
+    "shx": "^0.3.4",
+    "ts-node": "^10.9.2",
+    "tslib": "^2.8.1",
+    "typescript": "^4.9.5"
+  },
+  "oclif": {
+    "bin": "notion-cli",
+    "dirname": "notion-cli",
+    "commands": "./dist/commands",
+    "plugins": [
+      "@oclif/plugin-help"
+    ],
+    "topicSeparator": " ",
+    "topics": {
+      "hello": {
+        "description": "Say hello to the world and others"
+      }
+    }
+  },
+  "scripts": {
+    "build": "shx rm -rf dist && tsc -b",
+    "lint": "eslint . --ext .ts --config .eslintrc.json",
+    "postpack": "shx rm -f oclif.manifest.json",
+    "prepack": "yarn build && oclif manifest && yarn readme",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bugs": "https://github.com/jakeschepis/notion-cli/issues",
+  "keywords": [
+    "oclif"
+  ],
+  "types": "dist/index.d.ts"
+}
