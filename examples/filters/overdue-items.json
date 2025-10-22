@@ -1,0 +1,16 @@
+{
+  "and": [
+    {
+      "property": "Due Date",
+      "date": {
+        "before": "2025-10-23"
+      }
+    },
+    {
+      "property": "Status",
+      "select": {
+        "does_not_equal": "Done"
+      }
+    }
+  ]
+}

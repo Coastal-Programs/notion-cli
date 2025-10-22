@@ -6,9 +6,8 @@ const helper_1 = require("../../helper");
 const notion_resolver_1 = require("../../utils/notion-resolver");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const property_expander_1 = require("../../utils/property-expander");
 class PageUpdate extends core_1.Command {
-    // NOTE: Support only archived or un archive property for now
-    // TODO: Add support for updating a page properties, icon, cover
     async run() {
         const { args, flags } = await this.parse(PageUpdate);
         try {
@@ -17,11 +16,44 @@ class PageUpdate extends core_1.Command {
             const pageProps = {
                 page_id: pageId,
             };
+            // Handle archived flags
             if (flags.archived) {
                 pageProps.archived = true;
             }
             if (flags.unarchive) {
                 pageProps.archived = false;
+            }
+            // Handle properties update
+            if (flags.properties) {
+                try {
+                    const parsedProps = JSON.parse(flags.properties);
+                    if (flags['simple-properties']) {
+                        // User provided simple format - expand to Notion format
+                        // Need to get the page first to find its parent database
+                        const page = await notion.retrievePage({ page_id: pageId });
+                        // Check if page is in a database
+                        if (!('parent' in page) || !('data_source_id' in page.parent)) {
+                            throw new Error('The --simple-properties flag can only be used with pages in a database. ' +
+                                'This page does not have a parent database.');
+                        }
+                        // Get the database schema
+                        const parentDataSourceId = page.parent.data_source_id;
+                        const dbSchema = await notion.retrieveDataSource(parentDataSourceId);
+                        // Expand simple properties to Notion format
+                        pageProps.properties = await (0, property_expander_1.expandSimpleProperties)(parsedProps, dbSchema.properties);
+                    }
+                    else {
+                        // Use raw Notion format
+                        pageProps.properties = parsedProps;
+                    }
+                }
+                catch (error) {
+                    if (error.message.includes('Unexpected token') || error.message.includes('JSON')) {
+                        throw new Error(`Invalid JSON in --properties flag: ${error.message}\n` +
+                            `Example: --properties '{"Status": "Done", "Priority": "High"}'`);
+                    }
+                    throw error;
+                }
             }
             const res = await notion.updatePageProps(pageProps);
             // Handle JSON output for automation
@@ -83,6 +115,18 @@ PageUpdate.examples = [
         command: `$ notion-cli page update https://notion.so/PAGE_ID -a`,
     },
     {
+        description: 'Update page properties with simple format (recommended for AI agents)',
+        command: `$ notion-cli page update PAGE_ID -S --properties '{"Status": "Done", "Priority": "High"}'`,
+    },
+    {
+        description: 'Update page properties with relative date',
+        command: `$ notion-cli page update PAGE_ID -S --properties '{"Due Date": "tomorrow", "Status": "In Progress"}'`,
+    },
+    {
+        description: 'Update page with multi-select tags',
+        command: `$ notion-cli page update PAGE_ID -S --properties '{"Tags": ["urgent", "bug"], "Status": "Done"}'`,
+    },
+    {
         description: 'Update a page and output raw json',
         command: `$ notion-cli page update PAGE_ID -r`,
     },
@@ -116,6 +160,14 @@ PageUpdate.args = {
 PageUpdate.flags = {
     archived: core_1.Flags.boolean({ char: 'a', description: 'Archive the page' }),
     unarchive: core_1.Flags.boolean({ char: 'u', description: 'Unarchive the page' }),
+    properties: core_1.Flags.string({
+        description: 'Page properties to update as JSON string',
+    }),
+    'simple-properties': core_1.Flags.boolean({
+        char: 'S',
+        description: 'Use simplified property format (flat key-value pairs, recommended for AI agents)',
+        default: false,
+    }),
     raw: core_1.Flags.boolean({
         char: 'r',
         description: 'output raw json',

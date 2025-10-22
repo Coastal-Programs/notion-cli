@@ -14,51 +14,86 @@ class DbQuery extends core_1.Command {
     async run() {
         const { flags, args } = await this.parse(DbQuery);
         try {
+            // Handle deprecation warnings (output to stderr to not pollute stdout)
+            if (flags.rawFilter) {
+                console.error('⚠️  Warning: --rawFilter is deprecated and will be removed in v6.0.0');
+                console.error('   Use --filter instead: notion-cli db query DS_ID --filter \'...\'');
+                console.error('');
+            }
+            if (flags.fileFilter) {
+                console.error('⚠️  Warning: --fileFilter is deprecated and will be removed in v6.0.0');
+                console.error('   Use --file-filter instead: notion-cli db query DS_ID --file-filter ./filter.json');
+                console.error('');
+            }
             // Resolve ID from URL, direct ID, or name (future)
             const databaseId = await (0, notion_resolver_1.resolveNotionId)(args.database_id, 'database');
             let queryParams;
-            // Build query parameters
+            // Build filter
+            let filter = undefined;
             try {
-                if (flags.rawFilter != undefined) {
-                    const filter = JSON.parse(flags.rawFilter);
-                    queryParams = {
-                        data_source_id: databaseId,
-                        filter: filter,
-                        page_size: flags.pageSize,
-                    };
-                }
-                else if (flags.fileFilter != undefined) {
-                    const fp = path.join('./', flags.fileFilter);
-                    const fj = fs.readFileSync(fp, { encoding: 'utf-8' });
-                    const filter = JSON.parse(fj);
-                    queryParams = {
-                        data_source_id: databaseId,
-                        filter: filter,
-                        page_size: flags.pageSize,
-                    };
-                }
-                else {
-                    let sorts = [];
-                    const direction = flags.sortDirection == 'desc' ? 'descending' : 'ascending';
-                    if (flags.sortProperty != undefined) {
-                        sorts.push({
-                            property: flags.sortProperty,
-                            direction: direction,
-                        });
+                if (flags.filter || flags.rawFilter) {
+                    // JSON filter object (new flag or deprecated rawFilter)
+                    const filterStr = flags.filter || flags.rawFilter;
+                    try {
+                        filter = JSON.parse(filterStr);
                     }
-                    queryParams = {
-                        data_source_id: databaseId,
-                        sorts: sorts,
-                        page_size: flags.pageSize,
+                    catch (error) {
+                        throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Invalid JSON in --filter. Example: --filter '{"property": "Status", "select": {"equals": "Done"}}'`, { error });
+                    }
+                }
+                else if (flags['file-filter'] || flags.fileFilter) {
+                    // Load from file (new flag or deprecated fileFilter)
+                    const filterFile = flags['file-filter'] || flags.fileFilter;
+                    const fp = path.join('./', filterFile);
+                    try {
+                        const fj = fs.readFileSync(fp, { encoding: 'utf-8' });
+                        filter = JSON.parse(fj);
+                    }
+                    catch (error) {
+                        throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Failed to read filter file: ${filterFile}. Ensure the file exists and contains valid JSON.`, { error });
+                    }
+                }
+                else if (flags.search) {
+                    // Simple text search - convert to Notion filter
+                    // Search across common text properties using OR
+                    // Note: This searches properties named "Name", "Title", and "Description"
+                    // For more complex searches, use --filter with explicit property names
+                    filter = {
+                        or: [
+                            { property: 'Name', title: { contains: flags.search } },
+                            { property: 'Title', title: { contains: flags.search } },
+                            { property: 'Description', rich_text: { contains: flags.search } },
+                            { property: 'Name', rich_text: { contains: flags.search } },
+                        ]
                     };
                 }
+                // Build sorts
+                let sorts = [];
+                const direction = flags['sort-direction'] == 'desc' ? 'descending' : 'ascending';
+                if (flags['sort-property']) {
+                    sorts.push({
+                        property: flags['sort-property'],
+                        direction: direction,
+                    });
+                }
+                // Build query parameters
+                queryParams = {
+                    data_source_id: databaseId,
+                    filter: filter,
+                    sorts: sorts.length > 0 ? sorts : undefined,
+                    page_size: flags['page-size'],
+                };
             }
             catch (e) {
-                throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Failed to parse filter: ${e.message}`, { error: e });
+                // Re-throw NotionCLIError, wrap others
+                if (e instanceof errors_1.NotionCLIError) {
+                    throw e;
+                }
+                throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Failed to build query parameters: ${e.message}`, { error: e });
             }
             // Fetch pages from database
             let pages = [];
-            if (flags.pageAll) {
+            if (flags['page-all']) {
                 pages = await notion.fetchAllPagesInDS(databaseId, queryParams.filter);
             }
             else {
@@ -152,55 +187,59 @@ DbQuery.aliases = ['db:q'];
 DbQuery.examples = [
     {
         description: 'Query a database with full data (recommended for AI assistants)',
-        command: `$ notion-cli db query DATABASE_ID -r`,
+        command: `$ notion-cli db query DATABASE_ID --raw`,
     },
     {
-        description: 'Query a db with a specific database_id',
-        command: `$ notion-cli db query DATABASE_ID`,
+        description: 'Query all records as JSON',
+        command: `$ notion-cli db query DATABASE_ID --json`,
     },
     {
-        description: 'Query a db using database URL',
-        command: `$ notion-cli db query https://notion.so/DATABASE_ID`,
+        description: 'Filter with JSON object (recommended for AI agents)',
+        command: `$ notion-cli db query DATABASE_ID --filter '{"property": "Status", "select": {"equals": "Done"}}' --json`,
     },
     {
-        description: 'Query a db with a specific database_id and raw filter string',
-        command: `$ notion-cli db query -a '{"and": ...}' DATABASE_ID`,
+        description: 'Simple text search across properties',
+        command: `$ notion-cli db query DATABASE_ID --search "urgent" --json`,
     },
     {
-        description: 'Query a db with a specific database_id and filter file',
-        command: `$ notion-cli db query -f ./path/to/filter.json DATABASE_ID`,
+        description: 'Load complex filter from file',
+        command: `$ notion-cli db query DATABASE_ID --file-filter ./filter.json --json`,
     },
     {
-        description: 'Query a db with a specific database_id and output CSV',
-        command: `$ notion-cli db query --csv DATABASE_ID`,
+        description: 'Query with AND filter',
+        command: `$ notion-cli db query DATABASE_ID --filter '{"and": [{"property": "Status", "select": {"equals": "Done"}}, {"property": "Priority", "number": {"greater_than": 5}}]}' --json`,
     },
     {
-        description: 'Query a db with a specific database_id and output raw json',
-        command: `$ notion-cli db query --raw DATABASE_ID`,
+        description: 'Query using database URL',
+        command: `$ notion-cli db query https://notion.so/DATABASE_ID --json`,
     },
     {
-        description: 'Query a db with a specific database_id and output markdown table',
-        command: `$ notion-cli db query --markdown DATABASE_ID`,
+        description: 'Query with sorting',
+        command: `$ notion-cli db query DATABASE_ID --sort-property Name --sort-direction desc`,
     },
     {
-        description: 'Query a db with a specific database_id and output compact json',
-        command: `$ notion-cli db query --compact-json DATABASE_ID`,
+        description: 'Query with pagination',
+        command: `$ notion-cli db query DATABASE_ID --page-size 50`,
     },
     {
-        description: 'Query a db with a specific database_id and output pretty table',
-        command: `$ notion-cli db query --pretty DATABASE_ID`,
+        description: 'Get all pages (bypass pagination)',
+        command: `$ notion-cli db query DATABASE_ID --page-all`,
     },
     {
-        description: 'Query a db with a specific database_id and page size',
-        command: `$ notion-cli db query -p 10 DATABASE_ID`,
+        description: 'Output as CSV',
+        command: `$ notion-cli db query DATABASE_ID --csv`,
     },
     {
-        description: 'Query a db with a specific database_id and get all pages',
-        command: `$ notion-cli db query -A DATABASE_ID`,
+        description: 'Output as markdown table',
+        command: `$ notion-cli db query DATABASE_ID --markdown`,
     },
     {
-        description: 'Query a db with a specific database_id and sort property and sort direction',
-        command: `$ notion-cli db query -s Name -d desc DATABASE_ID`,
+        description: 'Output as compact JSON',
+        command: `$ notion-cli db query DATABASE_ID --compact-json`,
+    },
+    {
+        description: 'Output as pretty table',
+        command: `$ notion-cli db query DATABASE_ID --pretty`,
     },
 ];
 DbQuery.args = {
@@ -210,42 +249,60 @@ DbQuery.args = {
     }),
 };
 DbQuery.flags = {
-    rawFilter: core_1.Flags.string({
-        char: 'a',
-        description: 'JSON stringified filter string',
-    }),
-    fileFilter: core_1.Flags.string({
-        char: 'f',
-        description: 'JSON filter file path',
-    }),
-    pageSize: core_1.Flags.integer({
+    'page-size': core_1.Flags.integer({
         char: 'p',
-        description: 'The number of results to return(1-100). ',
+        description: 'The number of results to return (1-100)',
         min: 1,
         max: 100,
         default: 10,
     }),
-    pageAll: core_1.Flags.boolean({
+    'page-all': core_1.Flags.boolean({
         char: 'A',
-        description: 'get all pages',
+        description: 'Get all pages (bypass pagination)',
         default: false,
     }),
-    sortProperty: core_1.Flags.string({
-        char: 's',
+    'sort-property': core_1.Flags.string({
         description: 'The property to sort results by',
     }),
-    sortDirection: core_1.Flags.string({
-        char: 'd',
+    'sort-direction': core_1.Flags.string({
         options: ['asc', 'desc'],
         description: 'The direction to sort results',
         default: 'asc',
     }),
     raw: core_1.Flags.boolean({
         char: 'r',
-        description: 'output raw json (recommended for AI assistants - returns all page data)',
+        description: 'Output raw JSON (recommended for AI assistants - returns all page data)',
         default: false,
     }),
     ...core_1.ux.table.flags(),
     ...base_flags_1.AutomationFlags,
     ...base_flags_1.OutputFormatFlags,
+    // New simplified filter interface (placed AFTER table flags to override)
+    filter: core_1.Flags.string({
+        char: 'f',
+        description: 'Filter as JSON object (Notion filter API format)',
+        exclusive: ['search', 'file-filter', 'rawFilter', 'fileFilter'],
+    }),
+    'file-filter': core_1.Flags.string({
+        char: 'F',
+        description: 'Load filter from JSON file',
+        exclusive: ['filter', 'search', 'rawFilter', 'fileFilter'],
+    }),
+    search: core_1.Flags.string({
+        char: 's',
+        description: 'Simple text search (searches across title and common text properties)',
+        exclusive: ['filter', 'file-filter', 'rawFilter', 'fileFilter'],
+    }),
+    // DEPRECATED: Keep for backward compatibility
+    rawFilter: core_1.Flags.string({
+        char: 'a',
+        description: 'DEPRECATED: Use --filter instead. JSON stringified filter string',
+        hidden: true,
+        exclusive: ['filter', 'search', 'file-filter', 'fileFilter'],
+    }),
+    fileFilter: core_1.Flags.string({
+        description: 'DEPRECATED: Use --file-filter instead. JSON filter file path',
+        hidden: true,
+        exclusive: ['filter', 'search', 'file-filter', 'rawFilter'],
+    }),
 };

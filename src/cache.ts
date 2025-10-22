@@ -30,6 +30,43 @@ export interface CacheConfig {
   }
 }
 
+/**
+ * Structured cache event for logging to stderr
+ */
+interface CacheEvent {
+  level: 'debug' | 'info'
+  event: 'cache_hit' | 'cache_miss' | 'cache_set' | 'cache_invalidate' | 'cache_evict'
+  namespace: string
+  key?: string
+  age_ms?: number
+  ttl_ms?: number
+  cache_size?: number
+  timestamp: string
+}
+
+/**
+ * Check if verbose logging is enabled
+ */
+function isVerboseEnabled(): boolean {
+  return process.env.DEBUG === 'true' ||
+         process.env.NOTION_CLI_DEBUG === 'true' ||
+         process.env.NOTION_CLI_VERBOSE === 'true'
+}
+
+/**
+ * Log structured cache event to stderr
+ * Never pollutes stdout - safe for JSON output
+ */
+function logCacheEvent(event: CacheEvent): void {
+  // Only log if verbose mode is enabled
+  if (!isVerboseEnabled()) {
+    return
+  }
+
+  // Always write to stderr, never stdout
+  console.error(JSON.stringify(event))
+}
+
 export class CacheManager {
   private cache: Map<string, CacheEntry<any>>
   private stats: CacheStats
@@ -83,13 +120,28 @@ export class CacheManager {
    */
   private evictExpired(): void {
     const now = Date.now()
+    let evictedCount = 0
+
     for (const [key, entry] of this.cache.entries()) {
       if (!this.isValid(entry)) {
         this.cache.delete(key)
         this.stats.evictions++
+        evictedCount++
       }
     }
+
     this.stats.size = this.cache.size
+
+    // Log eviction event if any entries were evicted
+    if (evictedCount > 0 && isVerboseEnabled()) {
+      logCacheEvent({
+        level: 'debug',
+        event: 'cache_evict',
+        namespace: 'expired',
+        cache_size: this.cache.size,
+        timestamp: new Date().toISOString(),
+      })
+    }
   }
 
   /**
@@ -111,6 +163,16 @@ export class CacheManager {
       if (oldestKey) {
         this.cache.delete(oldestKey)
         this.stats.evictions++
+
+        // Log LRU eviction
+        logCacheEvent({
+          level: 'debug',
+          event: 'cache_evict',
+          namespace: 'lru',
+          key: oldestKey,
+          cache_size: this.cache.size,
+          timestamp: new Date().toISOString(),
+        })
       }
     }
   }
@@ -128,6 +190,16 @@ export class CacheManager {
 
     if (!entry) {
       this.stats.misses++
+
+      // Log cache miss
+      logCacheEvent({
+        level: 'debug',
+        event: 'cache_miss',
+        namespace: type,
+        key: identifiers.join(':'),
+        timestamp: new Date().toISOString(),
+      })
+
       return null
     }
 
@@ -135,10 +207,32 @@ export class CacheManager {
       this.cache.delete(key)
       this.stats.misses++
       this.stats.evictions++
+
+      // Log cache miss (expired)
+      logCacheEvent({
+        level: 'debug',
+        event: 'cache_miss',
+        namespace: type,
+        key: identifiers.join(':'),
+        timestamp: new Date().toISOString(),
+      })
+
       return null
     }
 
     this.stats.hits++
+
+    // Log cache hit
+    logCacheEvent({
+      level: 'debug',
+      event: 'cache_hit',
+      namespace: type,
+      key: identifiers.join(':'),
+      age_ms: Date.now() - entry.timestamp,
+      ttl_ms: entry.ttl,
+      timestamp: new Date().toISOString(),
+    })
+
     return entry.data as T
   }
 
@@ -169,6 +263,17 @@ export class CacheManager {
 
     this.stats.sets++
     this.stats.size = this.cache.size
+
+    // Log cache set
+    logCacheEvent({
+      level: 'debug',
+      event: 'cache_set',
+      namespace: type,
+      key: identifiers.join(':'),
+      ttl_ms: ttl,
+      cache_size: this.cache.size,
+      timestamp: new Date().toISOString(),
+    })
   }
 
   /**
@@ -178,17 +283,41 @@ export class CacheManager {
     if (identifiers.length === 0) {
       // Invalidate all entries of this type
       const pattern = `${type}:`
+      let invalidatedCount = 0
+
       for (const key of this.cache.keys()) {
         if (key.startsWith(pattern)) {
           this.cache.delete(key)
           this.stats.evictions++
+          invalidatedCount++
         }
+      }
+
+      // Log bulk invalidation
+      if (invalidatedCount > 0) {
+        logCacheEvent({
+          level: 'debug',
+          event: 'cache_invalidate',
+          namespace: type,
+          cache_size: this.cache.size,
+          timestamp: new Date().toISOString(),
+        })
       }
     } else {
       // Invalidate specific entry
       const key = this.generateKey(type, ...identifiers)
       if (this.cache.delete(key)) {
         this.stats.evictions++
+
+        // Log specific invalidation
+        logCacheEvent({
+          level: 'debug',
+          event: 'cache_invalidate',
+          namespace: type,
+          key: identifiers.join(':'),
+          cache_size: this.cache.size,
+          timestamp: new Date().toISOString(),
+        })
       }
     }
     this.stats.size = this.cache.size
@@ -198,9 +327,21 @@ export class CacheManager {
    * Clear all cache entries
    */
   clear(): void {
+    const previousSize = this.cache.size
     this.cache.clear()
     this.stats.evictions += this.stats.size
     this.stats.size = 0
+
+    // Log cache clear
+    if (previousSize > 0) {
+      logCacheEvent({
+        level: 'info',
+        event: 'cache_invalidate',
+        namespace: 'all',
+        cache_size: 0,
+        timestamp: new Date().toISOString(),
+      })
+    }
   }
 
   /**

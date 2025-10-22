@@ -1,0 +1,16 @@
+{
+  "and": [
+    {
+      "property": "Status",
+      "select": {
+        "equals": "Review"
+      }
+    },
+    {
+      "property": "Reviewer",
+      "people": {
+        "is_empty": true
+      }
+    }
+  ]
+}

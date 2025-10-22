@@ -26,6 +26,12 @@ exports.AutomationFlags = {
         description: 'Bypass cache and force fresh API calls',
         default: false,
     }),
+    verbose: core_1.Flags.boolean({
+        char: 'v',
+        description: 'Enable verbose logging to stderr (retry events, cache stats) - never pollutes stdout',
+        default: false,
+        env: 'NOTION_CLI_VERBOSE',
+    }),
 };
 exports.OutputFormatFlags = {
     markdown: core_1.Flags.boolean({

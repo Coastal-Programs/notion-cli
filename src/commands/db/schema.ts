@@ -7,6 +7,12 @@ import {
   formatSchemaAsMarkdown,
   DataSourceSchema,
 } from '../../utils/schema-extractor'
+import {
+  generatePropertyExamples,
+  formatExamplesForConsole,
+  groupExamplesByWritability,
+  PropertyExample,
+} from '../../utils/schema-examples'
 import { wrapNotionError } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
@@ -24,12 +30,20 @@ export default class DbSchema extends Command {
       command: '<%= config.bin %> db schema abc123def456 --output json',
     },
     {
+      description: 'Get schema with property payload examples (recommended for AI agents)',
+      command: '<%= config.bin %> db schema abc123def456 --with-examples --json',
+    },
+    {
       description: 'Get schema using database URL',
       command: '<%= config.bin %> db schema https://notion.so/DATABASE_ID --output json',
     },
     {
       description: 'Get schema as formatted table',
       command: '<%= config.bin %> db schema abc123def456',
+    },
+    {
+      description: 'Get schema with examples in human-readable format',
+      command: '<%= config.bin %> db schema abc123def456 --with-examples',
     },
     {
       description: 'Get schema in YAML format',
@@ -81,6 +95,11 @@ export default class DbSchema extends Command {
       description: 'Output as JSON (shorthand for --output json)',
       default: false,
     }),
+    'with-examples': Flags.boolean({
+      char: 'e',
+      description: 'Include property payload examples for create/update operations',
+      default: false,
+    }),
   }
 
   public async run(): Promise<void> {
@@ -102,6 +121,51 @@ export default class DbSchema extends Command {
         schema = filterProperties(schema, propertyNames)
       }
 
+      // Generate examples if requested
+      if (flags['with-examples']) {
+        const examples = generatePropertyExamples(dataSource.properties)
+        const { writable, readOnly } = groupExamplesByWritability(examples)
+
+        // Determine output format
+        const outputFormat = flags.json ? 'json' : flags.output
+
+        // Handle JSON output
+        if (outputFormat === 'json') {
+          this.log(
+            JSON.stringify(
+              {
+                success: true,
+                data: {
+                  schema: schema,
+                  examples: {
+                    writable: writable,
+                    read_only: readOnly,
+                    all: examples,
+                  },
+                },
+                metadata: {
+                  timestamp: new Date().toISOString(),
+                  command: 'db schema',
+                  examples_count: examples.length,
+                  writable_count: writable.length,
+                  read_only_count: readOnly.length,
+                },
+              },
+              null,
+              2
+            )
+          )
+          process.exit(0)
+          return
+        }
+
+        // Human-readable output with examples
+        this.outputSchemaWithExamples(schema, examples)
+        process.exit(0)
+        return
+      }
+
+      // Regular schema output (without examples)
       // Determine output format
       const outputFormat = flags.json ? 'json' : flags.output
 
@@ -152,6 +216,62 @@ export default class DbSchema extends Command {
 
       process.exit(1)
     }
+  }
+
+  /**
+   * Output schema with examples in human-readable format
+   */
+  private outputSchemaWithExamples(schema: DataSourceSchema, examples: PropertyExample[]): void {
+    // First show basic schema info
+    this.log(`\n📋 ${schema.title}`)
+    if (schema.description) {
+      this.log(`   ${schema.description}`)
+    }
+    this.log(`   ID: ${schema.id}`)
+    if (schema.url) {
+      this.log(`   URL: ${schema.url}`)
+    }
+    this.log('')
+
+    // Group examples by writability
+    const { writable, readOnly } = groupExamplesByWritability(examples)
+
+    // Show writable properties with examples
+    if (writable.length > 0) {
+      this.log('✏️  Writable Properties (can be set via API)')
+      this.log('='.repeat(80))
+
+      for (const example of writable) {
+        this.log('')
+        this.log(`${example.property_name} (${example.property_type})`)
+        this.log(`  ${example.description}`)
+        this.log('')
+        this.log('  Simple value:')
+        this.log(`  ${JSON.stringify(example.simple_value)}`)
+        this.log('')
+        this.log('  Notion API payload:')
+        const payload = JSON.stringify(example.notion_payload, null, 2)
+        const indentedPayload = payload.split('\n').map(line => `  ${line}`).join('\n')
+        this.log(indentedPayload)
+        this.log('-'.repeat(80))
+      }
+    }
+
+    // Show read-only properties
+    if (readOnly.length > 0) {
+      this.log('')
+      this.log('🔒 Read-Only Properties (cannot be set via API)')
+      this.log('='.repeat(80))
+
+      for (const example of readOnly) {
+        this.log('')
+        this.log(`${example.property_name} (${example.property_type})`)
+        this.log(`  ${example.description}`)
+        this.log('-'.repeat(80))
+      }
+    }
+
+    this.log('')
   }
 
   /**

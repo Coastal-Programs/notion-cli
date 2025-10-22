@@ -15,6 +15,7 @@ export default class PageUpdate extends Command {
         retry: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         columns: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         sort: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         filter: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
@@ -25,6 +26,8 @@ export default class PageUpdate extends Command {
         'no-header': import("@oclif/core/lib/interfaces").Flag<boolean>;
         archived: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         unarchive: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        properties: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        'simple-properties': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
     run(): Promise<void>;

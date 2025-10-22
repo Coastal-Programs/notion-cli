@@ -191,6 +191,63 @@ notion-cli db query "Tasks Database" --json
 notion-cli list --json
 ```
 
+### Cache Management - AI-Friendly Metadata
+AI agents need to know when data is fresh. Get machine-readable cache metadata:
+
+```bash
+# Check cache status and TTLs
+notion-cli cache:info --json
+
+# Sample output:
+# {
+#   "success": true,
+#   "data": {
+#     "in_memory": {
+#       "enabled": true,
+#       "stats": { "hits": 42, "misses": 8, "hit_rate": 84.0 },
+#       "ttls_ms": {
+#         "data_source": 600000,  // 10 minutes
+#         "page": 60000,          // 1 minute
+#         "user": 3600000,        // 1 hour
+#         "block": 30000          // 30 seconds
+#       }
+#     },
+#     "workspace": {
+#       "last_sync": "2025-10-23T14:30:00.000Z",
+#       "cache_age_hours": 2.5,
+#       "is_stale": false,
+#       "databases_cached": 15
+#     },
+#     "recommendations": {
+#       "sync_interval_hours": 24,
+#       "next_sync": "2025-10-24T14:30:00.000Z",
+#       "action_needed": "Cache is fresh"
+#     }
+#   }
+# }
+
+# List databases with cache age metadata
+notion-cli list --json
+
+# Sync with comprehensive metadata
+notion-cli sync --json
+```
+
+**Cache TTLs:**
+- **Workspace cache**: Persists until next `sync` (recommended: every 24 hours)
+- **In-memory cache**:
+  - Data sources: 10 minutes (schemas rarely change)
+  - Pages: 1 minute (frequently updated)
+  - Users: 1 hour (very stable)
+  - Blocks: 30 seconds (most dynamic)
+
+**AI Agent Best Practices:**
+1. Run `cache:info --json` to check freshness before bulk operations
+2. Parse `is_stale` flag to decide whether to re-sync
+3. Use `cache_age_hours` for smart caching decisions
+4. Respect TTL metadata when planning repeated reads
+
+
 ### Exit Codes - Script-Friendly
 ```bash
 notion-cli db retrieve <ID> --json
@@ -216,9 +273,7 @@ notion-cli db retrieve <DATA_SOURCE_ID>
 notion-cli db retrieve "Tasks"
 
 # Query database with filters
-notion-cli db query <ID> \
-  --filter status equals "Done" \
-  --json
+notion-cli db query <ID> --json
 
 # Update database properties
 notion-cli db update <ID> --title "New Title"
@@ -295,9 +350,107 @@ notion-cli sync
 # List cached databases
 notion-cli list --json
 
+# Check cache status
+notion-cli cache:info --json
+
+
 # Configure token
 notion-cli config set-token
 ```
+
+## Database Query Filtering
+
+Filter database queries with three powerful options optimized for AI agents and automation:
+
+### JSON Filter (Primary Method - Recommended for AI)
+
+Use `--filter` with JSON objects matching Notion's filter API format:
+
+```bash
+# Filter by select property
+notion-cli db query <ID> \
+  --filter '{"property": "Status", "select": {"equals": "Done"}}' \
+  --json
+
+# Complex AND filter
+notion-cli db query <ID> \
+  --filter '{"and": [{"property": "Status", "select": {"equals": "Done"}}, {"property": "Priority", "number": {"greater_than": 5}}]}' \
+  --json
+
+# OR filter for multiple conditions
+notion-cli db query <ID> \
+  --filter '{"or": [{"property": "Tags", "multi_select": {"contains": "urgent"}}, {"property": "Tags", "multi_select": {"contains": "bug"}}]}' \
+  --json
+
+# Date filter
+notion-cli db query <ID> \
+  --filter '{"property": "Due Date", "date": {"on_or_before": "2025-12-31"}}' \
+  --json
+```
+
+### Text Search (Human Convenience)
+
+Use `--search` for simple text matching across common properties:
+
+```bash
+# Quick text search (searches Name, Title, Description)
+notion-cli db query <ID> --search "urgent" --json
+
+# Case-sensitive matching
+notion-cli db query <ID> --search "Project Alpha" --json
+```
+
+### File Filter (Complex Queries)
+
+Use `--file-filter` to load complex filters from JSON files:
+
+```bash
+# Create filter file
+cat > high-priority-filter.json << 'EOF'
+{
+  "and": [
+    {"property": "Status", "select": {"equals": "In Progress"}},
+    {"property": "Priority", "number": {"greater_than_or_equal_to": 8}},
+    {"property": "Assigned To", "people": {"is_not_empty": true}}
+  ]
+}
+EOF
+
+# Use filter file
+notion-cli db query <ID> --file-filter ./high-priority-filter.json --json
+```
+
+### Common Filter Examples
+
+**Find completed high-priority tasks:**
+```bash
+notion-cli db query <ID> \
+  --filter '{"and": [{"property": "Status", "select": {"equals": "Done"}}, {"property": "Priority", "number": {"greater_than": 7}}]}' \
+  --json
+```
+
+**Find items due this week:**
+```bash
+notion-cli db query <ID> \
+  --filter '{"property": "Due Date", "date": {"next_week": {}}}' \
+  --json
+```
+
+**Find unassigned tasks:**
+```bash
+notion-cli db query <ID> \
+  --filter '{"property": "Assigned To", "people": {"is_empty": true}}' \
+  --json
+```
+
+**Find items without attachments:**
+```bash
+notion-cli db query <ID> \
+  --filter '{"property": "Attachments", "files": {"is_empty": true}}' \
+  --json
+```
+
+[📖 Full Filter Guide with Examples](./docs/FILTER_GUIDE.md)
 
 ## Output Formats
 
@@ -353,6 +506,32 @@ NOTION_CACHE_DISABLED=true         # Disable all caching
 ```bash
 DEBUG=notion-cli:*                 # Enable debug logging
 ```
+
+### Verbose Logging
+```bash
+# Enable structured event logging to stderr
+NOTION_CLI_VERBOSE=true            # Logs retry events, cache stats to stderr
+NOTION_CLI_DEBUG=true              # Enables DEBUG + VERBOSE modes
+```
+
+**Verbose Mode** provides machine-readable JSON events to stderr for observability:
+- Retry events (rate limits, backoff delays, exhaustion)
+- Cache events (hits, misses, evictions)
+- Circuit breaker state changes
+- Never pollutes stdout JSON output
+
+```bash
+# Enable verbose logging for debugging
+notion-cli db query <ID> --json --verbose 2>debug.log
+
+# View retry events
+cat debug.log | jq 'select(.event == "retry")'
+
+# Monitor rate limiting
+notion-cli db query <ID> --verbose 2>&1 >/dev/null | jq 'select(.reason == "RATE_LIMITED")'
+```
+
+[📖 Full Verbose Logging Guide](./docs/VERBOSE_LOGGING.md)
 
 ## Real-World Examples
 
@@ -449,7 +628,7 @@ export NOTION_RETRY_MAX_DELAY=60000
 **Problem**: Database queries taking too long
 
 **Solution**:
-1. Use filters to reduce data: `--filter status equals "Active"`
+1. Use filters to reduce data: `--filter '{"property": "Status", "select": {"equals": "Active"}}'`
 2. Enable caching: `notion-cli sync`
 3. Use `--compact-json` for faster output
 

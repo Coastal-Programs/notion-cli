@@ -23,6 +23,23 @@ export interface RetryContext {
 export type RetryCallback = (context: RetryContext) => void
 
 /**
+ * Structured retry event for logging to stderr
+ */
+interface RetryEvent {
+  level: 'info' | 'warn' | 'error' | 'debug'
+  event: 'retry' | 'retry_attempt' | 'retry_exhausted' | 'rate_limited'
+  attempt: number
+  max_retries: number
+  reason?: string
+  retry_after_ms?: number
+  url?: string
+  context?: string
+  timestamp: string
+  status_code?: number
+  error_code?: string
+}
+
+/**
  * Default retry configuration
  */
 const DEFAULT_CONFIG: RetryConfig = {
@@ -40,6 +57,59 @@ const DEFAULT_CONFIG: RetryConfig = {
     'internal_server_error',
     'conflict_error',
   ],
+}
+
+/**
+ * Check if verbose logging is enabled
+ */
+function isVerboseEnabled(): boolean {
+  return process.env.DEBUG === 'true' ||
+         process.env.NOTION_CLI_DEBUG === 'true' ||
+         process.env.NOTION_CLI_VERBOSE === 'true'
+}
+
+/**
+ * Log structured retry event to stderr
+ * Never pollutes stdout - safe for JSON output
+ */
+function logRetryEvent(event: RetryEvent): void {
+  // Only log if verbose mode is enabled
+  if (!isVerboseEnabled()) {
+    return
+  }
+
+  // Always write to stderr, never stdout
+  console.error(JSON.stringify(event))
+}
+
+/**
+ * Extract error reason from error object
+ */
+function getErrorReason(error: any): string {
+  if (error.code === 'rate_limited' || error.status === 429) return 'RATE_LIMITED'
+  if (error.status === 503) return 'SERVICE_UNAVAILABLE'
+  if (error.status === 502) return 'BAD_GATEWAY'
+  if (error.status === 504) return 'GATEWAY_TIMEOUT'
+  if (error.status === 500) return 'INTERNAL_SERVER_ERROR'
+  if (error.status === 408) return 'REQUEST_TIMEOUT'
+  if (error.code === 'ECONNRESET') return 'CONNECTION_RESET'
+  if (error.code === 'ETIMEDOUT') return 'TIMEOUT'
+  if (error.code === 'ENOTFOUND') return 'DNS_ERROR'
+  if (error.code === 'EAI_AGAIN') return 'DNS_LOOKUP_FAILED'
+  if (error.code === 'service_unavailable') return 'SERVICE_UNAVAILABLE'
+  if (error.code === 'internal_server_error') return 'INTERNAL_SERVER_ERROR'
+  if (error.code === 'conflict_error') return 'CONFLICT'
+  return 'UNKNOWN'
+}
+
+/**
+ * Extract URL/endpoint from error object
+ */
+function extractUrl(error: any, context?: string): string | undefined {
+  if (error.url) return error.url
+  if (error.request?.url) return error.request.url
+  if (error.config?.url) return error.config.url
+  return context
 }
 
 /**
@@ -125,6 +195,18 @@ export async function fetchWithRetry<T>(
 
   for (let attempt = 1; attempt <= config.maxRetries + 1; attempt++) {
     try {
+      // Log attempt start (if verbose and not first attempt)
+      if (attempt > 1 && isVerboseEnabled()) {
+        logRetryEvent({
+          level: 'info',
+          event: 'retry_attempt',
+          attempt,
+          max_retries: config.maxRetries,
+          context,
+          timestamp: new Date().toISOString(),
+        })
+      }
+
       return await fn()
     } catch (error: any) {
       lastError = error
@@ -133,6 +215,20 @@ export async function fetchWithRetry<T>(
       const shouldRetry = attempt <= config.maxRetries && isRetryableError(error, config)
 
       if (!shouldRetry) {
+        // Log non-retryable error if verbose
+        if (isVerboseEnabled() && attempt > 1) {
+          logRetryEvent({
+            level: 'error',
+            event: 'retry_exhausted',
+            attempt,
+            max_retries: config.maxRetries,
+            reason: getErrorReason(error),
+            context,
+            status_code: error.status,
+            error_code: error.code,
+            timestamp: new Date().toISOString(),
+          })
+        }
         throw error
       }
 
@@ -140,6 +236,37 @@ export async function fetchWithRetry<T>(
       const retryAfter = error.headers?.['retry-after'] || error.headers?.['Retry-After']
       const delay = calculateDelay(attempt, config, retryAfter)
       totalDelay += delay
+
+      // Log rate limit event specifically
+      if (error.status === 429 || error.code === 'rate_limited') {
+        logRetryEvent({
+          level: 'warn',
+          event: 'rate_limited',
+          attempt,
+          max_retries: config.maxRetries,
+          reason: 'RATE_LIMITED',
+          retry_after_ms: delay,
+          url: extractUrl(error, context),
+          context,
+          status_code: error.status,
+          timestamp: new Date().toISOString(),
+        })
+      } else {
+        // Log general retry event
+        logRetryEvent({
+          level: 'warn',
+          event: 'retry',
+          attempt,
+          max_retries: config.maxRetries,
+          reason: getErrorReason(error),
+          retry_after_ms: delay,
+          url: extractUrl(error, context),
+          context,
+          status_code: error.status,
+          error_code: error.code,
+          timestamp: new Date().toISOString(),
+        })
+      }
 
       // Create retry context
       const retryContext: RetryContext = {
@@ -149,19 +276,9 @@ export async function fetchWithRetry<T>(
         totalDelay,
       }
 
-      // Call retry callback if provided
+      // Call retry callback if provided (for custom logging/monitoring)
       if (onRetry) {
         onRetry(retryContext)
-      } else {
-        // Default logging
-        const errorType = error.status === 429 ? 'Rate limited' :
-                         error.status ? `HTTP ${error.status}` :
-                         error.code || 'Network error'
-        const contextStr = context ? ` [${context}]` : ''
-        console.error(
-          `${errorType}${contextStr}. Retrying in ${delay}ms... ` +
-          `(attempt ${attempt}/${config.maxRetries}, total delay: ${totalDelay}ms)`
-        )
       }
 
       // Wait before retrying
@@ -229,9 +346,33 @@ export class CircuitBreaker {
   async execute<T>(fn: () => Promise<T>, retryOptions?: Parameters<typeof fetchWithRetry>[1]): Promise<T> {
     if (this.state === 'open') {
       if (Date.now() < this.nextAttempt) {
+        // Log circuit breaker open event
+        if (isVerboseEnabled()) {
+          logRetryEvent({
+            level: 'error',
+            event: 'retry_exhausted',
+            attempt: 0,
+            max_retries: 0,
+            reason: 'CIRCUIT_OPEN',
+            context: 'Circuit breaker is open',
+            timestamp: new Date().toISOString(),
+          })
+        }
         throw new Error('Circuit breaker is open. Too many failures.')
       }
       this.state = 'half-open'
+
+      // Log circuit breaker half-open event
+      if (isVerboseEnabled()) {
+        logRetryEvent({
+          level: 'info',
+          event: 'retry_attempt',
+          attempt: 1,
+          max_retries: this.successThreshold,
+          context: 'Circuit breaker entering half-open state',
+          timestamp: new Date().toISOString(),
+        })
+      }
     }
 
     try {
@@ -251,6 +392,18 @@ export class CircuitBreaker {
       if (this.successes >= this.successThreshold) {
         this.state = 'closed'
         this.successes = 0
+
+        // Log circuit breaker closed event
+        if (isVerboseEnabled()) {
+          logRetryEvent({
+            level: 'info',
+            event: 'retry_attempt',
+            attempt: this.successThreshold,
+            max_retries: this.successThreshold,
+            context: 'Circuit breaker closed - service recovered',
+            timestamp: new Date().toISOString(),
+          })
+        }
       }
     }
   }
@@ -261,6 +414,20 @@ export class CircuitBreaker {
     if (this.failures >= this.failureThreshold) {
       this.state = 'open'
       this.nextAttempt = Date.now() + this.timeout
+
+      // Log circuit breaker open event
+      if (isVerboseEnabled()) {
+        logRetryEvent({
+          level: 'error',
+          event: 'retry_exhausted',
+          attempt: this.failures,
+          max_retries: this.failureThreshold,
+          reason: 'CIRCUIT_OPENED',
+          retry_after_ms: this.timeout,
+          context: `Circuit breaker opened after ${this.failures} failures`,
+          timestamp: new Date().toISOString(),
+        })
+      }
     }
   }
 

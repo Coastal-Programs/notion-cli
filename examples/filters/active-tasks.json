@@ -1,0 +1,22 @@
+{
+  "and": [
+    {
+      "property": "Status",
+      "select": {
+        "does_not_equal": "Done"
+      }
+    },
+    {
+      "property": "Status",
+      "select": {
+        "does_not_equal": "Cancelled"
+      }
+    },
+    {
+      "property": "Assigned To",
+      "people": {
+        "is_not_empty": true
+      }
+    }
+  ]
+}
