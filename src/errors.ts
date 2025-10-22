@@ -44,10 +44,15 @@ export const wrapNotionError = (error: any): NotionCLIError => {
   }
 
   if (error.status === 401 || error.status === 403) {
+    const isTokenMissing = !process.env.NOTION_TOKEN
+    const message = isTokenMissing
+      ? 'NOTION_TOKEN environment variable is not set.\n\nTo fix:\n  export NOTION_TOKEN="your-token-here"  # Mac/Linux\n  set NOTION_TOKEN=your-token-here       # Windows CMD\n  $env:NOTION_TOKEN="your-token-here"    # Windows PowerShell\n\nGet your token at: https://developers.notion.com/docs/create-a-notion-integration'
+      : 'Authentication failed. Your NOTION_TOKEN may be invalid or expired.\n\nVerify your token at: https://www.notion.so/my-integrations'
+
     return new NotionCLIError(
       ErrorCode.UNAUTHORIZED,
-      'Authentication failed. Check your NOTION_TOKEN.',
-      null,
+      message,
+      { tokenSet: !isTokenMissing },
       error
     )
   }

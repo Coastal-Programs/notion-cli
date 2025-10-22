@@ -31,28 +31,146 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
 
 [📖 Full Enhancement Documentation](./ENHANCEMENTS.md) | [📊 Output Formats Guide](./OUTPUT_FORMATS.md)
 
-## Quick Start
+## Quick Start for AI Agents
 
-```sh
-$ npm install -g Coastal-Programs/notion-cli
-$ export NOTION_TOKEN=secret_xxx...
-$ notion-cli page retrieve <PAGE_ID> --json
-```
+**If you're Claude, GPT, or another AI assistant**, here's everything you need:
 
-* **Get your `NOTION_TOKEN`**: https://developers.notion.com/docs/create-a-notion-integration
-* **Find `PAGE_ID`**: In page URL `https://www.notion.so/Page-title-<PAGE_ID>`
+1. **Install** (choose based on platform):
+   ```bash
+   # Mac/Linux: GitHub install works
+   npm install -g Coastal-Programs/notion-cli
+
+   # Windows: Use local install (GitHub has symlink issues)
+   git clone https://github.com/Coastal-Programs/notion-cli
+   cd notion-cli
+   npm install -g .
+   ```
+
+2. **Set your API token** (ask the human for this):
+   ```bash
+   # Mac/Linux
+   export NOTION_TOKEN="ntn_your_token_here"
+
+   # Windows (Command Prompt)
+   set NOTION_TOKEN=ntn_your_token_here
+
+   # Windows (PowerShell)
+   $env:NOTION_TOKEN="ntn_your_token_here"
+   ```
+
+3. **Verify it works**:
+   ```bash
+   notion-cli user retrieve bot --output json
+   ```
+
+4. **All commands support** `--output json` for machine-readable responses.
+
+**Get your API token**: https://developers.notion.com/docs/create-a-notion-integration
+
+---
 
 ## Installation
 
-**npm (Recommended):**
-```sh
+### Mac/Linux Users
+
+**GitHub Install (Recommended):**
+```bash
 npm install -g Coastal-Programs/notion-cli
 ```
 
-**npx (No install):**
-```sh
+**Local Install (Alternative):**
+```bash
+git clone https://github.com/Coastal-Programs/notion-cli
+cd notion-cli
+npm install -g .
+```
+
+### Windows Users
+
+**⚠️ Windows Note:** GitHub installations create broken symlinks on Windows. Use local install:
+
+```bash
+git clone https://github.com/Coastal-Programs/notion-cli
+cd notion-cli
+npm install -g .
+```
+
+### Using npx (No Install)
+
+**Mac/Linux:**
+```bash
 npx Coastal-Programs/notion-cli page retrieve <PAGE_ID> --json
 ```
+
+**Windows:** npx has the same symlink issue. Use local install method above.
+
+---
+
+## Setup Your API Token
+
+After installation, you need to configure your Notion Integration Token.
+
+### Get Your Token
+1. Go to https://developers.notion.com/
+2. Click "Create new integration"
+3. Copy your "Internal Integration Token" (starts with `ntn_`)
+
+### Set the Token
+
+**Mac/Linux (bash/zsh):**
+```bash
+export NOTION_TOKEN="ntn_your_token_here"
+
+# Make it permanent (add to ~/.bashrc or ~/.zshrc)
+echo 'export NOTION_TOKEN="ntn_your_token_here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Windows (Command Prompt):**
+```cmd
+set NOTION_TOKEN=ntn_your_token_here
+
+REM Make it permanent (system-wide)
+setx NOTION_TOKEN "ntn_your_token_here"
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:NOTION_TOKEN="ntn_your_token_here"
+
+# Make it permanent (current user)
+[System.Environment]::SetEnvironmentVariable('NOTION_TOKEN', 'ntn_your_token_here', 'User')
+```
+
+### Verify Setup
+
+```bash
+notion-cli user retrieve bot --output json
+```
+
+**Expected output:**
+```json
+[
+  {
+    "id": "your-bot-id",
+    "name": "Your Integration Name",
+    "type": "bot",
+    ...
+  }
+]
+```
+
+**If you see an error:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "unauthorized",
+    "message": "API token is invalid"
+  }
+}
+```
+→ Double-check your `NOTION_TOKEN` is set correctly.
 
 ## Performance & Reliability Configuration
 
