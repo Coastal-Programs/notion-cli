@@ -8,6 +8,7 @@ import {
   DataSourceSchema,
 } from '../../utils/schema-extractor'
 import { wrapNotionError } from '../../errors'
+import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbSchema extends Command {
   static description =
@@ -21,6 +22,10 @@ export default class DbSchema extends Command {
     {
       description: 'Get full schema in JSON format (recommended for AI agents)',
       command: '<%= config.bin %> db schema abc123def456 --output json',
+    },
+    {
+      description: 'Get schema using database URL',
+      command: '<%= config.bin %> db schema https://notion.so/DATABASE_ID --output json',
     },
     {
       description: 'Get schema as formatted table',
@@ -51,7 +56,7 @@ export default class DbSchema extends Command {
   static args = {
     data_source_id: Args.string({
       required: true,
-      description: 'Data source ID (the table whose schema you want to extract)',
+      description: 'Data source ID or URL (the table whose schema you want to extract)',
     }),
   }
 
@@ -82,8 +87,11 @@ export default class DbSchema extends Command {
     const { args, flags } = await this.parse(DbSchema)
 
     try {
+      // Resolve ID from URL, direct ID, or name (future)
+      const dataSourceId = await resolveNotionId(args.data_source_id, 'database')
+
       // Fetch data source from Notion (uses caching)
-      const dataSource = await notion.retrieveDataSource(args.data_source_id)
+      const dataSource = await notion.retrieveDataSource(dataSourceId)
 
       // Extract clean schema
       let schema: DataSourceSchema = extractSchema(dataSource)

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBlockPlainText = exports.getPageTitle = exports.getDataSourceTitle = exports.getDbTitle = exports.buildOneDepthJson = exports.buildPagePropUpdateData = exports.buildDatabaseQueryFilter = exports.getFilterFields = exports.outputPrettyTable = exports.outputMarkdownTable = exports.outputCompactJson = exports.outputRawJson = void 0;
+exports.getBlockPlainText = exports.getPageTitle = exports.getDataSourceTitle = exports.getDbTitle = exports.buildOneDepthJson = exports.buildPagePropUpdateData = exports.buildDatabaseQueryFilter = exports.getFilterFields = exports.showRawFlagHint = exports.outputPrettyTable = exports.outputMarkdownTable = exports.outputCompactJson = exports.outputRawJson = void 0;
 const client_1 = require("@notionhq/client");
 const outputRawJson = async (res) => {
     console.log(JSON.stringify(res, null, 2));
@@ -118,6 +118,38 @@ const outputPrettyTable = (data, columns) => {
     console.log(bottomBorder);
 };
 exports.outputPrettyTable = outputPrettyTable;
+/**
+ * Show a hint to users (especially AI assistants) that more data is available with the -r flag
+ * This makes the -r flag more discoverable for automation and AI use cases
+ *
+ * @param itemCount Number of items displayed in the table
+ * @param item The item object to count total fields from
+ * @param visibleFields Number of fields shown in the table (default: 4 for title, object, id, url)
+ */
+function showRawFlagHint(itemCount, item, visibleFields = 4) {
+    // Count total fields in the item
+    let totalFields = visibleFields; // Start with the visible fields (title, object, id, url)
+    if (item) {
+        // For pages and databases, count properties
+        if (item.properties) {
+            totalFields += Object.keys(item.properties).length;
+        }
+        // Add other top-level metadata fields
+        const metadataFields = ['created_time', 'last_edited_time', 'created_by', 'last_edited_by', 'parent', 'archived', 'icon', 'cover'];
+        metadataFields.forEach(field => {
+            if (item[field] !== undefined) {
+                totalFields++;
+            }
+        });
+    }
+    const hiddenFields = totalFields - visibleFields;
+    if (hiddenFields > 0) {
+        const itemText = itemCount === 1 ? 'item' : 'items';
+        console.log(`\nTip: Showing ${visibleFields} of ${totalFields} fields for ${itemCount} ${itemText}.`);
+        console.log(`Use -r flag for full JSON output with all properties (recommended for AI assistants and automation).`);
+    }
+}
+exports.showRawFlagHint = showRawFlagHint;
 const getFilterFields = async (type) => {
     switch (type) {
         case 'checkbox':

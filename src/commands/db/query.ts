@@ -20,10 +20,12 @@ import {
   getDbTitle,
   getDataSourceTitle,
   getPageTitle,
+  showRawFlagHint,
 } from '../../helper'
 import { client } from '../../notion'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
 import { NotionCLIError, wrapNotionError } from '../../errors'
+import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbQuery extends Command {
   static description = 'Query a database'
@@ -32,8 +34,16 @@ export default class DbQuery extends Command {
 
   static examples = [
     {
+      description: 'Query a database with full data (recommended for AI assistants)',
+      command: `$ notion-cli db query DATABASE_ID -r`,
+    },
+    {
       description: 'Query a db with a specific database_id',
       command: `$ notion-cli db query DATABASE_ID`,
+    },
+    {
+      description: 'Query a db using database URL',
+      command: `$ notion-cli db query https://notion.so/DATABASE_ID`,
     },
     {
       description: 'Query a db with a specific database_id and raw filter string',
@@ -80,7 +90,7 @@ export default class DbQuery extends Command {
   static args = {
     database_id: Args.string({
       required: true,
-      description: 'Database or data source ID (required for automation)',
+      description: 'Database or data source ID or URL (required for automation)',
     }),
   }
 
@@ -117,7 +127,7 @@ export default class DbQuery extends Command {
     }),
     raw: Flags.boolean({
       char: 'r',
-      description: 'output raw json',
+      description: 'output raw json (recommended for AI assistants - returns all page data)',
       default: false,
     }),
     ...ux.table.flags(),
@@ -128,10 +138,12 @@ export default class DbQuery extends Command {
   public async run(): Promise<void> {
     const { flags, args } = await this.parse(DbQuery)
 
-    let databaseId = args.database_id
-    let queryParams: QueryDataSourceParameters
-
     try {
+      // Resolve ID from URL, direct ID, or name (future)
+      const databaseId = await resolveNotionId(args.database_id, 'database')
+
+      let queryParams: QueryDataSourceParameters
+
       // Build query parameters
       try {
         if (flags.rawFilter != undefined) {
@@ -217,6 +229,10 @@ export default class DbQuery extends Command {
       // Handle pretty table output
       if (flags.pretty) {
         outputPrettyTable(pages, columns)
+        // Show hint after table output (use first page as sample)
+        if (pages.length > 0) {
+          showRawFlagHint(pages.length, pages[0])
+        }
         process.exit(0)
         return
       }
@@ -246,6 +262,12 @@ export default class DbQuery extends Command {
         ...flags,
       }
       ux.table(pages, columns, options)
+
+      // Show hint after table output to make -r flag discoverable
+      // Use first page as sample to count fields
+      if (pages.length > 0) {
+        showRawFlagHint(pages.length, pages[0])
+      }
       process.exit(0)
     } catch (error) {
       const cliError = wrapNotionError(error)

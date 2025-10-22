@@ -14,14 +14,20 @@ import {
   outputRawJson,
   outputCompactJson,
   outputMarkdownTable,
-  outputPrettyTable
+  outputPrettyTable,
+  showRawFlagHint
 } from '../helper'
-import { OutputFormatFlags } from '../base-flags'
+import { AutomationFlags, OutputFormatFlags } from '../base-flags'
+import { wrapNotionError } from '../errors'
 
 export default class Search extends Command {
   static description = 'Search by title'
 
   static examples = [
+    {
+      description: 'Search with full data (recommended for AI assistants)',
+      command: `$ notion-cli search -q 'My Page' -r`,
+    },
     {
       description: 'Search by title',
       command: `$ notion-cli search -q 'My Page'`,
@@ -69,6 +75,10 @@ export default class Search extends Command {
         'Search by title and output table with specific columns and sort direction and page size and start cursor and property',
       command: `$ notion-cli search -q 'My Page' --columns=title,object -d asc -s 10 -c START_CURSOR_ID -p page`,
     },
+    {
+      description: 'Search and output JSON for automation',
+      command: `$ notion-cli search -q 'My Page' --json`,
+    },
   ]
 
   static flags = {
@@ -100,98 +110,135 @@ export default class Search extends Command {
     }),
     raw: Flags.boolean({
       char: 'r',
-      description: 'output raw json',
+      description: 'output raw json (recommended for AI assistants - returns all search results)',
     }),
     ...ux.table.flags(),
     ...OutputFormatFlags,
+    ...AutomationFlags,
   }
 
   public async run(): Promise<void> {
     const { flags } = await this.parse(Search)
-    const params: SearchParameters = {}
-    if (flags.query) {
-      params.query = flags.query
-    }
-    if (flags.sort_direction) {
-      let direction: 'ascending' | 'descending'
-      if (flags.sort_direction == 'asc') {
-        direction = 'ascending'
-      } else {
-        direction = 'descending'
-      }
-      params.sort = {
-        direction: direction,
-        timestamp: 'last_edited_time',
-      }
-    }
-    if (flags.property == 'data_source' || flags.property == 'page') {
-      params.filter = {
-        value: flags.property,
-        property: 'object',
-      }
-    }
-    if (flags.start_cursor) {
-      params.start_cursor = flags.start_cursor
-    }
-    if (flags.page_size) {
-      params.page_size = flags.page_size
-    }
 
-    if (process.env.DEBUG) {
-      console.log(params)
-    }
-    const res = await notion.search(params)
+    try {
+      const params: SearchParameters = {}
+      if (flags.query) {
+        params.query = flags.query
+      }
+      if (flags.sort_direction) {
+        let direction: 'ascending' | 'descending'
+        if (flags.sort_direction == 'asc') {
+          direction = 'ascending'
+        } else {
+          direction = 'descending'
+        }
+        params.sort = {
+          direction: direction,
+          timestamp: 'last_edited_time',
+        }
+      }
+      if (flags.property == 'data_source' || flags.property == 'page') {
+        params.filter = {
+          value: flags.property,
+          property: 'object',
+        }
+      }
+      if (flags.start_cursor) {
+        params.start_cursor = flags.start_cursor
+      }
+      if (flags.page_size) {
+        params.page_size = flags.page_size
+      }
 
-    // Define columns for table output
-    const columns = {
-      title: {
-        get: (row: any) => {
-          if (row.object == 'database' && isFullDatabase(row)) {
-            return getDbTitle(row)
-          }
-          if (row.object == 'data_source' && isFullDataSource(row)) {
-            return getDataSourceTitle(row)
-          }
-          if (row.object == 'page' && isFullPage(row)) {
-            return getPageTitle(row)
-          }
-          return 'Untitled'
+      if (process.env.DEBUG) {
+        console.log(params)
+      }
+      const res = await notion.search(params)
+
+      // Handle JSON output for automation (takes precedence)
+      if (flags.json) {
+        this.log(JSON.stringify({
+          success: true,
+          data: res,
+          timestamp: new Date().toISOString()
+        }, null, 2))
+        process.exit(0)
+        return
+      }
+
+      // Define columns for table output
+      const columns = {
+        title: {
+          get: (row: any) => {
+            if (row.object == 'database' && isFullDatabase(row)) {
+              return getDbTitle(row)
+            }
+            if (row.object == 'data_source' && isFullDataSource(row)) {
+              return getDataSourceTitle(row)
+            }
+            if (row.object == 'page' && isFullPage(row)) {
+              return getPageTitle(row)
+            }
+            return 'Untitled'
+          },
         },
-      },
-      object: {},
-      id: {},
-      url: {},
-    }
+        object: {},
+        id: {},
+        url: {},
+      }
 
-    // Handle compact JSON output
-    if (flags['compact-json']) {
-      outputCompactJson(res.results)
-      this.exit(0)
-    }
+      // Handle compact JSON output
+      if (flags['compact-json']) {
+        outputCompactJson(res.results)
+        process.exit(0)
+        return
+      }
 
-    // Handle markdown table output
-    if (flags.markdown) {
-      outputMarkdownTable(res.results, columns)
-      this.exit(0)
-    }
+      // Handle markdown table output
+      if (flags.markdown) {
+        outputMarkdownTable(res.results, columns)
+        process.exit(0)
+        return
+      }
 
-    // Handle pretty table output
-    if (flags.pretty) {
-      outputPrettyTable(res.results, columns)
-      this.exit(0)
-    }
+      // Handle pretty table output
+      if (flags.pretty) {
+        outputPrettyTable(res.results, columns)
+        // Show hint after table output (use first result as sample)
+        if (res.results.length > 0) {
+          showRawFlagHint(res.results.length, res.results[0])
+        }
+        process.exit(0)
+        return
+      }
 
-    // Handle raw JSON output
-    if (flags.raw) {
-      outputRawJson(res)
-      this.exit(0)
-    }
+      // Handle raw JSON output
+      if (flags.raw) {
+        outputRawJson(res)
+        process.exit(0)
+        return
+      }
 
-    // Handle table output (default)
-    const options = {
-      printLine: this.log.bind(this),
-      ...flags,
+      // Handle table output (default)
+      const options = {
+        printLine: this.log.bind(this),
+        ...flags,
+      }
+      ux.table(res.results, columns, options)
+
+      // Show hint after table output to make -r flag discoverable
+      // Use first result as sample to count fields
+      if (res.results.length > 0) {
+        showRawFlagHint(res.results.length, res.results[0])
+      }
+    } catch (error) {
+      const cliError = wrapNotionError(error)
+      if (flags.json) {
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
+      } else {
+        this.error(cliError.message)
+      }
+      process.exit(1)
     }
-    ux.table(res.results, columns, options)
   }
 }

@@ -9,12 +9,14 @@ const helper_1 = require("../../helper");
 const notion_1 = require("../../notion");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class DbQuery extends core_1.Command {
     async run() {
         const { flags, args } = await this.parse(DbQuery);
-        let databaseId = args.database_id;
-        let queryParams;
         try {
+            // Resolve ID from URL, direct ID, or name (future)
+            const databaseId = await (0, notion_resolver_1.resolveNotionId)(args.database_id, 'database');
+            let queryParams;
             // Build query parameters
             try {
                 if (flags.rawFilter != undefined) {
@@ -95,6 +97,10 @@ class DbQuery extends core_1.Command {
             // Handle pretty table output
             if (flags.pretty) {
                 (0, helper_1.outputPrettyTable)(pages, columns);
+                // Show hint after table output (use first page as sample)
+                if (pages.length > 0) {
+                    (0, helper_1.showRawFlagHint)(pages.length, pages[0]);
+                }
                 process.exit(0);
                 return;
             }
@@ -121,6 +127,11 @@ class DbQuery extends core_1.Command {
                 ...flags,
             };
             core_1.ux.table(pages, columns, options);
+            // Show hint after table output to make -r flag discoverable
+            // Use first page as sample to count fields
+            if (pages.length > 0) {
+                (0, helper_1.showRawFlagHint)(pages.length, pages[0]);
+            }
             process.exit(0);
         }
         catch (error) {
@@ -140,8 +151,16 @@ DbQuery.description = 'Query a database';
 DbQuery.aliases = ['db:q'];
 DbQuery.examples = [
     {
+        description: 'Query a database with full data (recommended for AI assistants)',
+        command: `$ notion-cli db query DATABASE_ID -r`,
+    },
+    {
         description: 'Query a db with a specific database_id',
         command: `$ notion-cli db query DATABASE_ID`,
+    },
+    {
+        description: 'Query a db using database URL',
+        command: `$ notion-cli db query https://notion.so/DATABASE_ID`,
     },
     {
         description: 'Query a db with a specific database_id and raw filter string',
@@ -187,7 +206,7 @@ DbQuery.examples = [
 DbQuery.args = {
     database_id: core_1.Args.string({
         required: true,
-        description: 'Database or data source ID (required for automation)',
+        description: 'Database or data source ID or URL (required for automation)',
     }),
 };
 DbQuery.flags = {
@@ -223,7 +242,7 @@ DbQuery.flags = {
     }),
     raw: core_1.Flags.boolean({
         char: 'r',
-        description: 'output raw json',
+        description: 'output raw json (recommended for AI assistants - returns all page data)',
         default: false,
     }),
     ...core_1.ux.table.flags(),

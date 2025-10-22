@@ -15,6 +15,15 @@ export declare const outputMarkdownTable: (data: any[], columns: Record<string, 
  * Enhanced table format with better visual separation
  */
 export declare const outputPrettyTable: (data: any[], columns: Record<string, any>) => void;
+/**
+ * Show a hint to users (especially AI assistants) that more data is available with the -r flag
+ * This makes the -r flag more discoverable for automation and AI use cases
+ *
+ * @param itemCount Number of items displayed in the table
+ * @param item The item object to count total fields from
+ * @param visibleFields Number of fields shown in the table (default: 4 for title, object, id, url)
+ */
+export declare function showRawFlagHint(itemCount: number, item: any, visibleFields?: number): void;
 export declare const getFilterFields: (type: string) => Promise<{
     title: string;
 }[]>;

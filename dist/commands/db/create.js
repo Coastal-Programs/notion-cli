@@ -5,17 +5,20 @@ const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class DbCreate extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(DbCreate);
-        console.log(`Creating a database in page ${args.page_id}`);
-        const dbTitle = flags.title;
         try {
+            // Resolve ID from URL, direct ID, or name (future)
+            const pageId = await (0, notion_resolver_1.resolveNotionId)(args.page_id, 'page');
+            console.log(`Creating a database in page ${pageId}`);
+            const dbTitle = flags.title;
             // TODO: support other properties
             const dbProps = {
                 parent: {
                     type: 'page_id',
-                    page_id: args.page_id,
+                    page_id: pageId,
                 },
                 title: [
                     {
@@ -89,12 +92,16 @@ DbCreate.examples = [
         command: `$ notion-cli db create PAGE_ID -t 'My Database'`,
     },
     {
+        description: 'Create a database using page URL',
+        command: `$ notion-cli db create https://notion.so/PAGE_ID -t 'My Database'`,
+    },
+    {
         description: 'Create a database with an initial data source and output raw json',
         command: `$ notion-cli db create PAGE_ID -t 'My Database' -r`,
     },
 ];
 DbCreate.args = {
-    page_id: core_1.Args.string({ required: true, description: 'Parent page ID where the database will be created' }),
+    page_id: core_1.Args.string({ required: true, description: 'Parent page ID or URL where the database will be created' }),
 };
 DbCreate.flags = {
     title: core_1.Flags.string({

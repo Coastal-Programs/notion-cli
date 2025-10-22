@@ -7,6 +7,7 @@ import * as notion from '../../notion'
 import { outputRawJson, getDataSourceTitle } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
 import { NotionCLIError, wrapNotionError } from '../../errors'
+import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbUpdate extends Command {
   static description = 'Update a data source (table) title and properties'
@@ -19,6 +20,10 @@ export default class DbUpdate extends Command {
       command: `$ notion-cli db update DATA_SOURCE_ID -t 'My Data Source'`,
     },
     {
+      description: 'Update a data source via URL',
+      command: `$ notion-cli db update https://notion.so/DATABASE_ID -t 'My Data Source'`,
+    },
+    {
       description: 'Update a data source with a specific data_source_id and output raw json',
       command: `$ notion-cli db update DATA_SOURCE_ID -t 'My Table' -r`,
     },
@@ -27,7 +32,7 @@ export default class DbUpdate extends Command {
   static args = {
     database_id: Args.string({
       required: true,
-      description: 'Data source ID (the ID of the table you want to update)',
+      description: 'Data source ID or URL (the ID of the table you want to update)',
     }),
   }
 
@@ -48,10 +53,11 @@ export default class DbUpdate extends Command {
   public async run(): Promise<void> {
     const { args, flags } = await this.parse(DbUpdate)
 
-    const dataSourceId = args.database_id // Keep arg name for backward compatibility
-    const dsTitle = flags.title
-
     try {
+      // Resolve ID from URL, direct ID, or name (future)
+      const dataSourceId = await resolveNotionId(args.database_id, 'database')
+      const dsTitle = flags.title
+
       // TODO: support other properties (description, properties schema, etc.)
       const dsProps: UpdateDataSourceParameters = {
         data_source_id: dataSourceId,

@@ -4,12 +4,15 @@ const core_1 = require("@oclif/core");
 const notion = require("../../notion");
 const schema_extractor_1 = require("../../utils/schema-extractor");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class DbSchema extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(DbSchema);
         try {
+            // Resolve ID from URL, direct ID, or name (future)
+            const dataSourceId = await (0, notion_resolver_1.resolveNotionId)(args.data_source_id, 'database');
             // Fetch data source from Notion (uses caching)
-            const dataSource = await notion.retrieveDataSource(args.data_source_id);
+            const dataSource = await notion.retrieveDataSource(dataSourceId);
             // Extract clean schema
             let schema = (0, schema_extractor_1.extractSchema)(dataSource);
             // Filter properties if specified
@@ -144,6 +147,10 @@ DbSchema.examples = [
         command: '<%= config.bin %> db schema abc123def456 --output json',
     },
     {
+        description: 'Get schema using database URL',
+        command: '<%= config.bin %> db schema https://notion.so/DATABASE_ID --output json',
+    },
+    {
         description: 'Get schema as formatted table',
         command: '<%= config.bin %> db schema abc123def456',
     },
@@ -171,7 +178,7 @@ DbSchema.examples = [
 DbSchema.args = {
     data_source_id: core_1.Args.string({
         required: true,
-        description: 'Data source ID (the table whose schema you want to extract)',
+        description: 'Data source ID or URL (the table whose schema you want to extract)',
     }),
 };
 DbSchema.flags = {

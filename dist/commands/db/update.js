@@ -5,12 +5,14 @@ const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class DbUpdate extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(DbUpdate);
-        const dataSourceId = args.database_id; // Keep arg name for backward compatibility
-        const dsTitle = flags.title;
         try {
+            // Resolve ID from URL, direct ID, or name (future)
+            const dataSourceId = await (0, notion_resolver_1.resolveNotionId)(args.database_id, 'database');
+            const dsTitle = flags.title;
             // TODO: support other properties (description, properties schema, etc.)
             const dsProps = {
                 data_source_id: dataSourceId,
@@ -79,6 +81,10 @@ DbUpdate.examples = [
         command: `$ notion-cli db update DATA_SOURCE_ID -t 'My Data Source'`,
     },
     {
+        description: 'Update a data source via URL',
+        command: `$ notion-cli db update https://notion.so/DATABASE_ID -t 'My Data Source'`,
+    },
+    {
         description: 'Update a data source with a specific data_source_id and output raw json',
         command: `$ notion-cli db update DATA_SOURCE_ID -t 'My Table' -r`,
     },
@@ -86,7 +92,7 @@ DbUpdate.examples = [
 DbUpdate.args = {
     database_id: core_1.Args.string({
         required: true,
-        description: 'Data source ID (the ID of the table you want to update)',
+        description: 'Data source ID or URL (the ID of the table you want to update)',
     }),
 };
 DbUpdate.flags = {

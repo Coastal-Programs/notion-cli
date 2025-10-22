@@ -5,11 +5,13 @@ const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class DbRetrieve extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(DbRetrieve);
-        const dataSourceId = args.database_id; // Keep arg name for backward compatibility
         try {
+            // Resolve ID from URL, direct ID, or name (future)
+            const dataSourceId = await (0, notion_resolver_1.resolveNotionId)(args.database_id, 'database');
             const res = await notion.retrieveDataSource(dataSourceId);
             // Define columns for table output
             const columns = {
@@ -37,6 +39,8 @@ class DbRetrieve extends core_1.Command {
             // Handle pretty table output
             if (flags.pretty) {
                 (0, helper_1.outputPrettyTable)([res], columns);
+                // Show hint after table output
+                (0, helper_1.showRawFlagHint)(1, res);
                 process.exit(0);
                 return;
             }
@@ -62,6 +66,8 @@ class DbRetrieve extends core_1.Command {
                 ...flags,
             };
             core_1.ux.table([res], columns, options);
+            // Show hint after table output to make -r flag discoverable
+            (0, helper_1.showRawFlagHint)(1, res);
             process.exit(0);
         }
         catch (error) {
@@ -81,8 +87,16 @@ DbRetrieve.description = 'Retrieve a data source (table) schema and properties';
 DbRetrieve.aliases = ['db:r', 'ds:retrieve', 'ds:r'];
 DbRetrieve.examples = [
     {
+        description: 'Retrieve a data source with full schema (recommended for AI assistants)',
+        command: 'notion-cli db retrieve DATA_SOURCE_ID -r',
+    },
+    {
         description: 'Retrieve a data source schema via data_source_id',
         command: 'notion-cli db retrieve DATA_SOURCE_ID',
+    },
+    {
+        description: 'Retrieve a data source via URL',
+        command: 'notion-cli db retrieve https://notion.so/DATABASE_ID',
     },
     {
         description: 'Retrieve a data source and output as markdown table',
@@ -96,13 +110,13 @@ DbRetrieve.examples = [
 DbRetrieve.args = {
     database_id: core_1.Args.string({
         required: true,
-        description: 'Data source ID (the ID of the table whose schema you want to retrieve)',
+        description: 'Data source ID or URL (the ID of the table whose schema you want to retrieve)',
     }),
 };
 DbRetrieve.flags = {
     raw: core_1.Flags.boolean({
         char: 'r',
-        description: 'output raw json',
+        description: 'output raw json (recommended for AI assistants - returns full schema)',
     }),
     ...core_1.ux.table.flags(),
     ...base_flags_1.AutomationFlags,

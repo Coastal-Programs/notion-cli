@@ -5,6 +5,9 @@ import {
   BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
 import { getBlockPlainText, outputRawJson } from '../../helper'
+import { resolveNotionId } from '../../utils/notion-resolver'
+import { AutomationFlags } from '../../base-flags'
+import { wrapNotionError } from '../../errors'
 
 export default class BlockAppend extends Command {
   static description = 'Append block children'
@@ -17,6 +20,10 @@ export default class BlockAppend extends Command {
       command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]'`,
     },
     {
+      description: 'Append block children via URL',
+      command: `$ notion-cli block append -b https://notion.so/BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]'`,
+    },
+    {
       description: 'Append block children after a block',
       command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]' -a AFTER_BLOCK_ID`,
     },
@@ -24,12 +31,16 @@ export default class BlockAppend extends Command {
       description: 'Append block children and output raw json',
       command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]' -r`,
     },
+    {
+      description: 'Append block children and output JSON for automation',
+      command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]' --json`,
+    },
   ]
 
   static flags = {
     block_id: Flags.string({
       char: 'b',
-      description: 'Parent block ID',
+      description: 'Parent block ID or URL',
       required: true,
     }),
     children: Flags.string({
@@ -39,46 +50,81 @@ export default class BlockAppend extends Command {
     }),
     after: Flags.string({
       char: 'a',
-      description: 'Block ID to append after (optional)',
+      description: 'Block ID or URL to append after (optional)',
     }),
     raw: Flags.boolean({
       char: 'r',
       description: 'output raw json',
     }),
     ...ux.table.flags(),
+    ...AutomationFlags,
   }
 
   // TODO: Add support children params building prompt
   public async run(): Promise<void> {
     const { flags } = await this.parse(BlockAppend)
-    const params: AppendBlockChildrenParameters = {
-      block_id: flags.block_id,
-      children: JSON.parse(flags.children),
-    }
-    if (flags.after) {
-      params.after = flags.after
-    }
-    const res = await notion.appendBlockChildren(params)
-    if (flags.raw) {
-      outputRawJson(res)
-      this.exit(0)
-    }
 
-    const columns = {
-      object: {},
-      id: {},
-      type: {},
-      parent: {},
-      content: {
-        get: (row: BlockObjectResponse) => {
-          return getBlockPlainText(row)
+    try {
+      // Resolve block ID from URL or direct ID
+      const blockId = await resolveNotionId(flags.block_id, 'page')
+
+      const params: AppendBlockChildrenParameters = {
+        block_id: blockId,
+        children: JSON.parse(flags.children),
+      }
+
+      if (flags.after) {
+        // Resolve after block ID from URL or direct ID
+        const afterBlockId = await resolveNotionId(flags.after, 'page')
+        params.after = afterBlockId
+      }
+
+      const res = await notion.appendBlockChildren(params)
+
+      // Handle JSON output for automation
+      if (flags.json) {
+        this.log(JSON.stringify({
+          success: true,
+          data: res,
+          timestamp: new Date().toISOString()
+        }, null, 2))
+        process.exit(0)
+        return
+      }
+
+      // Handle raw JSON output (legacy)
+      if (flags.raw) {
+        outputRawJson(res)
+        process.exit(0)
+        return
+      }
+
+      // Handle table output
+      const columns = {
+        object: {},
+        id: {},
+        type: {},
+        parent: {},
+        content: {
+          get: (row: BlockObjectResponse) => {
+            return getBlockPlainText(row)
+          },
         },
-      },
+      }
+      const options = {
+        printLine: this.log.bind(this),
+        ...flags,
+      }
+      ux.table(res.results, columns, options)
+      process.exit(0)
+    } catch (error) {
+      const cliError = wrapNotionError(error)
+      if (flags.json) {
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
+      } else {
+        this.error(cliError.message)
+      }
+      process.exit(1)
     }
-    const options = {
-      printLine: this.log.bind(this),
-      ...flags,
-    }
-    ux.table(res.results, columns, options)
   }
 }

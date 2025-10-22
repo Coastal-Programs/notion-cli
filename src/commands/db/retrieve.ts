@@ -6,10 +6,12 @@ import {
   outputCompactJson,
   outputMarkdownTable,
   outputPrettyTable,
-  getDataSourceTitle
+  getDataSourceTitle,
+  showRawFlagHint
 } from '../../helper'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
 import { NotionCLIError, wrapNotionError } from '../../errors'
+import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbRetrieve extends Command {
   static description = 'Retrieve a data source (table) schema and properties'
@@ -18,8 +20,16 @@ export default class DbRetrieve extends Command {
 
   static examples = [
     {
+      description: 'Retrieve a data source with full schema (recommended for AI assistants)',
+      command: 'notion-cli db retrieve DATA_SOURCE_ID -r',
+    },
+    {
       description: 'Retrieve a data source schema via data_source_id',
       command: 'notion-cli db retrieve DATA_SOURCE_ID',
+    },
+    {
+      description: 'Retrieve a data source via URL',
+      command: 'notion-cli db retrieve https://notion.so/DATABASE_ID',
     },
     {
       description: 'Retrieve a data source and output as markdown table',
@@ -34,14 +44,14 @@ export default class DbRetrieve extends Command {
   static args = {
     database_id: Args.string({
       required: true,
-      description: 'Data source ID (the ID of the table whose schema you want to retrieve)',
+      description: 'Data source ID or URL (the ID of the table whose schema you want to retrieve)',
     }),
   }
 
   static flags = {
     raw: Flags.boolean({
       char: 'r',
-      description: 'output raw json',
+      description: 'output raw json (recommended for AI assistants - returns full schema)',
     }),
     ...ux.table.flags(),
     ...AutomationFlags,
@@ -51,9 +61,10 @@ export default class DbRetrieve extends Command {
   public async run(): Promise<void> {
     const { args, flags } = await this.parse(DbRetrieve)
 
-    const dataSourceId = args.database_id // Keep arg name for backward compatibility
-
     try {
+      // Resolve ID from URL, direct ID, or name (future)
+      const dataSourceId = await resolveNotionId(args.database_id, 'database')
+
       const res = await notion.retrieveDataSource(dataSourceId)
 
       // Define columns for table output
@@ -85,6 +96,8 @@ export default class DbRetrieve extends Command {
       // Handle pretty table output
       if (flags.pretty) {
         outputPrettyTable([res], columns)
+        // Show hint after table output
+        showRawFlagHint(1, res)
         process.exit(0)
         return
       }
@@ -113,6 +126,9 @@ export default class DbRetrieve extends Command {
         ...flags,
       }
       ux.table([res], columns, options)
+
+      // Show hint after table output to make -r flag discoverable
+      showRawFlagHint(1, res)
       process.exit(0)
     } catch (error) {
       const cliError = wrapNotionError(error)

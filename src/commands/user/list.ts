@@ -2,6 +2,8 @@ import { Command, Flags, ux } from '@oclif/core'
 import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../notion'
 import { outputRawJson } from '../../helper'
+import { AutomationFlags } from '../../base-flags'
+import { wrapNotionError } from '../../errors'
 
 export default class UserList extends Command {
   static description = 'List all users'
@@ -17,6 +19,10 @@ export default class UserList extends Command {
       description: 'List all users and output raw json',
       command: `$ notion-cli user list -r`,
     },
+    {
+      description: 'List all users and output JSON for automation',
+      command: `$ notion-cli user list --json`,
+    },
   ]
 
   static flags = {
@@ -25,36 +31,64 @@ export default class UserList extends Command {
       description: 'output raw json',
     }),
     ...ux.table.flags(),
+    ...AutomationFlags,
   }
 
   public async run(): Promise<void> {
     const { args, flags } = await this.parse(UserList)
-    const res = await notion.listUser()
-    if (flags.raw) {
-      outputRawJson(res)
-      this.exit(0)
-    }
 
-    const columns = {
-      id: {},
-      name: {},
-      object: {},
-      type: {},
-      person_or_bot: {
-        header: 'person/bot',
-        get: (row: UserObjectResponse) => {
-          if (row.type === 'person') {
-            return row.person
-          }
-          return row.bot
+    try {
+      const res = await notion.listUser()
+
+      // Handle JSON output for automation
+      if (flags.json) {
+        this.log(JSON.stringify({
+          success: true,
+          data: res,
+          timestamp: new Date().toISOString()
+        }, null, 2))
+        process.exit(0)
+        return
+      }
+
+      // Handle raw JSON output (legacy)
+      if (flags.raw) {
+        outputRawJson(res)
+        process.exit(0)
+        return
+      }
+
+      // Handle table output
+      const columns = {
+        id: {},
+        name: {},
+        object: {},
+        type: {},
+        person_or_bot: {
+          header: 'person/bot',
+          get: (row: UserObjectResponse) => {
+            if (row.type === 'person') {
+              return row.person
+            }
+            return row.bot
+          },
         },
-      },
-      avatar_url: {},
+        avatar_url: {},
+      }
+      const options = {
+        printLine: this.log.bind(this),
+        ...flags,
+      }
+      ux.table(res.results, columns, options)
+      process.exit(0)
+    } catch (error) {
+      const cliError = wrapNotionError(error)
+      if (flags.json) {
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
+      } else {
+        this.error(cliError.message)
+      }
+      process.exit(1)
     }
-    const options = {
-      printLine: this.log.bind(this),
-      ...flags,
-    }
-    ux.table(res.results, columns, options)
   }
 }

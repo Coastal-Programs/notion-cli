@@ -7,6 +7,7 @@ import * as notion from '../../notion'
 import { outputRawJson, getDbTitle } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
 import { NotionCLIError, wrapNotionError } from '../../errors'
+import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbCreate extends Command {
   static description = 'Create a database with an initial data source (table)'
@@ -19,13 +20,17 @@ export default class DbCreate extends Command {
       command: `$ notion-cli db create PAGE_ID -t 'My Database'`,
     },
     {
+      description: 'Create a database using page URL',
+      command: `$ notion-cli db create https://notion.so/PAGE_ID -t 'My Database'`,
+    },
+    {
       description: 'Create a database with an initial data source and output raw json',
       command: `$ notion-cli db create PAGE_ID -t 'My Database' -r`,
     },
   ]
 
   static args = {
-    page_id: Args.string({ required: true, description: 'Parent page ID where the database will be created' }),
+    page_id: Args.string({ required: true, description: 'Parent page ID or URL where the database will be created' }),
   }
 
   static flags = {
@@ -44,16 +49,19 @@ export default class DbCreate extends Command {
 
   public async run(): Promise<void> {
     const { args, flags } = await this.parse(DbCreate)
-    console.log(`Creating a database in page ${args.page_id}`)
-
-    const dbTitle = flags.title
 
     try {
+      // Resolve ID from URL, direct ID, or name (future)
+      const pageId = await resolveNotionId(args.page_id, 'page')
+      console.log(`Creating a database in page ${pageId}`)
+
+      const dbTitle = flags.title
+
       // TODO: support other properties
       const dbProps: CreateDatabaseParameters = {
         parent: {
           type: 'page_id',
-          page_id: args.page_id,
+          page_id: pageId,
         },
         title: [
           {
