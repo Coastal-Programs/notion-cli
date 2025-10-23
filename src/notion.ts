@@ -415,3 +415,103 @@ export { cacheManager } from './cache'
  * Export retry utilities for external use
  */
 export { fetchWithRetry as enhancedFetchWithRetry, CircuitBreaker } from './retry'
+
+/**
+ * Recursively retrieve a page with all its blocks and nested content
+ * @param pageId - The ID of the page to retrieve
+ * @param depth - Current recursion depth (internal use)
+ * @param maxDepth - Maximum depth to recurse (default: 3)
+ * @returns Object containing page metadata, blocks, and optional warnings
+ */
+export const retrievePageRecursive = async (
+  pageId: string,
+  depth = 0,
+  maxDepth = 3
+): Promise<{
+  page: any
+  blocks: any[]
+  warnings?: Array<{
+    block_id: string
+    type: string
+    notion_type?: string
+    message: string
+    has_children: boolean
+  }>
+}> => {
+  // Prevent infinite recursion
+  if (depth >= maxDepth) {
+    return {
+      page: null,
+      blocks: [],
+      warnings: [
+        {
+          block_id: pageId,
+          type: 'max_depth_reached',
+          message: `Maximum recursion depth of ${maxDepth} reached`,
+          has_children: false,
+        },
+      ],
+    }
+  }
+
+  // Retrieve the page
+  const page = await retrievePage({ page_id: pageId })
+
+  // Retrieve all blocks (children)
+  const blocksResponse = await retrieveBlockChildren(pageId)
+  const blocks = blocksResponse.results || []
+
+  const warnings: any[] = []
+
+  // Recursively fetch nested blocks
+  for (const block of blocks) {
+    // Handle unsupported blocks
+    if (block.type === 'unsupported') {
+      warnings.push({
+        block_id: block.id,
+        type: 'unsupported',
+        notion_type: (block as any).unsupported?.type || 'unknown',
+        message: `Block type '${(block as any).unsupported?.type || 'unknown'}' not supported by Notion API`,
+        has_children: block.has_children,
+      })
+      continue
+    }
+
+    // Recursively fetch children for blocks that have them
+    if (block.has_children) {
+      try {
+        const childrenResponse = await retrieveBlockChildren(block.id)
+        ;(block as any).children = childrenResponse.results || []
+
+        // If this is a child_page block, recursively fetch that page too
+        if (block.type === 'child_page' && depth + 1 < maxDepth) {
+          const childPageData = await retrievePageRecursive(
+            block.id,
+            depth + 1,
+            maxDepth
+          )
+          ;(block as any).child_page_details = childPageData
+
+          // Merge warnings from recursive calls
+          if (childPageData.warnings) {
+            warnings.push(...childPageData.warnings)
+          }
+        }
+      } catch (error) {
+        // If we can't fetch children, add a warning
+        warnings.push({
+          block_id: block.id,
+          type: 'fetch_error',
+          message: `Failed to fetch children for block: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          has_children: true,
+        })
+      }
+    }
+  }
+
+  return {
+    page,
+    blocks,
+    ...(warnings.length > 0 && { warnings }),
+  }
+}
