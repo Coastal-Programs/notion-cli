@@ -41,35 +41,12 @@ export default class Whoami extends Command {
     try {
       // Verify NOTION_TOKEN is set
       if (!process.env.NOTION_TOKEN) {
-        const error = new NotionCLIError(
-          ErrorCode.UNAUTHORIZED,
-          'NOTION_TOKEN environment variable is not set',
-          {
-            suggestions: [
-              'Set token: export NOTION_TOKEN="your-token-here"  # Mac/Linux',
-              'Set token: set NOTION_TOKEN=your-token-here       # Windows CMD',
-              'Set token: $env:NOTION_TOKEN="your-token-here"    # Windows PowerShell',
-              'Get new token: https://developers.notion.com/docs/create-a-notion-integration',
-            ]
-          }
-        )
+        const error = NotionCLIErrorFactory.tokenMissing()
 
         if (flags.json) {
-          this.log(JSON.stringify({
-            success: false,
-            error: {
-              code: error.code,
-              message: error.message,
-              suggestions: error.details?.suggestions || [],
-            },
-            metadata: {
-              timestamp: new Date().toISOString(),
-              command: 'whoami',
-              execution_time_ms: Date.now() - startTime,
-            }
-          }, null, 2))
+          this.log(JSON.stringify(error.toJSON(), null, 2))
         } else {
-          this.error(error.message)
+          this.error(error.toHumanString())
         }
 
         process.exit(1)
@@ -215,49 +192,15 @@ export default class Whoami extends Command {
 
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-
-      // Build suggestions based on error type
-      const suggestions: string[] = []
-
-      if (cliError.code === ErrorCode.UNAUTHORIZED) {
-        suggestions.push('Check NOTION_TOKEN: echo $NOTION_TOKEN')
-        suggestions.push('Verify token at: https://www.notion.so/my-integrations')
-        suggestions.push('Get new token: https://developers.notion.com/docs/create-a-notion-integration')
-      } else if (cliError.code === ErrorCode.RATE_LIMITED) {
-        suggestions.push('Wait a moment and try again')
-        suggestions.push('Rate limit will reset automatically')
-      } else {
-        suggestions.push('Check your internet connection')
-        suggestions.push('Verify Notion API status: https://status.notion.so')
-        suggestions.push('Try again with --no-cache flag')
-      }
+      const cliError = wrapNotionError(error, {
+        endpoint: 'users.botUser',
+        resourceType: 'user'
+      })
 
       if (flags.json) {
-        this.log(JSON.stringify({
-          success: false,
-          error: {
-            code: cliError.code,
-            message: cliError.message,
-            suggestions,
-            details: cliError.details,
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            command: 'whoami',
-            execution_time_ms: Date.now() - startTime,
-          }
-        }, null, 2))
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.log('\nConnection Failed')
-        this.log('='.repeat(60))
-        this.log(`Error:       ${cliError.code}`)
-        this.log(`Message:     ${cliError.message}`)
-        this.log('\nSuggestions:')
-        suggestions.forEach(suggestion => {
-          this.log(`  - ${suggestion}`)
-        })
-        this.log('='.repeat(60))
+        this.error(cliError.toHumanString())
       }
 
       process.exit(1)

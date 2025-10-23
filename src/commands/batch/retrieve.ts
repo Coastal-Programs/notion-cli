@@ -10,6 +10,7 @@ import {
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
 import {
   NotionCLIError,
+  NotionCLIErrorCode,
   wrapNotionError
 } from '../../errors'
 import { PageObjectResponse, BlockObjectResponse, GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints'
@@ -129,7 +130,12 @@ export default class BatchRetrieve extends Command {
           data = await notion.retrieveDataSource(id)
           break
         default:
-          throw new NotionCLIError(`Invalid resource type: ${type}`, 'VALIDATION_ERROR')
+          throw new NotionCLIError(
+            NotionCLIErrorCode.VALIDATION_ERROR,
+            `Invalid resource type: ${type}`,
+            [],
+            { userInput: type, resourceType: type as any }
+          )
       }
 
       return {
@@ -174,8 +180,18 @@ export default class BatchRetrieve extends Command {
 
       if (ids.length === 0) {
         throw new NotionCLIError(
+          NotionCLIErrorCode.VALIDATION_ERROR,
           'No IDs provided. Use --ids flag, positional argument, or pipe IDs via stdin',
-          'VALIDATION_ERROR'
+          [
+            {
+              description: 'Provide IDs via --ids flag',
+              command: 'notion-cli batch retrieve --ids ID1,ID2,ID3'
+            },
+            {
+              description: 'Or pipe IDs from a file',
+              command: 'cat ids.txt | notion-cli batch retrieve'
+            }
+          ]
         )
       }
 

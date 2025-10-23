@@ -21,6 +21,7 @@ import {
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
 import {
   NotionCLIError,
+  NotionCLIErrorCode,
   NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
@@ -169,26 +170,34 @@ export default class Search extends Command {
       // Validate date filters
       if (flags['created-after'] && !dayjs(flags['created-after']).isValid()) {
         throw new NotionCLIError(
-          'VALIDATION_ERROR' as any,
-          `Invalid date format for --created-after: ${flags['created-after']}. Use ISO 8601 format (YYYY-MM-DD).`
+          NotionCLIErrorCode.VALIDATION_ERROR,
+          `Invalid date format for --created-after: ${flags['created-after']}. Use ISO 8601 format (YYYY-MM-DD).`,
+          [],
+          { userInput: flags['created-after'] }
         )
       }
       if (flags['created-before'] && !dayjs(flags['created-before']).isValid()) {
         throw new NotionCLIError(
-          'VALIDATION_ERROR' as any,
-          `Invalid date format for --created-before: ${flags['created-before']}. Use ISO 8601 format (YYYY-MM-DD).`
+          NotionCLIErrorCode.VALIDATION_ERROR,
+          `Invalid date format for --created-before: ${flags['created-before']}. Use ISO 8601 format (YYYY-MM-DD).`,
+          [],
+          { userInput: flags['created-before'] }
         )
       }
       if (flags['edited-after'] && !dayjs(flags['edited-after']).isValid()) {
         throw new NotionCLIError(
-          'VALIDATION_ERROR' as any,
-          `Invalid date format for --edited-after: ${flags['edited-after']}. Use ISO 8601 format (YYYY-MM-DD).`
+          NotionCLIErrorCode.VALIDATION_ERROR,
+          `Invalid date format for --edited-after: ${flags['edited-after']}. Use ISO 8601 format (YYYY-MM-DD).`,
+          [],
+          { userInput: flags['edited-after'] }
         )
       }
       if (flags['edited-before'] && !dayjs(flags['edited-before']).isValid()) {
         throw new NotionCLIError(
-          'VALIDATION_ERROR' as any,
-          `Invalid date format for --edited-before: ${flags['edited-before']}. Use ISO 8601 format (YYYY-MM-DD).`
+          NotionCLIErrorCode.VALIDATION_ERROR,
+          `Invalid date format for --edited-before: ${flags['edited-before']}. Use ISO 8601 format (YYYY-MM-DD).`,
+          [],
+          { userInput: flags['edited-before'] }
         )
       }
 
