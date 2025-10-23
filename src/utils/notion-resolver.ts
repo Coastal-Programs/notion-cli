@@ -16,7 +16,7 @@
  */
 
 import { extractNotionId, isNotionUrl } from './notion-url-parser'
-import { NotionCLIError, ErrorCode, wrapNotionError } from '../errors'
+import { NotionCLIError, NotionCLIErrorCode, wrapNotionError } from '../errors/enhanced-errors'
 import { loadCache } from './workspace-cache'
 import { search, retrieveDataSource } from '../notion'
 import { isFullPage } from '@notionhq/client'
@@ -58,8 +58,9 @@ export async function resolveNotionId(
 ): Promise<string> {
   if (!input || typeof input !== 'string') {
     throw new NotionCLIError(
-      ErrorCode.VALIDATION_ERROR,
-      `Invalid input: expected a ${type} name, ID, or URL`
+      NotionCLIErrorCode.VALIDATION_ERROR,
+      `Invalid input: expected a ${type} name, ID, or URL`,
+      []
     )
   }
 
@@ -76,10 +77,11 @@ export async function resolveNotionId(
       return extractedId
     } catch (error) {
       throw new NotionCLIError(
-        ErrorCode.VALIDATION_ERROR,
+        NotionCLIErrorCode.INVALID_URL,
         `Invalid Notion URL: ${trimmed}\n\n` +
         `Expected format: https://www.notion.so/{id}\n` +
         `Example: https://www.notion.so/1fb79d4c71bb8032b722c82305b63a00`,
+        [],
         { originalError: error }
       )
     }
@@ -105,12 +107,13 @@ export async function resolveNotionId(
 
   // Nothing found - throw helpful error
   throw new NotionCLIError(
-    ErrorCode.NOT_FOUND,
+    NotionCLIErrorCode.NOT_FOUND,
     `${type === 'database' ? 'Database' : 'Page'} "${input}" not found.\n\n` +
     `Try:\n` +
     `  1. Run 'notion-cli sync' to refresh your workspace index\n` +
     `  2. Use the full Notion URL instead\n` +
-    `  3. Check available databases with 'notion-cli list'`
+    `  3. Check available databases with 'notion-cli list'`,
+    []
   )
 }
 

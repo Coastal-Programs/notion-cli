@@ -3,7 +3,7 @@ import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../../notion'
 import { outputRawJson } from '../../../helper'
 import { AutomationFlags } from '../../../base-flags'
-import { wrapNotionError } from '../../../errors'
+import { wrapNotionError } from '../../../errors/enhanced-errors'
 
 export default class UserRetrieveBot extends Command {
   static description = 'Retrieve a bot user'
@@ -84,11 +84,14 @@ export default class UserRetrieveBot extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = wrapNotionError(error, {
+        resourceType: 'user',
+        endpoint: 'users.me',
+      })
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

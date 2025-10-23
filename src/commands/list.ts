@@ -2,7 +2,7 @@ import { Command, Flags, ux } from '@oclif/core'
 import { loadCache, getCachePath } from '../utils/workspace-cache'
 import { outputMarkdownTable, outputPrettyTable, outputCompactJson } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
-import { NotionCLIError } from '../errors'
+import { NotionCLIError, NotionCLIErrorCode } from '../errors/enhanced-errors'
 import * as path from 'path'
 import * as os from 'os'
 
@@ -201,13 +201,19 @@ export default class List extends Command {
       this.log(`\nTip: Run "notion-cli sync" to refresh the cache.`)
       process.exit(0)
     } catch (error: any) {
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : new NotionCLIError(
+            NotionCLIErrorCode.INTERNAL_ERROR,
+            error.message || 'Failed to load cache',
+            [],
+            { originalError: error }
+          )
+
       if (flags.json) {
-        this.log(JSON.stringify({
-          success: false,
-          error: error.message,
-        }, null, 2))
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(error.message)
+        this.error(cliError.toHumanString())
       }
 
       process.exit(1)

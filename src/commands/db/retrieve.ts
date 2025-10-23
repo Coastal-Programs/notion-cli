@@ -10,7 +10,7 @@ import {
   showRawFlagHint
 } from '../../helper'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
-import { NotionCLIError, wrapNotionError } from '../../errors'
+import { wrapNotionError, NotionCLIErrorFactory } from '../../errors/enhanced-errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbRetrieve extends Command {
@@ -131,11 +131,15 @@ export default class DbRetrieve extends Command {
       showRawFlagHint(1, res)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = wrapNotionError(error, {
+        resourceType: 'database',
+        attemptedId: args.database_id,
+        userInput: args.database_id,
+      })
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

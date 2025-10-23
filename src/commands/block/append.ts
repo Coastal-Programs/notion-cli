@@ -7,7 +7,7 @@ import {
 import { getBlockPlainText, outputRawJson } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { wrapNotionError, NotionCLIErrorFactory } from '../../errors/enhanced-errors'
 
 export default class BlockAppend extends Command {
   static description = 'Append block children'
@@ -68,9 +68,16 @@ export default class BlockAppend extends Command {
       // Resolve block ID from URL or direct ID
       const blockId = await resolveNotionId(flags.block_id, 'page')
 
+      let children: any
+      try {
+        children = JSON.parse(flags.children)
+      } catch (error: any) {
+        throw NotionCLIErrorFactory.invalidJson(flags.children, error)
+      }
+
       const params: AppendBlockChildrenParameters = {
         block_id: blockId,
-        children: JSON.parse(flags.children),
+        children,
       }
 
       if (flags.after) {
@@ -118,11 +125,16 @@ export default class BlockAppend extends Command {
       ux.table(res.results, columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = wrapNotionError(error, {
+        resourceType: 'block',
+        attemptedId: flags.block_id,
+        userInput: flags.block_id
+      })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

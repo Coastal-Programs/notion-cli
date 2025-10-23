@@ -11,7 +11,7 @@ import {
 import { getPageTitle, outputRawJson } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { wrapNotionError, NotionCLIErrorFactory } from '../../errors/enhanced-errors'
 import { expandSimpleProperties } from '../../utils/property-expander'
 
 export default class PageCreate extends Command {
@@ -150,10 +150,7 @@ export default class PageCreate extends Command {
           }
         } catch (error: any) {
           if (error.message.includes('Unexpected token') || error.message.includes('JSON')) {
-            throw new Error(
-              `Invalid JSON in --properties flag: ${error.message}\n` +
-              `Example: --properties '{"Name": "Task", "Status": "Done"}'`
-            )
+            throw NotionCLIErrorFactory.invalidJson(flags.properties, error)
           }
           throw error
         }
@@ -231,11 +228,15 @@ export default class PageCreate extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = wrapNotionError(error, {
+        resourceType: 'page',
+        userInput: flags.parent_page_id || flags.parent_data_source_id
+      })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

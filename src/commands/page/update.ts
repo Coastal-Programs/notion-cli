@@ -4,7 +4,7 @@ import { UpdatePageParameters, PageObjectResponse } from '@notionhq/client/build
 import { getPageTitle, outputRawJson } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { wrapNotionError, NotionCLIErrorFactory } from '../../errors/enhanced-errors'
 import { expandSimpleProperties } from '../../utils/property-expander'
 
 export default class PageUpdate extends Command {
@@ -134,10 +134,7 @@ export default class PageUpdate extends Command {
           }
         } catch (error: any) {
           if (error.message.includes('Unexpected token') || error.message.includes('JSON')) {
-            throw new Error(
-              `Invalid JSON in --properties flag: ${error.message}\n` +
-              `Example: --properties '{"Status": "Done", "Priority": "High"}'`
-            )
+            throw NotionCLIErrorFactory.invalidJson(flags.properties, error)
           }
           throw error
         }
@@ -181,11 +178,16 @@ export default class PageUpdate extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = wrapNotionError(error, {
+        resourceType: 'page',
+        attemptedId: args.page_id,
+        userInput: args.page_id
+      })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

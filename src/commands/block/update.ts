@@ -7,7 +7,7 @@ import {
 import { outputRawJson, getBlockPlainText } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { wrapNotionError, NotionCLIErrorFactory } from '../../errors/enhanced-errors'
 
 export default class BlockUpdate extends Command {
   static description = 'Update a block'
@@ -88,7 +88,13 @@ export default class BlockUpdate extends Command {
           const content = JSON.parse(flags.content)
           Object.assign(params, content)
         } catch (error) {
-          this.error('Invalid JSON in --content flag. Please provide valid JSON.')
+          const parseError = NotionCLIErrorFactory.invalidJson(flags.content, error as Error)
+          if (flags.json) {
+            this.log(JSON.stringify(parseError.toJSON(), null, 2))
+          } else {
+            this.error(parseError.toHumanString())
+          }
+          process.exit(1)
         }
       }
 
@@ -136,11 +142,15 @@ export default class BlockUpdate extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = wrapNotionError(error, {
+        resourceType: 'block',
+        attemptedId: args.block_id,
+        userInput: args.block_id,
+      })
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }
