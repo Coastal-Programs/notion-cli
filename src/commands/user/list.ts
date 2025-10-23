@@ -3,7 +3,10 @@ import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../notion'
 import { outputRawJson, stripMetadata } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import {
+  NotionCLIError,
+  wrapNotionError
+} from '../../errors'
 
 export default class UserList extends Command {
   static description = 'List all users'
@@ -87,11 +90,17 @@ export default class UserList extends Command {
       ux.table(res.results, columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            resourceType: 'user',
+            endpoint: 'users.list'
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

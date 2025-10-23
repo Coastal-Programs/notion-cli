@@ -19,7 +19,11 @@ import {
   stripMetadata
 } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
-import { wrapNotionError, NotionCLIError } from '../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorFactory,
+  wrapNotionError
+} from '../errors'
 import * as dayjs from 'dayjs'
 
 export default class Search extends Command {
@@ -382,11 +386,17 @@ export default class Search extends Command {
         showRawFlagHint(res.results.length, res.results[0])
       }
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            endpoint: 'search',
+            userInput: flags.query || flags.filter
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

@@ -3,7 +3,10 @@ import * as notion from '../../../notion'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import { getBlockPlainText, outputRawJson, stripMetadata, enrichChildDatabaseBlock, getChildDatabasesWithIds } from '../../../helper'
 import { AutomationFlags } from '../../../base-flags'
-import { wrapNotionError } from '../../../errors'
+import {
+  NotionCLIError,
+  wrapNotionError
+} from '../../../errors'
 
 export default class BlockRetrieveChildren extends Command {
   static description = 'Retrieve block children (supports database discovery via --show-databases)'
@@ -172,11 +175,18 @@ export default class BlockRetrieveChildren extends Command {
       ux.table(res.results, columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            resourceType: 'block',
+            attemptedId: args.block_id,
+            endpoint: 'blocks.children.list'
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

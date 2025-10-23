@@ -11,7 +11,11 @@ import {
 } from '../utils/workspace-cache'
 import { getDataSourceTitle } from '../helper'
 import { AutomationFlags } from '../base-flags'
-import { NotionCLIError, wrapNotionError } from '../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorFactory,
+  wrapNotionError
+} from '../errors'
 import { DataSourceObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as os from 'os'
 import * as path from 'path'
@@ -146,13 +150,18 @@ export default class Sync extends Command {
 
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            endpoint: 'search',
+            resourceType: 'database'
+          })
 
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
         ux.action.stop('failed')
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
 
       process.exit(1)

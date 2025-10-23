@@ -2,7 +2,10 @@ import { Args, Command, Flags } from '@oclif/core'
 import * as notion from '../../../notion'
 import { outputRawJson } from '../../../helper'
 import { AutomationFlags } from '../../../base-flags'
-import { wrapNotionError } from '../../../errors'
+import {
+  NotionCLIError,
+  wrapNotionError
+} from '../../../errors'
 
 export default class PageRetrievePropertyItem extends Command {
   static description = 'Retrieve a page property item'
@@ -58,11 +61,18 @@ export default class PageRetrievePropertyItem extends Command {
       outputRawJson(res)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            resourceType: 'page',
+            attemptedId: args.page_id,
+            endpoint: 'pages.properties.retrieve'
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

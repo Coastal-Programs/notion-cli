@@ -36,10 +36,5 @@ export {
   ErrorContext,
 } from './enhanced-errors'
 
-// Re-export legacy error system for backward compatibility
-// TODO: Remove after migration is complete
-export {
-  ErrorCode as LegacyErrorCode,
-  NotionCLIError as LegacyNotionCLIError,
-  wrapNotionError as legacyWrapNotionError,
-} from '../errors'
+// Note: Legacy error system is in src/errors.ts
+// Commands should import from this file (src/errors/index.ts) to get enhanced errors

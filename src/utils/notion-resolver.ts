@@ -16,7 +16,12 @@
  */
 
 import { extractNotionId, isNotionUrl } from './notion-url-parser'
-import { NotionCLIError, ErrorCode, wrapNotionError } from '../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorCode,
+  NotionCLIErrorFactory,
+  wrapNotionError
+} from '../errors'
 import { loadCache } from './workspace-cache'
 import { search, retrieveDataSource } from '../notion'
 import { isFullPage } from '@notionhq/client'
@@ -58,8 +63,10 @@ export async function resolveNotionId(
 ): Promise<string> {
   if (!input || typeof input !== 'string') {
     throw new NotionCLIError(
-      ErrorCode.VALIDATION_ERROR,
-      `Invalid input: expected a ${type} name, ID, or URL`
+      NotionCLIErrorCode.VALIDATION_ERROR,
+      `Invalid input: expected a ${type} name, ID, or URL`,
+      [],
+      { resourceType: type, userInput: String(input) }
     )
   }
 
@@ -75,13 +82,7 @@ export async function resolveNotionId(
       }
       return extractedId
     } catch (error) {
-      throw new NotionCLIError(
-        ErrorCode.VALIDATION_ERROR,
-        `Invalid Notion URL: ${trimmed}\n\n` +
-        `Expected format: https://www.notion.so/{id}\n` +
-        `Example: https://www.notion.so/1fb79d4c71bb8032b722c82305b63a00`,
-        { originalError: error }
-      )
+      throw NotionCLIErrorFactory.invalidIdFormat(trimmed, type)
     }
   }
 
@@ -104,14 +105,10 @@ export async function resolveNotionId(
   if (fromApi) return fromApi
 
   // Nothing found - throw helpful error
-  throw new NotionCLIError(
-    ErrorCode.NOT_FOUND,
-    `${type === 'database' ? 'Database' : 'Page'} "${input}" not found.\n\n` +
-    `Try:\n` +
-    `  1. Run 'notion-cli sync' to refresh your workspace index\n` +
-    `  2. Use the full Notion URL instead\n` +
-    `  3. Check available databases with 'notion-cli list'`
-  )
+  if (type === 'database') {
+    throw NotionCLIErrorFactory.workspaceNotSynced(trimmed)
+  }
+  throw NotionCLIErrorFactory.resourceNotFound(type, trimmed)
 }
 
 /**
