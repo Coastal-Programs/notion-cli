@@ -1,7 +1,7 @@
 import { Args, Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
-import { getBlockPlainText, outputRawJson } from '../../helper'
+import { getBlockPlainText, outputRawJson, stripMetadata } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
 import { wrapNotionError } from '../../errors'
 
@@ -42,7 +42,12 @@ export default class BlockRetrieve extends Command {
     const { args, flags } = await this.parse(BlockRetrieve)
 
     try {
-      const res = await notion.retrieveBlock(args.block_id)
+      let res = await notion.retrieveBlock(args.block_id)
+
+      // Apply minimal flag to strip metadata
+      if (flags.minimal) {
+        res = stripMetadata(res)
+      }
 
       // Handle JSON output for automation
       if (flags.json) {

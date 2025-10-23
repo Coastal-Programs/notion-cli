@@ -30,6 +30,10 @@ export const AutomationFlags = {
     default: false,
     env: 'NOTION_CLI_VERBOSE',
   }),
+  minimal: Flags.boolean({
+    description: 'Strip unnecessary metadata (created_by, last_edited_by, object fields, request_id, etc.) - reduces response size by ~40%',
+    default: false,
+  }),
 }
 
 export const OutputFormatFlags = {

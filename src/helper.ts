@@ -24,6 +24,58 @@ export const outputCompactJson = (res: any) => {
 }
 
 /**
+ * Strip unnecessary metadata from Notion API responses to reduce size
+ * Removes created_by, last_edited_by, object fields, request_id, empty values, etc.
+ * Keeps timestamps (created_time, last_edited_time) and essential data
+ *
+ * @param data The data to strip metadata from (single object or array)
+ * @returns The stripped data
+ */
+export const stripMetadata = (data: any): any => {
+  if (Array.isArray(data)) {
+    return data.map(item => stripMetadata(item))
+  }
+
+  if (data === null || typeof data !== 'object') {
+    return data
+  }
+
+  const result: any = {}
+
+  for (const [key, value] of Object.entries(data)) {
+    // Skip fields that should be removed
+    if (
+      key === 'created_by' ||
+      key === 'last_edited_by' ||
+      key === 'request_id' ||
+      key === 'object' ||
+      (key === 'has_more' && value === false)
+    ) {
+      continue
+    }
+
+    // Skip empty arrays
+    if (Array.isArray(value) && value.length === 0) {
+      continue
+    }
+
+    // Skip empty objects (but keep objects with properties)
+    if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+      continue
+    }
+
+    // Recursively strip metadata from nested objects and arrays
+    if (value && typeof value === 'object') {
+      result[key] = stripMetadata(value)
+    } else {
+      result[key] = value
+    }
+  }
+
+  return result
+}
+
+/**
  * Output data as a markdown table
  * Converts column data into GitHub-flavored markdown table format
  */

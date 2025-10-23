@@ -7,7 +7,8 @@ import {
   outputCompactJson,
   outputMarkdownTable,
   outputPrettyTable,
-  showRawFlagHint
+  showRawFlagHint,
+  stripMetadata
 } from '../../helper'
 import { NotionToMarkdown } from 'notion-to-md'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
@@ -96,7 +97,12 @@ export default class PageRetrieve extends Command {
         page_id: pageId,
       }
 
-      const res = await notion.retrievePage(pageProps)
+      let res = await notion.retrievePage(pageProps)
+
+      // Apply minimal flag to strip metadata
+      if (flags.minimal) {
+        res = stripMetadata(res)
+      }
 
       // Handle JSON output for automation (takes precedence)
       if (flags.json) {

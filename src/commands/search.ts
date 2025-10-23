@@ -15,7 +15,8 @@ import {
   outputCompactJson,
   outputMarkdownTable,
   outputPrettyTable,
-  showRawFlagHint
+  showRawFlagHint,
+  stripMetadata
 } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
 import { wrapNotionError } from '../errors'
@@ -153,7 +154,12 @@ export default class Search extends Command {
       if (process.env.DEBUG) {
         console.log(params)
       }
-      const res = await notion.search(params)
+      let res = await notion.search(params)
+
+      // Apply minimal flag to strip metadata
+      if (flags.minimal) {
+        res = stripMetadata(res)
+      }
 
       // Handle JSON output for automation (takes precedence)
       if (flags.json) {
