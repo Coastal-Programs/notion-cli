@@ -27,45 +27,68 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
 
 ## What's New in v5.4.0
 
-### NEW: Smart ID Resolution
-- **Automatic conversion** - Use `database_id` or `data_source_id` interchangeably
-- **No more confusion** - System detects and converts wrong ID type automatically
-- **Helpful messaging** - Shows when conversion happens and explains the difference
-- **Zero friction** - Works with all database commands (retrieve, query, update)
+**7 Major AI Agent Usability Features** (Issue #4) 🎉
 
-[📖 Read the Smart ID Resolution Guide](./docs/smart-id-resolution.md)
+### 1. Simple Properties Mode
+- **NEW `--simple-properties` (`-S`) flag** - Use flat JSON instead of complex nested structures
+- **70% complexity reduction** - `{"Name": "Task", "Status": "Done"}` vs verbose Notion format
+- **13 property types supported** - title, rich_text, number, checkbox, select, multi_select, status, date, url, email, phone, people, files, relation
+- **Case-insensitive matching** - Property names and select values work regardless of case
+- **Relative dates** - Use `"today"`, `"tomorrow"`, `"+7 days"`, `"+2 weeks"`, etc.
+- **Smart validation** - Helpful error messages with suggestions
 
-### Workspace Database Caching
-- **`sync` command** - Cache all workspace databases locally for instant lookups
-- **`list` command** - Browse cached databases with rich metadata
-- **`config set-token` command** - Easy token setup with guided workflow
-- **Persistent cache** at `~/.notion-cli/databases.json`
-- **Alias generation** - Find databases by name, nickname, or acronym
-- **Zero API calls** for name resolution after sync
+[📖 Simple Properties Guide](./docs/SIMPLE_PROPERTIES.md) | [⚡ Quick Reference](./AI_AGENT_QUICK_REFERENCE.md)
 
-### Schema Discovery Command
-- **`db schema` command** - Extract clean, AI-parseable database schemas
-- **Property type detection** - Automatic identification of all Notion property types
-- **Option enumeration** - Get valid values for select/multi-select properties
-- **Multiple formats** - JSON, YAML, table, or markdown output
-- **Filtered extraction** - Get only the properties you need
+### 2. JSON Envelope Standardization
+- **Consistent response format** - All commands return `{success, data, metadata}`
+- **Standardized exit codes** - 0 = success, 1 = API error, 2 = CLI error
+- **Predictable parsing** - AI agents can reliably extract data
 
-### Enhanced Retry Logic
-- **Exponential backoff** with jitter to prevent thundering herd
-- **Intelligent error categorization** (retryable vs non-retryable)
-- **Automatic rate limit handling** with Retry-After header support
-- **Circuit breaker pattern** for resilient operations
-- **Configurable via environment variables**
+[📖 Envelope Documentation](./docs/ENVELOPE_INDEX.md)
 
-### Caching Layer
-- **In-memory caching** for frequently accessed resources
-- **Persistent workspace cache** for database metadata
-- **TTL-based expiration** (data sources: 10min, users: 1hr)
-- **Automatic invalidation** on write operations
-- **Cache statistics** for monitoring performance
-- **Up to 100x faster** for repeated reads
+### 3. Health Check Command
+- **NEW `whoami` command** - Verify connectivity before operations (aliases: `test`, `health`)
+- **Reports** - Bot info, workspace access, cache status, API latency
+- **Error diagnostics** - Comprehensive troubleshooting suggestions
 
-[📖 Full Enhancement Documentation](./ENHANCEMENTS.md) | [📊 Output Formats Guide](./OUTPUT_FORMATS.md) | [👨‍💻 AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md)
+### 4. Schema Examples
+- **NEW `--with-examples` flag** - Get copy-pastable property payloads
+- **Works with `db schema`** - Shows example values for each property type
+- **Groups properties** - Separates writable vs read-only
+
+### 5. Verbose Logging
+- **NEW `--verbose` (`-v`) flag** - Debug mode for troubleshooting
+- **Shows** - Cache hits/misses, retry attempts, API latency
+- **Helps AI agents** - Understand what's happening behind the scenes
+
+[📖 Verbose Logging Guide](./docs/VERBOSE_LOGGING.md)
+
+### 6. Filter Simplification
+- **Improved filter syntax** - Easier database query filters
+- **Better validation** - Clear error messages for invalid filters
+
+[📖 Filter Guide](./docs/FILTER_GUIDE.md)
+
+### 7. Output Format Enhancements
+- **NEW `--compact-json`** - Minified single-line JSON output
+- **NEW `--pretty`** - Enhanced table formatting
+- **NEW `--markdown`** - Markdown table output
+
+[📊 Output Formats Guide](./OUTPUT_FORMATS.md)
+
+---
+
+### Earlier Features (v5.2-5.3)
+
+**Smart ID Resolution** - Automatic `database_id` ↔ `data_source_id` conversion • [Guide](./docs/smart-id-resolution.md)
+
+**Workspace Caching** - `sync` and `list` commands for local database cache
+
+**Schema Discovery** - `db schema` command for AI-parseable schemas • [AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md)
+
+**Enhanced Reliability** - Exponential backoff retry + circuit breaker • [Details](./ENHANCEMENTS.md)
+
+**Performance** - In-memory caching (up to 100x faster for repeated reads)
 
 ## Quick Start for AI Agents
 
@@ -98,26 +121,90 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
    $env:NOTION_TOKEN="secret_your_token_here"
    ```
 
-3. **Sync your workspace** (one-time setup):
+3. **Verify connectivity** (health check):
+   ```bash
+   notion-cli whoami
+   # Returns: bot info, workspace, cache status, API latency
+   ```
+
+4. **Sync your workspace** (one-time setup):
    ```bash
    notion-cli sync
    ```
 
-4. **Verify it works**:
+5. **List your databases**:
    ```bash
    notion-cli list --json
    ```
 
-5. **Discover database schema**:
+6. **Discover database schema** (before creating pages):
    ```bash
-   notion-cli db schema <DATA_SOURCE_ID> --json
+   # Get schema with examples for easy copy-paste
+   notion-cli db schema <DATA_SOURCE_ID> --with-examples --json
    ```
 
-6. **All commands support** `--json` for machine-readable responses.
+7. **Create a page** (using simple properties):
+   ```bash
+   notion-cli page create -d <DATA_SOURCE_ID> -S --properties '{
+     "Name": "My Task",
+     "Status": "In Progress",
+     "Priority": 5,
+     "Due Date": "tomorrow"
+   }'
+   ```
+
+8. **All commands support** `--json` for machine-readable responses.
 
 **Get your API token**: https://developers.notion.com/docs/create-a-notion-integration
 
 ## Key Features for AI Agents
+
+### Simple Properties - 70% Less Complexity
+Create and update Notion pages with flat JSON instead of complex nested structures:
+
+```bash
+# ❌ OLD WAY: Complex nested structure (error-prone)
+notion-cli page create -d DB_ID --properties '{
+  "Name": {
+    "title": [{"text": {"content": "Task"}}]
+  },
+  "Status": {
+    "select": {"name": "In Progress"}
+  },
+  "Priority": {
+    "number": 5
+  },
+  "Tags": {
+    "multi_select": [
+      {"name": "urgent"},
+      {"name": "bug"}
+    ]
+  }
+}'
+
+# ✅ NEW WAY: Simple properties with -S flag
+notion-cli page create -d DB_ID -S --properties '{
+  "Name": "Task",
+  "Status": "In Progress",
+  "Priority": 5,
+  "Tags": ["urgent", "bug"],
+  "Due Date": "tomorrow"
+}'
+
+# Update is just as easy
+notion-cli page update PAGE_ID -S --properties '{
+  "Status": "Done",
+  "Completed": true
+}'
+```
+
+**Features:**
+- 🔤 **Case-insensitive** - Property names and select values work regardless of case
+- 📅 **Relative dates** - Use `"today"`, `"tomorrow"`, `"+7 days"`, `"+2 weeks"`
+- ✅ **Smart validation** - Clear error messages with valid options listed
+- 🎯 **13 property types** - title, rich_text, number, checkbox, select, multi_select, status, date, url, email, phone, people, files, relation
+
+[📖 Simple Properties Guide](./docs/SIMPLE_PROPERTIES.md) | [⚡ Quick Reference](./AI_AGENT_QUICK_REFERENCE.md)
 
 ### Smart Database ID Resolution
 No need to worry about `database_id` vs `data_source_id` confusion anymore! The CLI automatically detects and converts between them:

@@ -5,7 +5,7 @@
 This index provides a complete guide to the JSON envelope standardization system for the Notion CLI. All documentation, code, and tests are organized here for easy reference.
 
 **System Version:** 1.0.0
-**CLI Version:** 5.3.0+
+**CLI Version:** 5.4.0+
 **Status:** Ready for Implementation
 **Created:** 2025-10-23
 
@@ -321,7 +321,7 @@ $ notion-cli page retrieve abc-123 --json
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "page retrieve",
     "execution_time_ms": 234,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 ```
@@ -348,7 +348,7 @@ $ notion-cli page retrieve invalid-id --json
     "timestamp": "2025-10-23T14:23:45.789Z",
     "command": "page retrieve",
     "execution_time_ms": 156,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 ```

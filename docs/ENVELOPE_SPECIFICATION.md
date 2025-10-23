@@ -7,7 +7,7 @@ The JSON envelope standardization system ensures consistent, machine-readable ou
 **Version:** 1.0.0
 **Status:** Implementation Ready
 **Target API:** Notion API v5.2.1
-**CLI Version:** 5.3.0+
+**CLI Version:** 5.4.0+
 
 ## Motivation
 
@@ -50,7 +50,7 @@ interface SuccessEnvelope<T> {
     timestamp: string          // ISO 8601 format
     command: string            // e.g., "page retrieve"
     execution_time_ms: number  // Execution duration
-    version: string            // CLI version (e.g., "5.3.0")
+    version: string            // CLI version (e.g., "5.4.0")
   }
 }
 ```
@@ -69,7 +69,7 @@ interface SuccessEnvelope<T> {
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "page retrieve",
     "execution_time_ms": 234,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 ```
@@ -117,7 +117,7 @@ interface ErrorEnvelope {
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "db retrieve",
     "execution_time_ms": 156,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 ```
@@ -317,7 +317,7 @@ Every envelope includes these metadata fields:
 | `timestamp` | string | ISO 8601 timestamp | `"2025-10-23T14:23:45.123Z"` |
 | `command` | string | Full command name | `"page retrieve"`, `"db query"` |
 | `execution_time_ms` | number | Execution duration in ms | `234` |
-| `version` | string | CLI version | `"5.3.0"` |
+| `version` | string | CLI version | `"5.4.0"` |
 
 ### Additional Metadata (Optional)
 
@@ -348,7 +348,7 @@ envelope.wrapSuccess(data, {
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "db query",
     "execution_time_ms": 567,
-    "version": "5.3.0",
+    "version": "5.4.0",
     "total_results": 42,
     "page_size": 100,
     "has_more": false

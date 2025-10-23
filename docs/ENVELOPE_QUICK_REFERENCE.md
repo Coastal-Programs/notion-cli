@@ -357,5 +357,5 @@ A: Use standard ErrorCode enum values
 ## Version
 
 - **Envelope System Version:** 1.0.0
-- **CLI Version:** 5.3.0+
+- **CLI Version:** 5.4.0+
 - **Last Updated:** 2025-10-23

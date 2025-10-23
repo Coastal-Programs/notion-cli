@@ -2,10 +2,10 @@
 
 ## Overview
 
-This report documents the build verification and code review for the name resolution implementation in notion-cli v5.3.0.
+This report documents the build verification and code review for the name resolution implementation in notion-cli v5.4.0.
 
 **Date:** October 22, 2025
-**Version:** 5.3.0
+**Version:** 5.4.0
 **Feature:** Name Resolution (Database lookup by name/alias/partial match)
 **Status:** BUILD SUCCESSFUL ✓
 
@@ -21,7 +21,7 @@ npm run build
 
 ### Build Output
 ```
-> @coastal-programs/notion-cli@5.3.0 build
+> @coastal-programs/notion-cli@5.4.0 build
 > shx rm -rf dist && tsc -b
 ```
 

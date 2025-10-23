@@ -47,7 +47,7 @@ The envelope system is a standardized way to format all CLI output in JSON mode.
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "page retrieve",
     "execution_time_ms": 234,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 ```
@@ -70,7 +70,7 @@ The envelope system is a standardized way to format all CLI output in JSON mode.
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "db retrieve",
     "execution_time_ms": 156,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 ```
@@ -367,7 +367,7 @@ $ notion-cli page retrieve abc-123 --json
     "timestamp": "2025-10-23T14:23:45.123Z",
     "command": "page retrieve",
     "execution_time_ms": 234,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 $ echo $?
@@ -396,7 +396,7 @@ $ notion-cli page retrieve invalid-id --json
     "timestamp": "2025-10-23T14:23:45.789Z",
     "command": "page retrieve",
     "execution_time_ms": 156,
-    "version": "5.3.0"
+    "version": "5.4.0"
   }
 }
 $ echo $?

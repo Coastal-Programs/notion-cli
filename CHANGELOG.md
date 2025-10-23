@@ -5,6 +5,193 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.0] - 2025-10-23
+
+### Added - AI Agent Usability Features (Issue #4)
+
+**Complete implementation of 7 major AI agent usability improvements:**
+
+**1. JSON Envelope Standardization**
+- Consistent `{success, data, metadata}` response format across ALL commands
+- Standardized exit codes: 0 = success, 1 = API error, 2 = CLI error
+- New `envelope.ts` module for centralized response handling
+- New `base-command.ts` extending oclif Command with envelope support
+- 7 comprehensive documentation guides in `docs/ENVELOPE_*.md`:
+  - Architecture overview
+  - Integration guide
+  - Quick reference
+  - Specification
+  - System summary
+  - Testing strategy
+  - Index
+
+**2. Health Check Command**
+- NEW `whoami` command (aliases: `test`, `health`, `connectivity`)
+- Reports bot info, workspace access, cache status, and API latency
+- Comprehensive error handling with actionable suggestions
+- Perfect for AI agents to verify connectivity before operations
+
+**3. Simple Properties Mode** 🎉
+- NEW `--simple-properties` (`-S`) flag for `page create` and `page update`
+- Flat JSON format: `{"Name": "Task", "Status": "Done"}` instead of complex nested Notion structures
+- **70% reduction in complexity** for AI agents
+- Supports 13 property types: title, rich_text, number, checkbox, select, multi_select, status, date, url, email, phone_number, people, files, relation
+- Case-insensitive property name and value matching
+- Relative date parsing: `"today"`, `"tomorrow"`, `"+7 days"`, `"+2 weeks"`, etc.
+- Comprehensive validation with helpful error messages
+- Auto-creates proper Notion API format based on database schema
+- Documentation: `docs/SIMPLE_PROPERTIES.md`, `AI_AGENT_QUICK_REFERENCE.md`
+- New utility: `src/utils/property-expander.ts` (400 lines, fully tested)
+
+**4. Schema Examples**
+- NEW `--with-examples` flag for `db schema` command
+- Shows copy-pastable property payloads for each property type
+- Groups writable vs read-only properties
+- Makes it trivial for AI agents to construct valid property objects
+
+**5. Verbose Logging**
+- NEW `--verbose` (`-v`) flag for debugging
+- Shows cache hits/misses, retry attempts, API latency
+- Helps AI agents understand what's happening behind the scenes
+- Documentation: `docs/VERBOSE_LOGGING.md`
+
+**6. Filter Simplification**
+- Simplified filter syntax for database queries
+- Better validation and error messages
+- Documentation: `docs/FILTER_GUIDE.md`, `docs/FILTER_MIGRATION.md`
+
+**7. Output Format Enhancements**
+- NEW `--compact-json` flag: minified JSON (one line)
+- NEW `--pretty` flag: enhanced table formatting
+- NEW `--markdown` flag: markdown table output
+- Consistent across all commands via `base-flags.ts`
+- Documentation: `OUTPUT_FORMATS.md`
+
+### Changed
+
+- **Version:** Bumped to 5.4.0 to reflect major feature release
+- **Package description:** Updated to "with simple properties, JSON envelopes, and enhanced usability"
+- **Keywords:** Added "simple-properties" and "json-envelope"
+- **All commands:** Now extend `BaseCommand` for consistent envelope responses
+- **Error handling:** Unified error response format across all commands
+
+### Technical Details
+
+**New Files:**
+- `src/base-command.ts` - Base command class with envelope support
+- `src/base-flags.ts` - Reusable flag sets for consistency
+- `src/envelope.ts` - Envelope response formatting
+- `src/utils/property-expander.ts` - Simple properties converter
+- `src/commands/whoami.ts` - Health check command
+- `test/utils/property-expander.test.ts` - 30+ test cases
+- 7 envelope documentation files
+- `docs/SIMPLE_PROPERTIES.md` - Complete simple properties guide
+- `docs/VERBOSE_LOGGING.md` - Verbose logging guide
+- `docs/FILTER_GUIDE.md` - Filter syntax guide
+- `AI_AGENT_QUICK_REFERENCE.md` - Quick reference for AI agents (root level for easy access)
+
+**Modified Files:**
+- `src/commands/page/create.ts` - Added `--simple-properties` support
+- `src/commands/page/update.ts` - Added `--simple-properties` support
+- `src/commands/db/schema.ts` - Added `--with-examples` flag
+- All command files updated to use envelope format
+
+**Type Safety:**
+- Full TypeScript type definitions for all new features
+- Interfaces for `Envelope`, `EnvelopeMetadata`, `SimpleProperties`
+- Type-safe property expansion and validation
+
+**Testing:**
+- 30+ test cases for property expander
+- Envelope response validation
+- All existing tests still passing
+
+### Why This Matters
+
+**For AI Agents:**
+- **Simple Properties:** Dramatically reduces errors from malformed property structures
+- **JSON Envelopes:** Predictable response format makes parsing trivial
+- **Health Check:** Easy connectivity verification before complex operations
+- **Verbose Logging:** Helps debug issues and understand system behavior
+- **Schema Examples:** Copy-paste examples eliminate guesswork
+
+**For Developers:**
+- Consistent API across all commands
+- Better error messages with actionable suggestions
+- Easier to debug with verbose mode
+- Simpler property syntax for manual use
+
+### Examples
+
+**Simple Properties (Before vs After):**
+
+```bash
+# BEFORE: Complex nested structure (easy to get wrong)
+notion-cli page create -d DB_ID --properties '{
+  "Name": {"title": [{"text": {"content": "Task"}}]},
+  "Status": {"select": {"name": "In Progress"}},
+  "Priority": {"number": 5}
+}'
+
+# AFTER: Flat, simple structure
+notion-cli page create -d DB_ID -S --properties '{
+  "Name": "Task",
+  "Status": "In Progress",
+  "Priority": 5
+}'
+```
+
+**Health Check:**
+```bash
+notion-cli whoami
+# Returns bot info, workspace, cache stats, API latency
+```
+
+**Schema with Examples:**
+```bash
+notion-cli db schema DB_ID --with-examples
+# Shows example payloads for each property
+```
+
+### Migration Guide
+
+**No breaking changes!** All existing commands work exactly as before.
+
+**New recommended workflow:**
+1. Run `whoami` to verify connectivity
+2. Run `db schema DB_ID --with-examples` to understand structure
+3. Use `-S` flag with simple properties for page create/update
+4. Use `--verbose` for debugging when needed
+
+---
+
+## [5.3.0] - 2025-10-22
+
+### Added - Workspace Management Features
+
+**Smart ID Resolution:**
+- Automatic conversion between `database_id` and `data_source_id`
+- System detects and converts wrong ID type automatically
+- Helpful messaging when conversion happens
+- Works with all database commands (retrieve, query, update)
+- Documentation: `docs/smart-id-resolution.md`
+
+**Workspace Database Caching:**
+- NEW `sync` command - Cache all workspace databases locally
+- NEW `list` command - Browse cached databases with rich metadata
+- NEW `config set-token` command - Easy token setup with guided workflow
+- Persistent cache at `~/.notion-cli/databases.json`
+- Alias generation - Find databases by name, nickname, or acronym
+- Zero API calls for name resolution after sync
+
+### Changed
+
+- **Version:** Bumped to 5.3.0 for workspace management features
+- Enhanced database resolution with smart ID conversion
+- Improved token configuration workflow
+
+---
+
 ## [5.2.0] - 2025-10-22
 
 ### Added - Schema Discovery for AI Agents

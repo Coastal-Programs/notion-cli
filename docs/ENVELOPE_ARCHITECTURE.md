@@ -229,7 +229,7 @@ function wrapNotionError(error: any): NotionCLIError
 2. BaseCommand.run()
    ├─ Parse arguments: { page_id: 'abc-123' }
    ├─ Parse flags: { json: true }
-   └─ Initialize EnvelopeFormatter('page retrieve', '5.3.0')
+   └─ Initialize EnvelopeFormatter('page retrieve', '5.4.0')
 
 3. Command logic
    ├─ Call Notion API: retrievePage({ page_id: 'abc-123' })
@@ -262,7 +262,7 @@ function wrapNotionError(error: any): NotionCLIError
 2. BaseCommand.run()
    ├─ Parse arguments: { page_id: 'invalid-id' }
    ├─ Parse flags: { json: true }
-   └─ Initialize EnvelopeFormatter('page retrieve', '5.3.0')
+   └─ Initialize EnvelopeFormatter('page retrieve', '5.4.0')
 
 3. Command logic
    ├─ Call Notion API: retrievePage({ page_id: 'invalid-id' })
@@ -477,7 +477,7 @@ Lifecycle:
     │   → "page retrieve"│ (replace ':' with ' ')
     │                   │
     │ - version         │ From this.config.version
-    │   → "5.3.0"       │
+    │   → "5.4.0"       │
     │                   │
     │ - startTime       │ From Date.now()
     │   → 1698234567890 │
@@ -700,7 +700,7 @@ if (process.env.NODE_ENV !== 'production') {
     "timestamp": "...",           // When
     "command": "page retrieve",   // What
     "execution_time_ms": 234,     // How long
-    "version": "5.3.0"            // Which version
+    "version": "5.4.0"            // Which version
   }
 }
 ```

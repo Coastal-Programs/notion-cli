@@ -1,7 +1,7 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "5.3.0",
-  "description": "Notion CLI optimized for automation and AI agents (API v5.2.1) with schema discovery and workspace caching",
+  "version": "5.4.0",
+  "description": "Notion CLI optimized for automation and AI agents (API v5.2.1) with simple properties, JSON envelopes, and enhanced usability",
   "author": "Jake Schepis",
   "bin": {
     "notion-cli": "./bin/run"
@@ -77,7 +77,9 @@
     "automation",
     "schema-discovery",
     "workspace-cache",
-    "database-sync"
+    "database-sync",
+    "simple-properties",
+    "json-envelope"
   ],
   "types": "dist/index.d.ts"
 }

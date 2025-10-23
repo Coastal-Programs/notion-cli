@@ -317,7 +317,7 @@ This checklist breaks down the implementation of the database caching system int
 
 ## Deployment Checklist
 
-- [ ] Bump version to 5.3.0
+- [ ] Bump version to 5.4.0
 - [ ] Update CHANGELOG.md
 - [ ] Create GitHub release
 - [ ] Publish to npm
@@ -348,7 +348,7 @@ This checklist breaks down the implementation of the database caching system int
 1. E2E testing
 2. Performance testing
 3. Bug fixes
-4. Release v5.3.0
+4. Release v5.4.0
 
 ## Success Metrics
 

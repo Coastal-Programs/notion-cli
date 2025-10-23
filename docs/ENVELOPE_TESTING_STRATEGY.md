@@ -405,7 +405,7 @@ export const mockSuccessEnvelope: SuccessEnvelope<PageObjectResponse> = {
     timestamp: '2025-01-01T00:00:00.000Z',
     command: 'page retrieve',
     execution_time_ms: 123,
-    version: '5.3.0',
+    version: '5.4.0',
   }
 }
 
@@ -424,7 +424,7 @@ export const mockErrorEnvelope: ErrorEnvelope = {
     timestamp: '2025-01-01T00:00:00.000Z',
     command: 'page retrieve',
     execution_time_ms: 56,
-    version: '5.3.0',
+    version: '5.4.0',
   }
 }
 ```
