@@ -165,18 +165,30 @@ export default class PageCreate extends Command {
         const md = fs.readFileSync(p, { encoding: 'utf-8' })
         const blocks = markdownToBlocks(md)
 
-        // If no properties were provided via flag, use filename as title
+        // Extract title from H1 heading or use filename without extension
+        const extractTitle = (markdown: string, filename: string): string => {
+          const h1Match = markdown.match(/^#\s+(.+)$/m)
+          if (h1Match && h1Match[1]) {
+            return h1Match[1].trim()
+          }
+          // Fallback: use filename without extension
+          return filename.replace(/\.md$/, '')
+        }
+
+        const pageTitle = extractTitle(md, fileName)
+
+        // If no properties were provided via flag, use extracted title
         if (!flags.properties) {
           properties = {
             [flags.title_property]: {
-              title: [{ text: { content: fileName } }],
+              title: [{ text: { content: pageTitle } }],
             },
           }
         } else {
           // Merge with existing properties, but ensure title is set
           if (!properties[flags.title_property]) {
             properties[flags.title_property] = {
-              title: [{ text: { content: fileName } }],
+              title: [{ text: { content: pageTitle } }],
             }
           }
         }
