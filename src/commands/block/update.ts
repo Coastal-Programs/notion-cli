@@ -94,7 +94,25 @@ export default class BlockUpdate extends Command {
 
       // Handle color updates
       if (flags.color) {
-        params.color = flags.color
+        // Retrieve the block to determine its type
+        const block = await notion.retrieveBlock(blockId)
+
+        // Color is only supported for certain block types
+        const colorSupportedTypes = [
+          'paragraph', 'heading_1', 'heading_2', 'heading_3',
+          'bulleted_list_item', 'numbered_list_item', 'toggle',
+          'quote', 'callout'
+        ]
+
+        if (!colorSupportedTypes.includes(block.type)) {
+          this.error(`Color property is not supported for block type: ${block.type}. Supported types: ${colorSupportedTypes.join(', ')}`)
+        }
+
+        // Color must be nested within the block type property
+        params[block.type] = {
+          ...params[block.type],
+          color: flags.color
+        }
       }
 
       const res = await notion.updateBlock(params as UpdateBlockParameters)
