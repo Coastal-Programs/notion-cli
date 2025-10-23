@@ -204,9 +204,9 @@ export class EnvelopeFormatter {
       errorDetails = {
         code: error.code,
         message: error.message,
-        details: { ...error.details, ...additionalContext },
-        suggestions: generateSuggestions(error.code),
-        notionError: error.notionError,
+        details: { ...error.context, ...additionalContext },
+        suggestions: error.suggestions.map(s => s.description),
+        notionError: error.context.originalError,
       }
     }
     // Handle standard Error
