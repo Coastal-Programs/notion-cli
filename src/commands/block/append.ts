@@ -4,7 +4,7 @@ import {
   AppendBlockChildrenParameters,
   BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
-import { getBlockPlainText, outputRawJson } from '../../helper'
+import { getBlockPlainText, outputRawJson, buildBlocksFromTextFlags } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
 import { wrapNotionError } from '../../errors'
@@ -16,24 +16,40 @@ export default class BlockAppend extends Command {
 
   static examples = [
     {
-      description: 'Append block children',
+      description: 'Append a simple paragraph',
+      command: `$ notion-cli block append -b BLOCK_ID --text "Hello world!"`,
+    },
+    {
+      description: 'Append a heading',
+      command: `$ notion-cli block append -b BLOCK_ID --heading-1 "Chapter Title"`,
+    },
+    {
+      description: 'Append a bullet point',
+      command: `$ notion-cli block append -b BLOCK_ID --bullet "First item"`,
+    },
+    {
+      description: 'Append a code block',
+      command: `$ notion-cli block append -b BLOCK_ID --code "console.log('test')" --language javascript`,
+    },
+    {
+      description: 'Append block children with complex JSON (for advanced cases)',
       command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]'`,
     },
     {
       description: 'Append block children via URL',
-      command: `$ notion-cli block append -b https://notion.so/BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]'`,
+      command: `$ notion-cli block append -b https://notion.so/BLOCK_ID --text "Hello world!"`,
     },
     {
       description: 'Append block children after a block',
-      command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]' -a AFTER_BLOCK_ID`,
+      command: `$ notion-cli block append -b BLOCK_ID --text "Hello world!" -a AFTER_BLOCK_ID`,
     },
     {
       description: 'Append block children and output raw json',
-      command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]' -r`,
+      command: `$ notion-cli block append -b BLOCK_ID --text "Hello world!" -r`,
     },
     {
       description: 'Append block children and output JSON for automation',
-      command: `$ notion-cli block append -b BLOCK_ID -c '[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Hello world!"}}]}}]' --json`,
+      command: `$ notion-cli block append -b BLOCK_ID --text "Hello world!" --json`,
     },
   ]
 
@@ -45,8 +61,45 @@ export default class BlockAppend extends Command {
     }),
     children: Flags.string({
       char: 'c',
-      description: 'Block children (JSON array)',
-      required: true,
+      description: 'Block children (JSON array) - for complex cases',
+    }),
+    // Simple text-based flags
+    text: Flags.string({
+      description: 'Paragraph text',
+    }),
+    'heading-1': Flags.string({
+      description: 'H1 heading text',
+    }),
+    'heading-2': Flags.string({
+      description: 'H2 heading text',
+    }),
+    'heading-3': Flags.string({
+      description: 'H3 heading text',
+    }),
+    bullet: Flags.string({
+      description: 'Bulleted list item text',
+    }),
+    numbered: Flags.string({
+      description: 'Numbered list item text',
+    }),
+    todo: Flags.string({
+      description: 'To-do item text',
+    }),
+    toggle: Flags.string({
+      description: 'Toggle block text',
+    }),
+    code: Flags.string({
+      description: 'Code block content',
+    }),
+    language: Flags.string({
+      description: 'Code block language (used with --code)',
+      default: 'plain text',
+    }),
+    quote: Flags.string({
+      description: 'Quote block text',
+    }),
+    callout: Flags.string({
+      description: 'Callout block text',
     }),
     after: Flags.string({
       char: 'a',
@@ -60,7 +113,6 @@ export default class BlockAppend extends Command {
     ...AutomationFlags,
   }
 
-  // TODO: Add support children params building prompt
   public async run(): Promise<void> {
     const { flags } = await this.parse(BlockAppend)
 
@@ -68,9 +120,47 @@ export default class BlockAppend extends Command {
       // Resolve block ID from URL or direct ID
       const blockId = await resolveNotionId(flags.block_id, 'page')
 
+      let children: any[]
+
+      // Check if using simple text-based flags or complex JSON
+      const hasTextFlags = flags.text || flags['heading-1'] || flags['heading-2'] || flags['heading-3'] ||
+                          flags.bullet || flags.numbered || flags.todo || flags.toggle ||
+                          flags.code || flags.quote || flags.callout
+
+      if (hasTextFlags && flags.children) {
+        this.error('Cannot use both text-based flags (--text, --heading-1, etc.) and --children flag together. Choose one approach.')
+      }
+
+      if (hasTextFlags) {
+        // Use simple text-based flags
+        children = buildBlocksFromTextFlags({
+          text: flags.text,
+          heading1: flags['heading-1'],
+          heading2: flags['heading-2'],
+          heading3: flags['heading-3'],
+          bullet: flags.bullet,
+          numbered: flags.numbered,
+          todo: flags.todo,
+          toggle: flags.toggle,
+          code: flags.code,
+          language: flags.language,
+          quote: flags.quote,
+          callout: flags.callout,
+        })
+
+        if (children.length === 0) {
+          this.error('No content provided. Use text-based flags (--text, --heading-1, etc.) or --children flag.')
+        }
+      } else if (flags.children) {
+        // Use complex JSON
+        children = JSON.parse(flags.children)
+      } else {
+        this.error('No content provided. Use text-based flags (--text, --heading-1, etc.) or --children flag.')
+      }
+
       const params: AppendBlockChildrenParameters = {
         block_id: blockId,
-        children: JSON.parse(flags.children),
+        children: children,
       }
 
       if (flags.after) {

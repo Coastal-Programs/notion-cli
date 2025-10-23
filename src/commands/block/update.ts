@@ -4,7 +4,7 @@ import {
   UpdateBlockParameters,
   BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
-import { outputRawJson, getBlockPlainText } from '../../helper'
+import { outputRawJson, getBlockPlainText, buildBlockUpdateFromTextFlags } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
 import { wrapNotionError } from '../../errors'
@@ -16,6 +16,18 @@ export default class BlockUpdate extends Command {
 
   static examples = [
     {
+      description: 'Update block with simple text',
+      command: `$ notion-cli block update BLOCK_ID --text "Updated content"`,
+    },
+    {
+      description: 'Update heading content',
+      command: `$ notion-cli block update BLOCK_ID --heading-1 "New Title"`,
+    },
+    {
+      description: 'Update code block',
+      command: `$ notion-cli block update BLOCK_ID --code "const x = 42;" --language javascript`,
+    },
+    {
       description: 'Archive a block',
       command: `$ notion-cli block update BLOCK_ID -a`,
     },
@@ -24,7 +36,7 @@ export default class BlockUpdate extends Command {
       command: `$ notion-cli block update https://notion.so/BLOCK_ID -a`,
     },
     {
-      description: 'Update block content',
+      description: 'Update block content with complex JSON (for advanced cases)',
       command: `$ notion-cli block update BLOCK_ID -c '{"paragraph":{"rich_text":[{"text":{"content":"Updated text"}}]}}'`,
     },
     {
@@ -33,11 +45,11 @@ export default class BlockUpdate extends Command {
     },
     {
       description: 'Update a block and output raw json',
-      command: `$ notion-cli block update BLOCK_ID -a -r`,
+      command: `$ notion-cli block update BLOCK_ID --text "Updated" -r`,
     },
     {
       description: 'Update a block and output JSON for automation',
-      command: `$ notion-cli block update BLOCK_ID -a --json`,
+      command: `$ notion-cli block update BLOCK_ID --text "Updated" --json`,
     },
   ]
 
@@ -52,7 +64,45 @@ export default class BlockUpdate extends Command {
     }),
     content: Flags.string({
       char: 'c',
-      description: 'Updated block content (JSON object with block type properties)',
+      description: 'Updated block content (JSON object with block type properties) - for complex cases',
+    }),
+    // Simple text-based flags
+    text: Flags.string({
+      description: 'Update paragraph text',
+    }),
+    'heading-1': Flags.string({
+      description: 'Update H1 heading text',
+    }),
+    'heading-2': Flags.string({
+      description: 'Update H2 heading text',
+    }),
+    'heading-3': Flags.string({
+      description: 'Update H3 heading text',
+    }),
+    bullet: Flags.string({
+      description: 'Update bulleted list item text',
+    }),
+    numbered: Flags.string({
+      description: 'Update numbered list item text',
+    }),
+    todo: Flags.string({
+      description: 'Update to-do item text',
+    }),
+    toggle: Flags.string({
+      description: 'Update toggle block text',
+    }),
+    code: Flags.string({
+      description: 'Update code block content',
+    }),
+    language: Flags.string({
+      description: 'Update code block language (used with --code)',
+      default: 'plain text',
+    }),
+    quote: Flags.string({
+      description: 'Update quote block text',
+    }),
+    callout: Flags.string({
+      description: 'Update callout block text',
     }),
     color: Flags.string({
       description: 'Block color (for supported block types)',
@@ -82,8 +132,38 @@ export default class BlockUpdate extends Command {
         params.archived = flags.archived
       }
 
+      // Check if using simple text-based flags or complex JSON
+      const hasTextFlags = flags.text || flags['heading-1'] || flags['heading-2'] || flags['heading-3'] ||
+                          flags.bullet || flags.numbered || flags.todo || flags.toggle ||
+                          flags.code || flags.quote || flags.callout
+
+      if (hasTextFlags && flags.content) {
+        this.error('Cannot use both text-based flags (--text, --heading-1, etc.) and --content flag together. Choose one approach.')
+      }
+
       // Handle content updates
-      if (flags.content) {
+      if (hasTextFlags) {
+        // Use simple text-based flags
+        const blockUpdate = buildBlockUpdateFromTextFlags('', {
+          text: flags.text,
+          heading1: flags['heading-1'],
+          heading2: flags['heading-2'],
+          heading3: flags['heading-3'],
+          bullet: flags.bullet,
+          numbered: flags.numbered,
+          todo: flags.todo,
+          toggle: flags.toggle,
+          code: flags.code,
+          language: flags.language,
+          quote: flags.quote,
+          callout: flags.callout,
+        })
+
+        if (blockUpdate) {
+          Object.assign(params, blockUpdate)
+        }
+      } else if (flags.content) {
+        // Use complex JSON
         try {
           const content = JSON.parse(flags.content)
           Object.assign(params, content)
