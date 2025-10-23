@@ -13,7 +13,7 @@ import {
   groupExamplesByWritability,
   PropertyExample,
 } from '../../utils/schema-examples'
-import { wrapNotionError } from '../../errors'
+import { NotionCLIError, wrapNotionError } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbSchema extends Command {

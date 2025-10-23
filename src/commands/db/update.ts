@@ -113,7 +113,7 @@ export default class DbUpdate extends Command {
         ? error
         : wrapNotionError(error, {
             resourceType: 'database',
-            attemptedId: args.data_source_id,
+            attemptedId: args.database_id,
             endpoint: 'dataSources.update'
           })
 
