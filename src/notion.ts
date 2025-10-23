@@ -515,3 +515,122 @@ export const retrievePageRecursive = async (
     ...(warnings.length > 0 && { warnings }),
   }
 }
+
+/**
+ * Map page structure (fast page discovery with parallel fetching)
+ * Returns minimal structure info (titles, types, IDs) instead of full content
+ * @param pageId - The ID of the page to map
+ * @returns Object containing page ID, title, icon, and structure overview
+ */
+export const mapPageStructure = async (pageId: string): Promise<{
+  id: string
+  title: string
+  type: string
+  icon?: string
+  structure: Array<{
+    type: string
+    id: string
+    title?: string
+    text?: string
+  }>
+}> => {
+  // Parallel fetch: get page and blocks simultaneously
+  const [page, blocksResponse] = await Promise.all([
+    retrievePage({ page_id: pageId }),
+    retrieveBlockChildren(pageId),
+  ])
+
+  const blocks = blocksResponse.results || []
+
+  // Extract page title
+  let pageTitle = 'Untitled'
+  if (page.object === 'page') {
+    Object.entries(page.properties).find(([_, prop]: [string, any]) => {
+      if (prop.type === 'title' && prop.title.length > 0) {
+        pageTitle = prop.title[0].plain_text
+        return true
+      }
+      return false
+    })
+  }
+
+  // Extract page icon
+  let pageIcon: string | undefined
+  if (page.icon) {
+    if (page.icon.type === 'emoji') {
+      pageIcon = page.icon.emoji
+    } else if (page.icon.type === 'external') {
+      pageIcon = page.icon.external.url
+    } else if (page.icon.type === 'file') {
+      pageIcon = page.icon.file.url
+    }
+  }
+
+  // Build minimal structure
+  const structure = blocks.map((block: any) => {
+    const structureItem: any = {
+      type: block.type,
+      id: block.id,
+    }
+
+    // Extract title/text based on block type
+    try {
+      switch (block.type) {
+        case 'child_page':
+          structureItem.title = block[block.type].title
+          break
+        case 'child_database':
+          structureItem.title = block[block.type].title
+          break
+        case 'heading_1':
+        case 'heading_2':
+        case 'heading_3':
+        case 'paragraph':
+        case 'bulleted_list_item':
+        case 'numbered_list_item':
+        case 'to_do':
+        case 'toggle':
+        case 'quote':
+        case 'callout':
+        case 'code':
+          if (block[block.type].rich_text && block[block.type].rich_text.length > 0) {
+            structureItem.text = block[block.type].rich_text[0].plain_text
+          }
+          break
+        case 'bookmark':
+        case 'embed':
+        case 'link_preview':
+          structureItem.text = block[block.type].url
+          break
+        case 'equation':
+          structureItem.text = block[block.type].expression
+          break
+        case 'image':
+        case 'file':
+        case 'video':
+        case 'pdf':
+          if (block[block.type].type === 'file') {
+            structureItem.text = block[block.type].file.url
+          } else if (block[block.type].type === 'external') {
+            structureItem.text = block[block.type].external.url
+          }
+          break
+        // For other types, just include type and id
+        default:
+          break
+      }
+    } catch (e) {
+      // If extraction fails, just include type and id
+    }
+
+    return structureItem
+  })
+
+  return {
+    id: pageId,
+    title: pageTitle,
+    type: 'page',
+    ...(pageIcon && { icon: pageIcon }),
+    structure,
+  }
+}
