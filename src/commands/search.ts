@@ -18,7 +18,8 @@ import {
   showRawFlagHint
 } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
-import { wrapNotionError } from '../errors'
+import { wrapNotionError, NotionCLIError } from '../errors'
+import * as dayjs from 'dayjs'
 
 export default class Search extends Command {
   static description = 'Search by title'
@@ -31,6 +32,26 @@ export default class Search extends Command {
     {
       description: 'Search by title',
       command: `$ notion-cli search -q 'My Page'`,
+    },
+    {
+      description: 'Search only within a specific database',
+      command: `$ notion-cli search -q 'meeting' --database DB_ID`,
+    },
+    {
+      description: 'Search with created date filter',
+      command: `$ notion-cli search -q 'report' --created-after 2025-10-01`,
+    },
+    {
+      description: 'Search with edited date filter',
+      command: `$ notion-cli search -q 'project' --edited-after 2025-10-20`,
+    },
+    {
+      description: 'Limit number of results',
+      command: `$ notion-cli search -q 'task' --limit 20`,
+    },
+    {
+      description: 'Combined filters',
+      command: `$ notion-cli search -q 'project' -d DB_ID --edited-after 2025-10-20 --limit 10`,
     },
     {
       description: 'Search by title and output csv',
@@ -108,6 +129,25 @@ export default class Search extends Command {
       max: 100,
       default: 5,
     }),
+    database: Flags.string({
+      description: 'Limit search to pages within a specific database (data source ID)',
+    }),
+    'created-after': Flags.string({
+      description: 'Filter results created after this date (ISO 8601 format: YYYY-MM-DD)',
+    }),
+    'created-before': Flags.string({
+      description: 'Filter results created before this date (ISO 8601 format: YYYY-MM-DD)',
+    }),
+    'edited-after': Flags.string({
+      description: 'Filter results edited after this date (ISO 8601 format: YYYY-MM-DD)',
+    }),
+    'edited-before': Flags.string({
+      description: 'Filter results edited before this date (ISO 8601 format: YYYY-MM-DD)',
+    }),
+    limit: Flags.integer({
+      description: 'Maximum number of results to return (applied after filters)',
+      min: 1,
+    }),
     raw: Flags.boolean({
       char: 'r',
       description: 'output raw json (recommended for AI assistants - returns all search results)',
@@ -121,6 +161,32 @@ export default class Search extends Command {
     const { flags } = await this.parse(Search)
 
     try {
+      // Validate date filters
+      if (flags['created-after'] && !dayjs(flags['created-after']).isValid()) {
+        throw new NotionCLIError(
+          'VALIDATION_ERROR' as any,
+          `Invalid date format for --created-after: ${flags['created-after']}. Use ISO 8601 format (YYYY-MM-DD).`
+        )
+      }
+      if (flags['created-before'] && !dayjs(flags['created-before']).isValid()) {
+        throw new NotionCLIError(
+          'VALIDATION_ERROR' as any,
+          `Invalid date format for --created-before: ${flags['created-before']}. Use ISO 8601 format (YYYY-MM-DD).`
+        )
+      }
+      if (flags['edited-after'] && !dayjs(flags['edited-after']).isValid()) {
+        throw new NotionCLIError(
+          'VALIDATION_ERROR' as any,
+          `Invalid date format for --edited-after: ${flags['edited-after']}. Use ISO 8601 format (YYYY-MM-DD).`
+        )
+      }
+      if (flags['edited-before'] && !dayjs(flags['edited-before']).isValid()) {
+        throw new NotionCLIError(
+          'VALIDATION_ERROR' as any,
+          `Invalid date format for --edited-before: ${flags['edited-before']}. Use ISO 8601 format (YYYY-MM-DD).`
+        )
+      }
+
       const params: SearchParameters = {}
       if (flags.query) {
         params.query = flags.query
@@ -146,7 +212,16 @@ export default class Search extends Command {
       if (flags.start_cursor) {
         params.start_cursor = flags.start_cursor
       }
-      if (flags.page_size) {
+
+      // Increase page_size if we need to apply client-side filters
+      // This ensures we get enough results before filtering
+      const hasClientSideFilters = flags.database || flags['created-after'] ||
+        flags['created-before'] || flags['edited-after'] || flags['edited-before']
+
+      if (hasClientSideFilters) {
+        // Use 100 (max) to get more results for filtering
+        params.page_size = 100
+      } else if (flags.page_size) {
         params.page_size = flags.page_size
       }
 
@@ -154,6 +229,75 @@ export default class Search extends Command {
         console.log(params)
       }
       const res = await notion.search(params)
+
+      // Apply client-side filters (Notion API doesn't support these natively in search)
+      let filteredResults = res.results
+
+      // Filter by database (parent)
+      if (flags.database) {
+        filteredResults = filteredResults.filter((result: any) => {
+          if (isFullPage(result) && result.parent) {
+            if ('database_id' in result.parent) {
+              return result.parent.database_id === flags.database
+            }
+          }
+          return false
+        })
+      }
+
+      // Filter by created date
+      if (flags['created-after']) {
+        const afterDate = dayjs(flags['created-after'])
+        filteredResults = filteredResults.filter((result: any) => {
+          if ('created_time' in result) {
+            return dayjs(result.created_time).isAfter(afterDate) ||
+                   dayjs(result.created_time).isSame(afterDate, 'day')
+          }
+          return false
+        })
+      }
+
+      if (flags['created-before']) {
+        const beforeDate = dayjs(flags['created-before'])
+        filteredResults = filteredResults.filter((result: any) => {
+          if ('created_time' in result) {
+            return dayjs(result.created_time).isBefore(beforeDate) ||
+                   dayjs(result.created_time).isSame(beforeDate, 'day')
+          }
+          return false
+        })
+      }
+
+      // Filter by edited date
+      if (flags['edited-after']) {
+        const afterDate = dayjs(flags['edited-after'])
+        filteredResults = filteredResults.filter((result: any) => {
+          if ('last_edited_time' in result) {
+            return dayjs(result.last_edited_time).isAfter(afterDate) ||
+                   dayjs(result.last_edited_time).isSame(afterDate, 'day')
+          }
+          return false
+        })
+      }
+
+      if (flags['edited-before']) {
+        const beforeDate = dayjs(flags['edited-before'])
+        filteredResults = filteredResults.filter((result: any) => {
+          if ('last_edited_time' in result) {
+            return dayjs(result.last_edited_time).isBefore(beforeDate) ||
+                   dayjs(result.last_edited_time).isSame(beforeDate, 'day')
+          }
+          return false
+        })
+      }
+
+      // Apply limit after all filters
+      if (flags.limit) {
+        filteredResults = filteredResults.slice(0, flags.limit)
+      }
+
+      // Update res.results with filtered results
+      res.results = filteredResults
 
       // Handle JSON output for automation (takes precedence)
       if (flags.json) {
