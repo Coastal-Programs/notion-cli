@@ -203,8 +203,9 @@ export default class DbQuery extends Command {
           // Load from file (new flag or deprecated fileFilter)
           const filterFile = flags['file-filter'] || flags.fileFilter
           const fp = path.join('./', filterFile!)
+          let fj: string
           try {
-            const fj = fs.readFileSync(fp, { encoding: 'utf-8' })
+            fj = fs.readFileSync(fp, { encoding: 'utf-8' })
             filter = JSON.parse(fj)
           } catch (error: any) {
             if (error.code === 'ENOENT') {
