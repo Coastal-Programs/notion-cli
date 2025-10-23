@@ -3,6 +3,11 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
 import { AutomationFlags } from '../../base-flags'
+import {
+  NotionCLIError,
+  NotionCLIErrorCode,
+  wrapNotionError
+} from '../../errors'
 
 export default class ConfigSetToken extends Command {
   static description = 'Set NOTION_TOKEN in your shell configuration file'
@@ -44,13 +49,16 @@ export default class ConfigSetToken extends Command {
 
       if (!token) {
         if (flags.json) {
-          this.log(JSON.stringify({
-            success: false,
-            error: 'Token required in JSON mode',
-            message: 'Please provide the token as an argument when using --json flag',
-          }, null, 2))
-          process.exit(1)
-          return
+          throw new NotionCLIError(
+            NotionCLIErrorCode.TOKEN_MISSING,
+            'Token required in JSON mode',
+            [
+              {
+                description: 'Provide the token as an argument',
+                command: 'notion-cli config set-token secret_your_token_here --json'
+              }
+            ]
+          )
         }
 
         // Interactive prompt
@@ -70,17 +78,23 @@ export default class ConfigSetToken extends Command {
 
       // Validate token format
       if (!token || !token.startsWith('secret_')) {
-        if (flags.json) {
-          this.log(JSON.stringify({
-            success: false,
-            error: 'Invalid token format',
-            message: 'Notion tokens must start with "secret_"',
-          }, null, 2))
-        } else {
-          this.error('Invalid token format. Notion tokens must start with "secret_"')
-        }
-        process.exit(1)
-        return
+        throw new NotionCLIError(
+          NotionCLIErrorCode.TOKEN_INVALID,
+          'Invalid token format - Notion tokens must start with "secret_"',
+          [
+            {
+              description: 'Get your integration token from Notion',
+              link: 'https://developers.notion.com/docs/create-a-notion-integration'
+            },
+            {
+              description: 'Tokens should look like: secret_abc123...',
+            }
+          ],
+          {
+            userInput: token,
+            metadata: { tokenFormat: 'invalid' }
+          }
+        )
       }
 
       // Detect shell and rc file
@@ -161,13 +175,16 @@ export default class ConfigSetToken extends Command {
 
       process.exit(0)
     } catch (error: any) {
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            endpoint: 'config.set-token'
+          })
+
       if (flags.json) {
-        this.log(JSON.stringify({
-          success: false,
-          error: error.message,
-        }, null, 2))
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(error.message)
+        this.error(cliError.toHumanString())
       }
 
       process.exit(1)

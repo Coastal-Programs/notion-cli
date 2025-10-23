@@ -4,7 +4,8 @@ import { outputMarkdownTable, outputPrettyTable, outputCompactJson } from '../he
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
 import {
   NotionCLIError,
-  NotionCLIErrorFactory
+  NotionCLIErrorFactory,
+  wrapNotionError
 } from '../errors'
 import * as path from 'path'
 import * as os from 'os'
@@ -47,25 +48,8 @@ export default class List extends Command {
       const cache = await loadCache()
 
       if (!cache) {
-        const cachePath = await getCachePath()
-
-        if (flags.json) {
-          this.log(JSON.stringify({
-            success: false,
-            error: {
-              code: 'WORKSPACE_NOT_SYNCED',
-              message: 'No workspace cache found. Run: notion-cli sync',
-              cache_path: cachePath,
-              suggestions: ['notion-cli sync'],
-            },
-          }, null, 2))
-        } else {
-          this.log(`No cache found at ${cachePath}`)
-          this.log('\nRun "notion-cli sync" to build the cache.')
-        }
-
-        process.exit(1)
-        return
+        // Use enhanced error factory for workspace not synced
+        throw NotionCLIErrorFactory.workspaceNotSynced('')
       }
 
       // Calculate cache age
@@ -204,13 +188,16 @@ export default class List extends Command {
       this.log(`\nTip: Run "notion-cli sync" to refresh the cache.`)
       process.exit(0)
     } catch (error: any) {
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            endpoint: 'workspace.list'
+          })
+
       if (flags.json) {
-        this.log(JSON.stringify({
-          success: false,
-          error: error.message,
-        }, null, 2))
+        this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(error.message)
+        this.error(cliError.toHumanString())
       }
 
       process.exit(1)
