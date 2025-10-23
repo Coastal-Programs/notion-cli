@@ -25,7 +25,11 @@ import {
 } from '../../helper'
 import { client } from '../../notion'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
-import { NotionCLIError, wrapNotionError } from '../../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorFactory,
+  wrapNotionError
+} from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbQuery extends Command {
@@ -192,12 +196,8 @@ export default class DbQuery extends Command {
           const filterStr = flags.filter || flags.rawFilter
           try {
             filter = JSON.parse(filterStr!)
-          } catch (error) {
-            throw new NotionCLIError(
-              'VALIDATION_ERROR' as any,
-              `Invalid JSON in --filter. Example: --filter '{"property": "Status", "select": {"equals": "Done"}}'`,
-              { error }
-            )
+          } catch (error: any) {
+            throw NotionCLIErrorFactory.invalidJson(filterStr!, error)
           }
         } else if (flags['file-filter'] || flags.fileFilter) {
           // Load from file (new flag or deprecated fileFilter)
@@ -206,12 +206,14 @@ export default class DbQuery extends Command {
           try {
             const fj = fs.readFileSync(fp, { encoding: 'utf-8' })
             filter = JSON.parse(fj)
-          } catch (error) {
-            throw new NotionCLIError(
-              'VALIDATION_ERROR' as any,
-              `Failed to read filter file: ${filterFile}. Ensure the file exists and contains valid JSON.`,
-              { error }
-            )
+          } catch (error: any) {
+            if (error.code === 'ENOENT') {
+              throw NotionCLIErrorFactory.invalidJson(
+                filterFile!,
+                new Error(`File not found: ${filterFile}`)
+              )
+            }
+            throw NotionCLIErrorFactory.invalidJson(fj, error)
           }
         } else if (flags.search) {
           // Simple text search - convert to Notion filter
@@ -245,16 +247,15 @@ export default class DbQuery extends Command {
           sorts: sorts.length > 0 ? sorts : undefined,
           page_size: flags['page-size'],
         }
-      } catch (e) {
+      } catch (e: any) {
         // Re-throw NotionCLIError, wrap others
         if (e instanceof NotionCLIError) {
           throw e
         }
-        throw new NotionCLIError(
-          'VALIDATION_ERROR' as any,
-          `Failed to build query parameters: ${e.message}`,
-          { error: e }
-        )
+        throw wrapNotionError(e, {
+          resourceType: 'database',
+          userInput: args.database_id
+        })
       }
 
       // Fetch pages from database
@@ -347,11 +348,18 @@ export default class DbQuery extends Command {
       }
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            resourceType: 'database',
+            attemptedId: args.database_id,
+            endpoint: 'dataSources.query'
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

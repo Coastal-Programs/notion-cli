@@ -8,7 +8,10 @@ import {
   getBlockPlainText,
 } from '../../helper'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
-import { wrapNotionError, NotionCLIError } from '../../errors'
+import {
+  NotionCLIError,
+  wrapNotionError
+} from '../../errors'
 import { PageObjectResponse, BlockObjectResponse, GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as readline from 'readline'
 
@@ -135,12 +138,18 @@ export default class BatchRetrieve extends Command {
         data,
       }
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            attemptedId: id,
+            userInput: id
+          })
+
       return {
         id,
         success: false,
         error: cliError.code,
-        message: cliError.message,
+        message: cliError.userMessage,
       }
     }
   }
@@ -261,11 +270,16 @@ export default class BatchRetrieve extends Command {
 
       process.exit(failureCount === 0 ? 0 : 1)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            endpoint: 'batch.retrieve'
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

@@ -7,7 +7,11 @@ import {
 import { getBlockPlainText, outputRawJson, buildBlocksFromTextFlags } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorFactory,
+  wrapNotionError
+} from '../../errors'
 
 export default class BlockAppend extends Command {
   static description = 'Append block children'
@@ -153,7 +157,11 @@ export default class BlockAppend extends Command {
         }
       } else if (flags.children) {
         // Use complex JSON
-        children = JSON.parse(flags.children)
+        try {
+          children = JSON.parse(flags.children)
+        } catch (error: any) {
+          throw NotionCLIErrorFactory.invalidJson(flags.children, error)
+        }
       } else {
         this.error('No content provided. Use text-based flags (--text, --heading-1, etc.) or --children flag.')
       }
@@ -208,11 +216,19 @@ export default class BlockAppend extends Command {
       ux.table(res.results, columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            resourceType: 'block',
+            attemptedId: flags.block_id,
+            endpoint: 'blocks.children.append',
+            userInput: flags.children
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }

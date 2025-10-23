@@ -2,7 +2,10 @@ import { Command, Flags, ux } from '@oclif/core'
 import { loadCache, getCachePath } from '../utils/workspace-cache'
 import { outputMarkdownTable, outputPrettyTable, outputCompactJson } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
-import { NotionCLIError } from '../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorFactory
+} from '../errors'
 import * as path from 'path'
 import * as os from 'os'
 

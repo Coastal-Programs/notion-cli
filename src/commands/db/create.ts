@@ -6,7 +6,11 @@ import {
 import * as notion from '../../notion'
 import { outputRawJson, getDbTitle } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
-import { NotionCLIError, wrapNotionError } from '../../errors'
+import {
+  NotionCLIError,
+  NotionCLIErrorFactory,
+  wrapNotionError
+} from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbCreate extends Command {
@@ -118,11 +122,17 @@ export default class DbCreate extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
+      const cliError = error instanceof NotionCLIError
+        ? error
+        : wrapNotionError(error, {
+            resourceType: 'database',
+            endpoint: 'databases.create'
+          })
+
       if (flags.json) {
         this.log(JSON.stringify(cliError.toJSON(), null, 2))
       } else {
-        this.error(cliError.message)
+        this.error(cliError.toHumanString())
       }
       process.exit(1)
     }
