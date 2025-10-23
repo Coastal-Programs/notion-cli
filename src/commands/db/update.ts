@@ -6,7 +6,7 @@ import {
 import * as notion from '../../notion'
 import { outputRawJson, getDataSourceTitle } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
-import { NotionCLIError, wrapNotionError } from '../../errors'
+import { NotionCLIError, NotionCLIErrorCode, handleCliError } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbUpdate extends Command {
@@ -109,13 +109,11 @@ export default class DbUpdate extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'database',
+        attemptedId: args.database_id,
+        endpoint: 'dataSources.update'
+      })
     }
   }
 }

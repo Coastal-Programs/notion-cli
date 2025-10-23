@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core'
 import { AutomationFlags } from '../base-flags'
 import * as notion from '../notion'
 import { cacheManager } from '../cache'
-import { wrapNotionError, ErrorCode, NotionCLIError } from '../errors'
+import { handleCliError, NotionCLIError, NotionCLIErrorCode } from '../errors'
 import { loadCache } from '../utils/workspace-cache'
 
 export default class Whoami extends Command {
@@ -210,52 +210,9 @@ export default class Whoami extends Command {
 
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-
-      // Build suggestions based on error type
-      const suggestions: string[] = []
-
-      if (cliError.code === ErrorCode.UNAUTHORIZED) {
-        suggestions.push('Check NOTION_TOKEN: echo $NOTION_TOKEN')
-        suggestions.push('Verify token at: https://www.notion.so/my-integrations')
-        suggestions.push('Get new token: https://developers.notion.com/docs/create-a-notion-integration')
-      } else if (cliError.code === ErrorCode.RATE_LIMITED) {
-        suggestions.push('Wait a moment and try again')
-        suggestions.push('Rate limit will reset automatically')
-      } else {
-        suggestions.push('Check your internet connection')
-        suggestions.push('Verify Notion API status: https://status.notion.so')
-        suggestions.push('Try again with --no-cache flag')
-      }
-
-      if (flags.json) {
-        this.log(JSON.stringify({
-          success: false,
-          error: {
-            code: cliError.code,
-            message: cliError.message,
-            suggestions,
-            details: cliError.details,
-          },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            command: 'whoami',
-            execution_time_ms: Date.now() - startTime,
-          }
-        }, null, 2))
-      } else {
-        this.log('\nConnection Failed')
-        this.log('='.repeat(60))
-        this.log(`Error:       ${cliError.code}`)
-        this.log(`Message:     ${cliError.message}`)
-        this.log('\nSuggestions:')
-        suggestions.forEach(suggestion => {
-          this.log(`  - ${suggestion}`)
-        })
-        this.log('='.repeat(60))
-      }
-
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        endpoint: 'users.me'
+      })
     }
   }
 }

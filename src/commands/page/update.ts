@@ -4,7 +4,7 @@ import { UpdatePageParameters, PageObjectResponse } from '@notionhq/client/build
 import { getPageTitle, outputRawJson } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { handleCliError } from '../../errors'
 import { expandSimpleProperties } from '../../utils/property-expander'
 
 export default class PageUpdate extends Command {
@@ -181,13 +181,11 @@ export default class PageUpdate extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'page',
+        attemptedId: args.page_id,
+        endpoint: 'pages.update'
+      })
     }
   }
 }

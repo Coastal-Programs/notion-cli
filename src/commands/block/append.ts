@@ -7,7 +7,7 @@ import {
 import { getBlockPlainText, outputRawJson } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { handleCliError } from '../../errors'
 
 export default class BlockAppend extends Command {
   static description = 'Append block children'
@@ -118,13 +118,11 @@ export default class BlockAppend extends Command {
       ux.table(res.results, columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'block',
+        attemptedId: flags['block-id'],
+        endpoint: 'blocks.children.append'
+      })
     }
   }
 }

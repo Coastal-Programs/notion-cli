@@ -12,7 +12,7 @@ import {
 import { NotionToMarkdown } from 'notion-to-md'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
 import { resolveNotionId } from '../../utils/notion-resolver'
-import { wrapNotionError } from '../../errors'
+import { handleCliError } from '../../errors'
 
 export default class PageRetrieve extends Command {
   static description = 'Retrieve a page'
@@ -154,13 +154,11 @@ export default class PageRetrieve extends Command {
       // Show hint after table output to make -r flag discoverable
       showRawFlagHint(1, res)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'page',
+        attemptedId: args.page_id,
+        endpoint: 'pages.retrieve'
+      })
     }
   }
 }

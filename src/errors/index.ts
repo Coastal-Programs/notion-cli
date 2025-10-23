@@ -16,7 +16,7 @@
  * ```
  */
 
-// Export enhanced error system
+// Export enhanced error system (primary exports)
 export {
   // Error Class
   NotionCLIError,
@@ -35,11 +35,3 @@ export {
   ErrorSuggestion,
   ErrorContext,
 } from './enhanced-errors'
-
-// Re-export legacy error system for backward compatibility
-// TODO: Remove after migration is complete
-export {
-  ErrorCode as LegacyErrorCode,
-  NotionCLIError as LegacyNotionCLIError,
-  wrapNotionError as legacyWrapNotionError,
-} from '../errors'

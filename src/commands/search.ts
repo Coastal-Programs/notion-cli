@@ -18,7 +18,7 @@ import {
   showRawFlagHint
 } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
-import { wrapNotionError } from '../errors'
+import { handleCliError } from '../errors'
 
 export default class Search extends Command {
   static description = 'Search by title'
@@ -232,13 +232,9 @@ export default class Search extends Command {
         showRawFlagHint(res.results.length, res.results[0])
       }
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        endpoint: 'search'
+      })
     }
   }
 }

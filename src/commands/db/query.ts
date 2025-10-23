@@ -24,7 +24,7 @@ import {
 } from '../../helper'
 import { client } from '../../notion'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
-import { NotionCLIError, wrapNotionError } from '../../errors'
+import { NotionCLIError, NotionCLIErrorCode, handleCliError } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbQuery extends Command {
@@ -193,9 +193,18 @@ export default class DbQuery extends Command {
             filter = JSON.parse(filterStr!)
           } catch (error) {
             throw new NotionCLIError(
-              'VALIDATION_ERROR' as any,
-              `Invalid JSON in --filter. Example: --filter '{"property": "Status", "select": {"equals": "Done"}}'`,
-              { error }
+              NotionCLIErrorCode.INVALID_JSON,
+              `Invalid JSON in --filter`,
+              [
+                {
+                  description: 'Check for common JSON syntax errors: missing quotes, trailing commas, unclosed brackets'
+                },
+                {
+                  description: 'Example filter format',
+                  command: `notion-cli db query ${args.database_id} --filter '{"property": "Status", "select": {"equals": "Done"}}'`
+                }
+              ],
+              { userInput: filterStr, originalError: error }
             )
           }
         } else if (flags['file-filter'] || flags.fileFilter) {
@@ -207,9 +216,18 @@ export default class DbQuery extends Command {
             filter = JSON.parse(fj)
           } catch (error) {
             throw new NotionCLIError(
-              'VALIDATION_ERROR' as any,
-              `Failed to read filter file: ${filterFile}. Ensure the file exists and contains valid JSON.`,
-              { error }
+              NotionCLIErrorCode.INVALID_JSON,
+              `Failed to read filter file: ${filterFile}`,
+              [
+                {
+                  description: 'Ensure the file exists and contains valid JSON'
+                },
+                {
+                  description: 'Check file path is correct',
+                  command: `ls -la ${filterFile}`
+                }
+              ],
+              { userInput: filterFile, originalError: error }
             )
           }
         } else if (flags.search) {
@@ -250,9 +268,14 @@ export default class DbQuery extends Command {
           throw e
         }
         throw new NotionCLIError(
-          'VALIDATION_ERROR' as any,
+          NotionCLIErrorCode.VALIDATION_ERROR,
           `Failed to build query parameters: ${e.message}`,
-          { error: e }
+          [
+            {
+              description: 'Check that all filter parameters are correctly formatted'
+            }
+          ],
+          { originalError: e }
         )
       }
 
@@ -341,13 +364,11 @@ export default class DbQuery extends Command {
       }
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'database',
+        attemptedId: args.database_id,
+        endpoint: 'dataSources.query'
+      })
     }
   }
 }

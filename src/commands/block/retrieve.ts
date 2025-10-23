@@ -3,7 +3,7 @@ import * as notion from '../../notion'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import { getBlockPlainText, outputRawJson } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { handleCliError } from '../../errors'
 
 export default class BlockRetrieve extends Command {
   static description = 'Retrieve a block'
@@ -81,13 +81,11 @@ export default class BlockRetrieve extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'block',
+        attemptedId: args.block_id,
+        endpoint: 'blocks.retrieve'
+      })
     }
   }
 }

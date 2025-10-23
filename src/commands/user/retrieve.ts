@@ -3,7 +3,7 @@ import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../notion'
 import { outputRawJson } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
-import { wrapNotionError } from '../../errors'
+import { handleCliError } from '../../errors'
 
 export default class UserRetrieve extends Command {
   static description = 'Retrieve a user'
@@ -86,13 +86,11 @@ export default class UserRetrieve extends Command {
       ux.table([res], columns, options)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-      if (flags.json) {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-      process.exit(1)
+      handleCliError(error, flags.json, {
+        resourceType: 'user',
+        attemptedId: args.user_id,
+        endpoint: 'users.retrieve'
+      })
     }
   }
 }

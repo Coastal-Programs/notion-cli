@@ -13,7 +13,7 @@ import {
   groupExamplesByWritability,
   PropertyExample,
 } from '../../utils/schema-examples'
-import { wrapNotionError } from '../../errors'
+import { handleCliError } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
 
 export default class DbSchema extends Command {
@@ -206,15 +206,11 @@ export default class DbSchema extends Command {
       this.outputTable(schema)
       process.exit(0)
     } catch (error) {
-      const cliError = wrapNotionError(error)
-
-      if (flags.json || flags.output === 'json') {
-        this.log(JSON.stringify(cliError.toJSON(), null, 2))
-      } else {
-        this.error(cliError.message)
-      }
-
-      process.exit(1)
+      handleCliError(error, flags.json || flags.output === 'json', {
+        resourceType: 'database',
+        attemptedId: args.database_id,
+        endpoint: 'dataSources.retrieve'
+      })
     }
   }
 
