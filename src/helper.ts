@@ -590,3 +590,57 @@ export const getBlockPlainText = (row: BlockObjectResponse) => {
     return ''
   }
 }
+
+/**
+ * Enrich child_database blocks with queryable data_source_id
+ *
+ * In Notion's API, child_database blocks only return a title, not the database ID.
+ * This function attempts to resolve the database ID by trying the block ID itself
+ * as a data_source_id (which often works in practice).
+ *
+ * @param block The block object to enrich (will be modified in place)
+ * @returns Promise that resolves when enrichment is complete
+ */
+export const enrichChildDatabaseBlock = async (block: any): Promise<void> => {
+  if (block.type !== 'child_database') {
+    return
+  }
+
+  try {
+    // Try using the block ID as the data_source_id
+    // In many cases, the child_database block ID IS the data_source_id
+    const dataSource = await notion.retrieveDataSource(block.id)
+
+    // Add the data_source_id to the child_database object
+    if (dataSource && dataSource.object === 'data_source') {
+      block.child_database.data_source_id = block.id
+      block.child_database.database_id = dataSource.database_id
+    }
+  } catch (error) {
+    // If the block ID doesn't work as a data_source_id, silently continue
+    // This is expected for some child_database blocks
+    if (process.env.DEBUG) {
+      console.error(`Could not resolve database ID for block ${block.id}: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * Filter and enrich child_database blocks from a list of blocks
+ *
+ * @param blocks Array of block objects
+ * @returns Array of enriched child_database blocks with data_source_id
+ */
+export const getChildDatabasesWithIds = async (blocks: BlockObjectResponse[]): Promise<any[]> => {
+  const childDatabases = blocks.filter(block => block.type === 'child_database')
+
+  // Enrich each child_database block with its data_source_id
+  await Promise.all(childDatabases.map(block => enrichChildDatabaseBlock(block)))
+
+  return childDatabases.map(block => ({
+    block_id: block.id,
+    title: block.child_database.title,
+    data_source_id: block.child_database.data_source_id || null,
+    database_id: block.child_database.database_id || null,
+  }))
+}
