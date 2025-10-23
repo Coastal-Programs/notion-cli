@@ -14,6 +14,7 @@ import {
   wrapNotionError
 } from '../../errors'
 import { PageObjectResponse, BlockObjectResponse, GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints'
+import { isFullPage, isFullBlock } from '@notionhq/client'
 import * as readline from 'readline'
 
 type RetrieveResult = {
@@ -120,12 +121,32 @@ export default class BatchRetrieve extends Command {
       let data: PageObjectResponse | BlockObjectResponse | GetDataSourceResponse
 
       switch (type) {
-        case 'page':
-          data = await notion.retrievePage({ page_id: id })
+        case 'page': {
+          const pageResponse = await notion.retrievePage({ page_id: id })
+          if (!isFullPage(pageResponse)) {
+            throw new NotionCLIError(
+              NotionCLIErrorCode.API_ERROR,
+              'Received partial page response instead of full page',
+              [],
+              { attemptedId: id }
+            )
+          }
+          data = pageResponse
           break
-        case 'block':
-          data = await notion.retrieveBlock(id)
+        }
+        case 'block': {
+          const blockResponse = await notion.retrieveBlock(id)
+          if (!isFullBlock(blockResponse)) {
+            throw new NotionCLIError(
+              NotionCLIErrorCode.API_ERROR,
+              'Received partial block response instead of full block',
+              [],
+              { attemptedId: id }
+            )
+          }
+          data = blockResponse
           break
+        }
         case 'database':
           data = await notion.retrieveDataSource(id)
           break
@@ -244,7 +265,7 @@ export default class BatchRetrieve extends Command {
           if ('object' in result.data) {
             if (result.data.object === 'page') {
               title = getPageTitle(result.data as PageObjectResponse)
-            } else if (result.data.object === 'database') {
+            } else if (result.data.object === 'data_source') {
               title = getDataSourceTitle(result.data as GetDataSourceResponse)
             } else if (result.data.object === 'block') {
               title = getBlockPlainText(result.data as BlockObjectResponse)

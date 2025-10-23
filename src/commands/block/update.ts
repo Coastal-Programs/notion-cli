@@ -4,6 +4,7 @@ import {
   UpdateBlockParameters,
   BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
+import { isFullBlock } from '@notionhq/client'
 import { outputRawJson, getBlockPlainText, buildBlockUpdateFromTextFlags } from '../../helper'
 import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
@@ -179,7 +180,17 @@ export default class BlockUpdate extends Command {
       // Handle color updates
       if (flags.color) {
         // Retrieve the block to determine its type
-        const block = await notion.retrieveBlock(blockId)
+        const blockResponse = await notion.retrieveBlock(blockId)
+
+        // Ensure we have a full block response
+        if (!isFullBlock(blockResponse)) {
+          throw new NotionCLIError(
+            NotionCLIErrorFactory.apiError('block', blockId).code,
+            'Received partial block response. Cannot determine block type for color update.',
+            [],
+            { attemptedId: blockId }
+          )
+        }
 
         // Color is only supported for certain block types
         const colorSupportedTypes = [
@@ -188,13 +199,13 @@ export default class BlockUpdate extends Command {
           'quote', 'callout'
         ]
 
-        if (!colorSupportedTypes.includes(block.type)) {
-          this.error(`Color property is not supported for block type: ${block.type}. Supported types: ${colorSupportedTypes.join(', ')}`)
+        if (!colorSupportedTypes.includes(blockResponse.type)) {
+          this.error(`Color property is not supported for block type: ${blockResponse.type}. Supported types: ${colorSupportedTypes.join(', ')}`)
         }
 
         // Color must be nested within the block type property
-        params[block.type] = {
-          ...params[block.type],
+        params[blockResponse.type] = {
+          ...params[blockResponse.type],
           color: flags.color
         }
       }
