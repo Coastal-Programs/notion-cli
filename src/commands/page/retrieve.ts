@@ -26,6 +26,14 @@ export default class PageRetrieve extends Command {
       command: `$ notion-cli page retrieve PAGE_ID -r`,
     },
     {
+      description: 'Retrieve entire page tree with all nested content (35% token reduction)',
+      command: `$ notion-cli page retrieve PAGE_ID --recursive --compact-json`,
+    },
+    {
+      description: 'Retrieve page tree with custom depth limit',
+      command: `$ notion-cli page retrieve PAGE_ID -R --max-depth 5 --json`,
+    },
+    {
       description: 'Retrieve a page and output table',
       command: `$ notion-cli page retrieve PAGE_ID`,
     },
@@ -71,6 +79,18 @@ export default class PageRetrieve extends Command {
       char: 'm',
       description: 'output page content as markdown',
     }),
+    recursive: Flags.boolean({
+      char: 'R',
+      description: 'recursively fetch all blocks and nested pages (reduces API calls)',
+      default: false,
+    }),
+    'max-depth': Flags.integer({
+      description: 'maximum recursion depth for --recursive (default: 3)',
+      default: 3,
+      min: 1,
+      max: 10,
+      dependsOn: ['recursive'],
+    }),
     ...ux.table.flags(),
     ...OutputFormatFlags,
     ...AutomationFlags,
@@ -90,6 +110,45 @@ export default class PageRetrieve extends Command {
         const mdString = n2m.toMarkdownString(mdBlocks)
         console.log(mdString.parent)
         process.exit(0)
+        return
+      }
+
+      // Handle recursive fetching
+      if (flags.recursive) {
+        const recursiveData = await notion.retrievePageRecursive(
+          pageId,
+          0,
+          flags['max-depth']
+        )
+
+        // Handle JSON output for automation (takes precedence)
+        if (flags.json) {
+          this.log(JSON.stringify({
+            success: true,
+            data: recursiveData,
+            timestamp: new Date().toISOString()
+          }, null, 2))
+          process.exit(0)
+          return
+        }
+
+        // Handle compact JSON output
+        if (flags['compact-json']) {
+          outputCompactJson(recursiveData)
+          process.exit(0)
+          return
+        }
+
+        // Handle raw JSON output
+        if (flags.raw) {
+          outputRawJson(recursiveData)
+          process.exit(0)
+          return
+        }
+
+        // For other formats, show a message that they're not supported with recursive
+        this.error('Recursive mode only supports --json, --compact-json, or --raw output formats')
+        process.exit(1)
         return
       }
 
