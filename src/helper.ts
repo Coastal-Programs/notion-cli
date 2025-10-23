@@ -797,6 +797,71 @@ export const buildBlocksFromTextFlags = (flags: {
 }
 
 /**
+ * Attempt to enrich a child_database block with its queryable data_source_id
+ *
+ * The Notion API returns child_database blocks without the database/data_source ID,
+ * making them unqueryable. This function attempts to resolve the block ID to a
+ * queryable data_source_id by trying to retrieve it as a data source.
+ *
+ * @param block The child_database block to enrich
+ * @returns The enriched block with data_source_id and database_id fields, or original block if resolution fails
+ */
+export const enrichChildDatabaseBlock = async (block: BlockObjectResponse): Promise<BlockObjectResponse> => {
+  // Only process child_database blocks
+  if (block.type !== 'child_database') {
+    return block
+  }
+
+  try {
+    // Attempt to use the block ID as a data source ID
+    // In many cases, the child_database block ID IS the data source ID
+    const dataSource = await notion.retrieveDataSource(block.id)
+
+    // If successful, add the IDs to the block object
+    return {
+      ...block,
+      child_database: {
+        ...block.child_database,
+        // @ts-ignore - Adding custom fields for discoverability
+        data_source_id: block.id,
+        database_id: dataSource.id,
+      },
+    }
+  } catch (error) {
+    // If retrieval fails, return the original block unchanged
+    // This is expected for some child_database blocks
+    return block
+  }
+}
+
+/**
+ * Get all child_database blocks from a list of blocks and enrich them with queryable IDs
+ *
+ * @param blocks Array of blocks to filter and enrich
+ * @returns Array of enriched child_database blocks with title, block_id, data_source_id, and database_id
+ */
+export const getChildDatabasesWithIds = async (blocks: BlockObjectResponse[]): Promise<any[]> => {
+  const childDatabases = blocks.filter(block => block.type === 'child_database')
+
+  const enrichedDatabases = await Promise.all(
+    childDatabases.map(async (block) => {
+      const enriched = await enrichChildDatabaseBlock(block)
+
+      return {
+        block_id: enriched.id,
+        title: enriched.child_database.title,
+        // @ts-ignore - Custom fields added by enrichChildDatabaseBlock
+        data_source_id: enriched.child_database.data_source_id || null,
+        // @ts-ignore
+        database_id: enriched.child_database.database_id || null,
+      }
+    })
+  )
+
+  return enrichedDatabases
+}
+
+/**
  * Build block update content from simple text flags
  * Returns an object with the block type properties for updating
  */
