@@ -590,3 +590,272 @@ export const getBlockPlainText = (row: BlockObjectResponse) => {
     return ''
   }
 }
+
+/**
+ * Helper to create rich text array from plain text string
+ */
+const createRichText = (text: string) => {
+  return [
+    {
+      type: 'text' as const,
+      text: {
+        content: text,
+      },
+    },
+  ]
+}
+
+/**
+ * Build block JSON from simple text-based flags
+ * Returns an array of block objects ready for Notion API
+ */
+export const buildBlocksFromTextFlags = (flags: {
+  text?: string
+  heading1?: string
+  heading2?: string
+  heading3?: string
+  bullet?: string
+  numbered?: string
+  todo?: string
+  toggle?: string
+  code?: string
+  language?: string
+  quote?: string
+  callout?: string
+}): any[] => {
+  const blocks: any[] = []
+
+  if (flags.text) {
+    blocks.push({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: createRichText(flags.text),
+      },
+    })
+  }
+
+  if (flags.heading1) {
+    blocks.push({
+      object: 'block',
+      type: 'heading_1',
+      heading_1: {
+        rich_text: createRichText(flags.heading1),
+      },
+    })
+  }
+
+  if (flags.heading2) {
+    blocks.push({
+      object: 'block',
+      type: 'heading_2',
+      heading_2: {
+        rich_text: createRichText(flags.heading2),
+      },
+    })
+  }
+
+  if (flags.heading3) {
+    blocks.push({
+      object: 'block',
+      type: 'heading_3',
+      heading_3: {
+        rich_text: createRichText(flags.heading3),
+      },
+    })
+  }
+
+  if (flags.bullet) {
+    blocks.push({
+      object: 'block',
+      type: 'bulleted_list_item',
+      bulleted_list_item: {
+        rich_text: createRichText(flags.bullet),
+      },
+    })
+  }
+
+  if (flags.numbered) {
+    blocks.push({
+      object: 'block',
+      type: 'numbered_list_item',
+      numbered_list_item: {
+        rich_text: createRichText(flags.numbered),
+      },
+    })
+  }
+
+  if (flags.todo) {
+    blocks.push({
+      object: 'block',
+      type: 'to_do',
+      to_do: {
+        rich_text: createRichText(flags.todo),
+        checked: false,
+      },
+    })
+  }
+
+  if (flags.toggle) {
+    blocks.push({
+      object: 'block',
+      type: 'toggle',
+      toggle: {
+        rich_text: createRichText(flags.toggle),
+      },
+    })
+  }
+
+  if (flags.code) {
+    blocks.push({
+      object: 'block',
+      type: 'code',
+      code: {
+        rich_text: createRichText(flags.code),
+        language: flags.language || 'plain text',
+      },
+    })
+  }
+
+  if (flags.quote) {
+    blocks.push({
+      object: 'block',
+      type: 'quote',
+      quote: {
+        rich_text: createRichText(flags.quote),
+      },
+    })
+  }
+
+  if (flags.callout) {
+    blocks.push({
+      object: 'block',
+      type: 'callout',
+      callout: {
+        rich_text: createRichText(flags.callout),
+        icon: {
+          type: 'emoji',
+          emoji: '💡',
+        },
+      },
+    })
+  }
+
+  return blocks
+}
+
+/**
+ * Build block update content from simple text flags
+ * Returns an object with the block type properties for updating
+ */
+export const buildBlockUpdateFromTextFlags = (
+  blockType: string,
+  flags: {
+    text?: string
+    heading1?: string
+    heading2?: string
+    heading3?: string
+    bullet?: string
+    numbered?: string
+    todo?: string
+    toggle?: string
+    code?: string
+    language?: string
+    quote?: string
+    callout?: string
+  }
+): any => {
+  // For updates, we need to know the block type and provide the appropriate content
+  // The text flags can update any compatible block type
+
+  if (flags.text) {
+    return {
+      paragraph: {
+        rich_text: createRichText(flags.text),
+      },
+    }
+  }
+
+  if (flags.heading1) {
+    return {
+      heading_1: {
+        rich_text: createRichText(flags.heading1),
+      },
+    }
+  }
+
+  if (flags.heading2) {
+    return {
+      heading_2: {
+        rich_text: createRichText(flags.heading2),
+      },
+    }
+  }
+
+  if (flags.heading3) {
+    return {
+      heading_3: {
+        rich_text: createRichText(flags.heading3),
+      },
+    }
+  }
+
+  if (flags.bullet) {
+    return {
+      bulleted_list_item: {
+        rich_text: createRichText(flags.bullet),
+      },
+    }
+  }
+
+  if (flags.numbered) {
+    return {
+      numbered_list_item: {
+        rich_text: createRichText(flags.numbered),
+      },
+    }
+  }
+
+  if (flags.todo) {
+    return {
+      to_do: {
+        rich_text: createRichText(flags.todo),
+      },
+    }
+  }
+
+  if (flags.toggle) {
+    return {
+      toggle: {
+        rich_text: createRichText(flags.toggle),
+      },
+    }
+  }
+
+  if (flags.code) {
+    return {
+      code: {
+        rich_text: createRichText(flags.code),
+        language: flags.language || 'plain text',
+      },
+    }
+  }
+
+  if (flags.quote) {
+    return {
+      quote: {
+        rich_text: createRichText(flags.quote),
+      },
+    }
+  }
+
+  if (flags.callout) {
+    return {
+      callout: {
+        rich_text: createRichText(flags.callout),
+      },
+    }
+  }
+
+  return null
+}
