@@ -10,6 +10,7 @@ import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
 import {
   NotionCLIError,
+  NotionCLIErrorCode,
   NotionCLIErrorFactory,
   wrapNotionError
 } from '../../errors'
@@ -185,7 +186,7 @@ export default class BlockUpdate extends Command {
         // Ensure we have a full block response
         if (!isFullBlock(blockResponse)) {
           throw new NotionCLIError(
-            NotionCLIErrorFactory.apiError('block', blockId).code,
+            NotionCLIErrorCode.API_ERROR,
             'Received partial block response. Cannot determine block type for color update.',
             [],
             { attemptedId: blockId }
