@@ -1,3 +1,14 @@
+/**
+ * @deprecated This file is deprecated. Use the enhanced error system instead:
+ * import { NotionCLIError, NotionCLIErrorCode, NotionCLIErrorFactory, wrapNotionError } from './errors/index'
+ *
+ * The new error system provides:
+ * - More detailed error codes
+ * - Context-rich error messages
+ * - Actionable suggestions with commands
+ * - Better AI-friendly formatting
+ */
+
 export enum ErrorCode {
   RATE_LIMITED = 'RATE_LIMITED',
   NOT_FOUND = 'NOT_FOUND',

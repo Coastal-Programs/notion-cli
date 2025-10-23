@@ -8,7 +8,7 @@
  * - Proper stdout/stderr separation
  */
 
-import { ErrorCode, NotionCLIError } from './errors'
+import { NotionCLIErrorCode, NotionCLIError } from './errors/index'
 
 /**
  * Standard metadata included in all envelopes
@@ -39,7 +39,7 @@ export interface SuccessEnvelope<T = any> {
  */
 export interface ErrorDetails {
   /** Semantic error code (e.g., "DATABASE_NOT_FOUND", "RATE_LIMITED") */
-  code: ErrorCode | string
+  code: NotionCLIErrorCode | string
   /** Human-readable error message */
   message: string
   /** Additional context about the error */
@@ -92,10 +92,10 @@ export interface OutputFlags {
 /**
  * Maps error codes to appropriate exit codes
  */
-function getExitCodeForError(errorCode: ErrorCode | string): ExitCode {
+function getExitCodeForError(errorCode: NotionCLIErrorCode | string): ExitCode {
   // CLI/validation errors
   const cliErrors = [
-    ErrorCode.VALIDATION_ERROR,
+    NotionCLIErrorCode.VALIDATION_ERROR,
     'VALIDATION_ERROR',
     'CLI_ERROR',
     'CONFIG_ERROR',
@@ -113,24 +113,24 @@ function getExitCodeForError(errorCode: ErrorCode | string): ExitCode {
 /**
  * Suggestion generator based on error codes
  */
-function generateSuggestions(errorCode: ErrorCode | string): string[] {
+function generateSuggestions(errorCode: NotionCLIErrorCode | string): string[] {
   const suggestions: string[] = []
 
   switch (errorCode) {
-    case ErrorCode.UNAUTHORIZED:
+    case NotionCLIErrorCode.UNAUTHORIZED:
       suggestions.push('Verify your NOTION_TOKEN is set correctly')
       suggestions.push('Check token at: https://www.notion.so/my-integrations')
       break
-    case ErrorCode.NOT_FOUND:
+    case NotionCLIErrorCode.NOT_FOUND:
       suggestions.push('Verify the resource ID is correct')
       suggestions.push('Ensure your integration has access to the resource')
       suggestions.push('Try running: notion-cli sync')
       break
-    case ErrorCode.RATE_LIMITED:
+    case NotionCLIErrorCode.RATE_LIMITED:
       suggestions.push('Wait and retry - the CLI will auto-retry with backoff')
       suggestions.push('Reduce request frequency if this persists')
       break
-    case ErrorCode.VALIDATION_ERROR:
+    case NotionCLIErrorCode.VALIDATION_ERROR:
       suggestions.push('Check command syntax: notion-cli [command] --help')
       suggestions.push('Verify all required arguments are provided')
       break
