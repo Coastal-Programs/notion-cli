@@ -7,7 +7,7 @@
 
 import { Command, Flags, Interfaces } from '@oclif/core'
 import { EnvelopeFormatter, ExitCode, OutputFlags } from './envelope'
-import { wrapNotionError, NotionCLIError } from './errors'
+import { wrapNotionError, NotionCLIError, NotionCLIErrorCode } from './errors/index'
 
 /**
  * Base command configuration
