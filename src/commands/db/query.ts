@@ -21,6 +21,7 @@ import {
   getDataSourceTitle,
   getPageTitle,
   showRawFlagHint,
+  stripMetadata,
 } from '../../helper'
 import { client } from '../../notion'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
@@ -263,6 +264,11 @@ export default class DbQuery extends Command {
       } else {
         const res = await client.dataSources.query(queryParams)
         pages.push(...res.results)
+      }
+
+      // Apply minimal flag to strip metadata
+      if (flags.minimal) {
+        pages = stripMetadata(pages)
       }
 
       // Define columns for table output

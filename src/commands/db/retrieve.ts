@@ -7,7 +7,8 @@ import {
   outputMarkdownTable,
   outputPrettyTable,
   getDataSourceTitle,
-  showRawFlagHint
+  showRawFlagHint,
+  stripMetadata
 } from '../../helper'
 import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
 import { NotionCLIError, wrapNotionError } from '../../errors'
@@ -65,7 +66,12 @@ export default class DbRetrieve extends Command {
       // Resolve ID from URL, direct ID, or name (future)
       const dataSourceId = await resolveNotionId(args.database_id, 'database')
 
-      const res = await notion.retrieveDataSource(dataSourceId)
+      let res = await notion.retrieveDataSource(dataSourceId)
+
+      // Apply minimal flag to strip metadata
+      if (flags.minimal) {
+        res = stripMetadata(res)
+      }
 
       // Define columns for table output
       const columns = {

@@ -1,7 +1,7 @@
 import { Args, Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../../notion'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
-import { getBlockPlainText, outputRawJson } from '../../../helper'
+import { getBlockPlainText, outputRawJson, stripMetadata } from '../../../helper'
 import { AutomationFlags } from '../../../base-flags'
 import { wrapNotionError } from '../../../errors'
 
@@ -46,7 +46,12 @@ export default class BlockRetrieveChildren extends Command {
 
     try {
       // TODO: Add support start_cursor, page_size
-      const res = await notion.retrieveBlockChildren(args.block_id)
+      let res = await notion.retrieveBlockChildren(args.block_id)
+
+      // Apply minimal flag to strip metadata
+      if (flags.minimal) {
+        res = stripMetadata(res)
+      }
 
       // Handle JSON output for automation
       if (flags.json) {
