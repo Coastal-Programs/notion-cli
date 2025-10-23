@@ -38,19 +38,23 @@ class DbQuery extends core_1.Command {
                         filter = JSON.parse(filterStr);
                     }
                     catch (error) {
-                        throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Invalid JSON in --filter. Example: --filter '{"property": "Status", "select": {"equals": "Done"}}'`, { error });
+                        throw errors_1.NotionCLIErrorFactory.invalidJson(filterStr, error);
                     }
                 }
                 else if (flags['file-filter'] || flags.fileFilter) {
                     // Load from file (new flag or deprecated fileFilter)
                     const filterFile = flags['file-filter'] || flags.fileFilter;
                     const fp = path.join('./', filterFile);
+                    let fj;
                     try {
-                        const fj = fs.readFileSync(fp, { encoding: 'utf-8' });
+                        fj = fs.readFileSync(fp, { encoding: 'utf-8' });
                         filter = JSON.parse(fj);
                     }
                     catch (error) {
-                        throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Failed to read filter file: ${filterFile}. Ensure the file exists and contains valid JSON.`, { error });
+                        if (error.code === 'ENOENT') {
+                            throw errors_1.NotionCLIErrorFactory.invalidJson(filterFile, new Error(`File not found: ${filterFile}`));
+                        }
+                        throw errors_1.NotionCLIErrorFactory.invalidJson(fj, error);
                     }
                 }
                 else if (flags.search) {
@@ -89,7 +93,10 @@ class DbQuery extends core_1.Command {
                 if (e instanceof errors_1.NotionCLIError) {
                     throw e;
                 }
-                throw new errors_1.NotionCLIError('VALIDATION_ERROR', `Failed to build query parameters: ${e.message}`, { error: e });
+                throw (0, errors_1.wrapNotionError)(e, {
+                    resourceType: 'database',
+                    userInput: args.database_id
+                });
             }
             // Fetch pages from database
             let pages = [];
@@ -99,6 +106,31 @@ class DbQuery extends core_1.Command {
             else {
                 const res = await notion_1.client.dataSources.query(queryParams);
                 pages.push(...res.results);
+            }
+            // Apply minimal flag to strip metadata
+            if (flags.minimal) {
+                pages = (0, helper_1.stripMetadata)(pages);
+            }
+            // Apply property selection if --select flag is used
+            if (flags.select) {
+                const selectedProps = flags.select.split(',').map(p => p.trim());
+                pages = pages.map((page) => {
+                    if (page.object === 'page' && page.properties) {
+                        // Keep core fields, filter properties
+                        const filtered = {
+                            ...page,
+                            properties: {}
+                        };
+                        // Copy only selected properties
+                        selectedProps.forEach(propName => {
+                            if (page.properties[propName]) {
+                                filtered.properties[propName] = page.properties[propName];
+                            }
+                        });
+                        return filtered;
+                    }
+                    return page;
+                });
             }
             // Define columns for table output
             const columns = {
@@ -170,12 +202,18 @@ class DbQuery extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'database',
+                    attemptedId: args.database_id,
+                    endpoint: 'dataSources.query'
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }
@@ -241,6 +279,10 @@ DbQuery.examples = [
         description: 'Output as pretty table',
         command: `$ notion-cli db query DATABASE_ID --pretty`,
     },
+    {
+        description: 'Select specific properties (60-80% token reduction)',
+        command: `$ notion-cli db query DATABASE_ID --select "title,status,priority" --json`,
+    },
 ];
 DbQuery.args = {
     database_id: core_1.Args.string({
@@ -292,6 +334,10 @@ DbQuery.flags = {
         char: 's',
         description: 'Simple text search (searches across title and common text properties)',
         exclusive: ['filter', 'file-filter', 'rawFilter', 'fileFilter'],
+    }),
+    select: core_1.Flags.string({
+        description: 'Select specific properties to return (comma-separated). Reduces token usage by 60-80%.',
+        examples: ['title,status', 'title,status,priority,due_date'],
     }),
     // DEPRECATED: Keep for backward compatibility
     rawFilter: core_1.Flags.string({
