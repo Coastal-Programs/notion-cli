@@ -1,4 +1,4 @@
-import { Client, LogLevel } from '@notionhq/client'
+import { Client, LogLevel, isFullBlock, isFullPage } from '@notionhq/client'
 import {
   CreateDatabaseParameters,
   QueryDataSourceParameters,
@@ -465,6 +465,11 @@ export const retrievePageRecursive = async (
 
   // Recursively fetch nested blocks
   for (const block of blocks) {
+    // Skip partial blocks
+    if (!isFullBlock(block)) {
+      continue
+    }
+
     // Handle unsupported blocks
     if (block.type === 'unsupported') {
       warnings.push({
@@ -544,7 +549,7 @@ export const mapPageStructure = async (pageId: string): Promise<{
 
   // Extract page title
   let pageTitle = 'Untitled'
-  if (page.object === 'page') {
+  if (page.object === 'page' && isFullPage(page)) {
     Object.entries(page.properties).find(([_, prop]: [string, any]) => {
       if (prop.type === 'title' && prop.title.length > 0) {
         pageTitle = prop.title[0].plain_text
@@ -556,7 +561,7 @@ export const mapPageStructure = async (pageId: string): Promise<{
 
   // Extract page icon
   let pageIcon: string | undefined
-  if (page.icon) {
+  if (isFullPage(page) && page.icon) {
     if (page.icon.type === 'emoji') {
       pageIcon = page.icon.emoji
     } else if (page.icon.type === 'external') {

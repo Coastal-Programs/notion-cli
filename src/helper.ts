@@ -9,7 +9,7 @@ import {
 } from '@notionhq/client/build/src/api-endpoints'
 import { IPromptChoice } from './interface'
 import * as notion from './notion'
-import { isFullPage, isFullDatabase, isFullDataSource } from '@notionhq/client'
+import { isFullPage, isFullDatabase, isFullDataSource, isFullBlock } from '@notionhq/client'
 
 export const outputRawJson = async (res: any) => {
   console.log(JSON.stringify(res, null, 2))
@@ -841,11 +841,21 @@ export const enrichChildDatabaseBlock = async (block: BlockObjectResponse): Prom
  * @returns Array of enriched child_database blocks with title, block_id, data_source_id, and database_id
  */
 export const getChildDatabasesWithIds = async (blocks: BlockObjectResponse[]): Promise<any[]> => {
-  const childDatabases = blocks.filter(block => block.type === 'child_database')
+  const childDatabases = blocks.filter(block => isFullBlock(block) && block.type === 'child_database')
 
   const enrichedDatabases = await Promise.all(
     childDatabases.map(async (block) => {
       const enriched = await enrichChildDatabaseBlock(block)
+
+      // Type guard to ensure we have a full block with child_database property
+      if (!isFullBlock(enriched) || enriched.type !== 'child_database') {
+        return {
+          block_id: enriched.id,
+          title: 'Untitled',
+          data_source_id: null,
+          database_id: null,
+        }
+      }
 
       return {
         block_id: enriched.id,
