@@ -99,3 +99,39 @@ export { cacheManager } from './cache';
  * Export retry utilities for external use
  */
 export { fetchWithRetry as enhancedFetchWithRetry, CircuitBreaker } from './retry';
+/**
+ * Recursively retrieve a page with all its blocks and nested content
+ * @param pageId - The ID of the page to retrieve
+ * @param depth - Current recursion depth (internal use)
+ * @param maxDepth - Maximum depth to recurse (default: 3)
+ * @returns Object containing page metadata, blocks, and optional warnings
+ */
+export declare const retrievePageRecursive: (pageId: string, depth?: number, maxDepth?: number) => Promise<{
+    page: any;
+    blocks: any[];
+    warnings?: Array<{
+        block_id: string;
+        type: string;
+        notion_type?: string;
+        message: string;
+        has_children: boolean;
+    }>;
+}>;
+/**
+ * Map page structure (fast page discovery with parallel fetching)
+ * Returns minimal structure info (titles, types, IDs) instead of full content
+ * @param pageId - The ID of the page to map
+ * @returns Object containing page ID, title, icon, and structure overview
+ */
+export declare const mapPageStructure: (pageId: string) => Promise<{
+    id: string;
+    title: string;
+    type: string;
+    icon?: string;
+    structure: Array<{
+        type: string;
+        id: string;
+        title?: string;
+        text?: string;
+    }>;
+}>;

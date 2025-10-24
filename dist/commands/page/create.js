@@ -65,11 +65,21 @@ class PageCreate extends core_1.Command {
                 const fileName = path.basename(flags.file_path);
                 const md = fs.readFileSync(p, { encoding: 'utf-8' });
                 const blocks = (0, martian_1.markdownToBlocks)(md);
-                // If no properties were provided via flag, use filename as title
+                // Extract title from H1 heading or use filename without extension
+                const extractTitle = (markdown, filename) => {
+                    const h1Match = markdown.match(/^#\s+(.+)$/m);
+                    if (h1Match && h1Match[1]) {
+                        return h1Match[1].trim();
+                    }
+                    // Fallback: use filename without extension
+                    return filename.replace(/\.md$/, '');
+                };
+                const pageTitle = extractTitle(md, fileName);
+                // If no properties were provided via flag, use extracted title
                 if (!flags.properties) {
                     properties = {
                         [flags.title_property]: {
-                            title: [{ text: { content: fileName } }],
+                            title: [{ text: { content: pageTitle } }],
                         },
                     };
                 }
@@ -77,7 +87,7 @@ class PageCreate extends core_1.Command {
                     // Merge with existing properties, but ensure title is set
                     if (!properties[flags.title_property]) {
                         properties[flags.title_property] = {
-                            title: [{ text: { content: fileName } }],
+                            title: [{ text: { content: pageTitle } }],
                         };
                     }
                 }
@@ -129,12 +139,17 @@ class PageCreate extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'page',
+                    endpoint: 'pages.create'
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

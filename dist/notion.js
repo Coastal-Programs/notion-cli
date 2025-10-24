@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CircuitBreaker = exports.enhancedFetchWithRetry = exports.cacheManager = exports.search = exports.searchDb = exports.botUser = exports.listUser = exports.retrieveUser = exports.deleteBlock = exports.appendBlockChildren = exports.retrieveBlockChildren = exports.updateBlock = exports.retrieveBlock = exports.updatePage = exports.updatePageProps = exports.createPage = exports.retrievePageProperty = exports.retrievePage = exports.updateDataSource = exports.retrieveDataSource = exports.retrieveDb = exports.updateDb = exports.createDb = exports.fetchAllPagesInDS = exports.fetchWithRetry = exports.client = void 0;
+exports.mapPageStructure = exports.retrievePageRecursive = exports.CircuitBreaker = exports.enhancedFetchWithRetry = exports.cacheManager = exports.search = exports.searchDb = exports.botUser = exports.listUser = exports.retrieveUser = exports.deleteBlock = exports.appendBlockChildren = exports.retrieveBlockChildren = exports.updateBlock = exports.retrieveBlock = exports.updatePage = exports.updatePageProps = exports.createPage = exports.retrievePageProperty = exports.retrievePage = exports.updateDataSource = exports.retrieveDataSource = exports.retrieveDb = exports.updateDb = exports.createDb = exports.fetchAllPagesInDS = exports.fetchWithRetry = exports.client = void 0;
 const client_1 = require("@notionhq/client");
 const cache_1 = require("./cache");
 const retry_1 = require("./retry");
@@ -275,3 +275,188 @@ Object.defineProperty(exports, "cacheManager", { enumerable: true, get: function
 var retry_2 = require("./retry");
 Object.defineProperty(exports, "enhancedFetchWithRetry", { enumerable: true, get: function () { return retry_2.fetchWithRetry; } });
 Object.defineProperty(exports, "CircuitBreaker", { enumerable: true, get: function () { return retry_2.CircuitBreaker; } });
+/**
+ * Recursively retrieve a page with all its blocks and nested content
+ * @param pageId - The ID of the page to retrieve
+ * @param depth - Current recursion depth (internal use)
+ * @param maxDepth - Maximum depth to recurse (default: 3)
+ * @returns Object containing page metadata, blocks, and optional warnings
+ */
+const retrievePageRecursive = async (pageId, depth = 0, maxDepth = 3) => {
+    var _a, _b;
+    // Prevent infinite recursion
+    if (depth >= maxDepth) {
+        return {
+            page: null,
+            blocks: [],
+            warnings: [
+                {
+                    block_id: pageId,
+                    type: 'max_depth_reached',
+                    message: `Maximum recursion depth of ${maxDepth} reached`,
+                    has_children: false,
+                },
+            ],
+        };
+    }
+    // Retrieve the page
+    const page = await (0, exports.retrievePage)({ page_id: pageId });
+    // Retrieve all blocks (children)
+    const blocksResponse = await (0, exports.retrieveBlockChildren)(pageId);
+    const blocks = blocksResponse.results || [];
+    const warnings = [];
+    // Recursively fetch nested blocks
+    for (const block of blocks) {
+        // Skip partial blocks
+        if (!(0, client_1.isFullBlock)(block)) {
+            continue;
+        }
+        // Handle unsupported blocks
+        if (block.type === 'unsupported') {
+            warnings.push({
+                block_id: block.id,
+                type: 'unsupported',
+                notion_type: ((_a = block.unsupported) === null || _a === void 0 ? void 0 : _a.type) || 'unknown',
+                message: `Block type '${((_b = block.unsupported) === null || _b === void 0 ? void 0 : _b.type) || 'unknown'}' not supported by Notion API`,
+                has_children: block.has_children,
+            });
+            continue;
+        }
+        // Recursively fetch children for blocks that have them
+        if (block.has_children) {
+            try {
+                const childrenResponse = await (0, exports.retrieveBlockChildren)(block.id);
+                block.children = childrenResponse.results || [];
+                // If this is a child_page block, recursively fetch that page too
+                if (block.type === 'child_page' && depth + 1 < maxDepth) {
+                    const childPageData = await (0, exports.retrievePageRecursive)(block.id, depth + 1, maxDepth);
+                    block.child_page_details = childPageData;
+                    // Merge warnings from recursive calls
+                    if (childPageData.warnings) {
+                        warnings.push(...childPageData.warnings);
+                    }
+                }
+            }
+            catch (error) {
+                // If we can't fetch children, add a warning
+                warnings.push({
+                    block_id: block.id,
+                    type: 'fetch_error',
+                    message: `Failed to fetch children for block: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    has_children: true,
+                });
+            }
+        }
+    }
+    return {
+        page,
+        blocks,
+        ...(warnings.length > 0 && { warnings }),
+    };
+};
+exports.retrievePageRecursive = retrievePageRecursive;
+/**
+ * Map page structure (fast page discovery with parallel fetching)
+ * Returns minimal structure info (titles, types, IDs) instead of full content
+ * @param pageId - The ID of the page to map
+ * @returns Object containing page ID, title, icon, and structure overview
+ */
+const mapPageStructure = async (pageId) => {
+    // Parallel fetch: get page and blocks simultaneously
+    const [page, blocksResponse] = await Promise.all([
+        (0, exports.retrievePage)({ page_id: pageId }),
+        (0, exports.retrieveBlockChildren)(pageId),
+    ]);
+    const blocks = blocksResponse.results || [];
+    // Extract page title
+    let pageTitle = 'Untitled';
+    if (page.object === 'page' && (0, client_1.isFullPage)(page)) {
+        Object.entries(page.properties).find(([_, prop]) => {
+            if (prop.type === 'title' && prop.title.length > 0) {
+                pageTitle = prop.title[0].plain_text;
+                return true;
+            }
+            return false;
+        });
+    }
+    // Extract page icon
+    let pageIcon;
+    if ((0, client_1.isFullPage)(page) && page.icon) {
+        if (page.icon.type === 'emoji') {
+            pageIcon = page.icon.emoji;
+        }
+        else if (page.icon.type === 'external') {
+            pageIcon = page.icon.external.url;
+        }
+        else if (page.icon.type === 'file') {
+            pageIcon = page.icon.file.url;
+        }
+    }
+    // Build minimal structure
+    const structure = blocks.map((block) => {
+        const structureItem = {
+            type: block.type,
+            id: block.id,
+        };
+        // Extract title/text based on block type
+        try {
+            switch (block.type) {
+                case 'child_page':
+                    structureItem.title = block[block.type].title;
+                    break;
+                case 'child_database':
+                    structureItem.title = block[block.type].title;
+                    break;
+                case 'heading_1':
+                case 'heading_2':
+                case 'heading_3':
+                case 'paragraph':
+                case 'bulleted_list_item':
+                case 'numbered_list_item':
+                case 'to_do':
+                case 'toggle':
+                case 'quote':
+                case 'callout':
+                case 'code':
+                    if (block[block.type].rich_text && block[block.type].rich_text.length > 0) {
+                        structureItem.text = block[block.type].rich_text[0].plain_text;
+                    }
+                    break;
+                case 'bookmark':
+                case 'embed':
+                case 'link_preview':
+                    structureItem.text = block[block.type].url;
+                    break;
+                case 'equation':
+                    structureItem.text = block[block.type].expression;
+                    break;
+                case 'image':
+                case 'file':
+                case 'video':
+                case 'pdf':
+                    if (block[block.type].type === 'file') {
+                        structureItem.text = block[block.type].file.url;
+                    }
+                    else if (block[block.type].type === 'external') {
+                        structureItem.text = block[block.type].external.url;
+                    }
+                    break;
+                // For other types, just include type and id
+                default:
+                    break;
+            }
+        }
+        catch (e) {
+            // If extraction fails, just include type and id
+        }
+        return structureItem;
+    });
+    return {
+        id: pageId,
+        title: pageTitle,
+        type: 'page',
+        ...(pageIcon && { icon: pageIcon }),
+        structure,
+    };
+};
+exports.mapPageStructure = mapPageStructure;

@@ -9,7 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.EnvelopeFlags = exports.BaseCommand = void 0;
 const core_1 = require("@oclif/core");
 const envelope_1 = require("./envelope");
-const errors_1 = require("./errors");
+const index_1 = require("./errors/index");
 /**
  * BaseCommand - Extends oclif Command with envelope support
  *
@@ -74,7 +74,7 @@ class BaseCommand extends core_1.Command {
      */
     outputError(error, flags, additionalContext) {
         // Wrap raw errors in NotionCLIError
-        const cliError = error instanceof errors_1.NotionCLIError ? error : (0, errors_1.wrapNotionError)(error);
+        const cliError = error instanceof index_1.NotionCLIError ? error : (0, index_1.wrapNotionError)(error);
         // Check if we should use envelope
         this.shouldUseEnvelope = this.checkEnvelopeUsage(flags);
         if (this.shouldUseEnvelope) {
@@ -107,7 +107,7 @@ class BaseCommand extends core_1.Command {
             throw error;
         }
         // Otherwise, wrap and handle the error
-        const cliError = (0, errors_1.wrapNotionError)(error);
+        const cliError = (0, index_1.wrapNotionError)(error);
         this.error(cliError.message, { exit: this.getExitCodeForError(cliError) });
     }
 }

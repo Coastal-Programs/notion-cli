@@ -16,6 +16,7 @@ export default class PageRetrieve extends Command {
         timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         markdown: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         'compact-json': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         pretty: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
@@ -28,6 +29,9 @@ export default class PageRetrieve extends Command {
         'no-truncate': import("@oclif/core/lib/interfaces").Flag<boolean>;
         'no-header': import("@oclif/core/lib/interfaces").Flag<boolean>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        map: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        recursive: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        'max-depth': import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
     };
     run(): Promise<void>;
 }

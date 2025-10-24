@@ -5,6 +5,7 @@ export declare const AutomationFlags: {
     timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
     'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+    minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
 };
 export declare const OutputFormatFlags: {
     markdown: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;

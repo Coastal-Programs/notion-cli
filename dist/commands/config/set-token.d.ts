@@ -16,6 +16,7 @@ export default class ConfigSetToken extends Command {
         timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
     run(): Promise<void>;
     /**

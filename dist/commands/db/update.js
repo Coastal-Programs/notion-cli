@@ -61,12 +61,18 @@ class DbUpdate extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'database',
+                    attemptedId: args.database_id,
+                    endpoint: 'dataSources.update'
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

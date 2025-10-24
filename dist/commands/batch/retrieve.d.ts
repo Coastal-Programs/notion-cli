@@ -1,5 +1,5 @@
 import { Command } from '@oclif/core';
-export default class DbRetrieve extends Command {
+export default class BatchRetrieve extends Command {
     static description: string;
     static aliases: string[];
     static examples: {
@@ -7,12 +7,9 @@ export default class DbRetrieve extends Command {
         command: string;
     }[];
     static args: {
-        database_id: import("@oclif/core/lib/interfaces/parser").Arg<string, Record<string, unknown>>;
+        ids: import("@oclif/core/lib/interfaces/parser").Arg<string, Record<string, unknown>>;
     };
     static flags: {
-        markdown: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
-        'compact-json': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
-        pretty: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         json: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         'page-size': import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         retry: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
@@ -20,6 +17,9 @@ export default class DbRetrieve extends Command {
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        markdown: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        'compact-json': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        pretty: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         columns: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         sort: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         filter: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
@@ -28,7 +28,17 @@ export default class DbRetrieve extends Command {
         extended: import("@oclif/core/lib/interfaces").Flag<boolean>;
         'no-truncate': import("@oclif/core/lib/interfaces").Flag<boolean>;
         'no-header': import("@oclif/core/lib/interfaces").Flag<boolean>;
+        ids: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        type: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
+    /**
+     * Read IDs from stdin
+     */
+    private readStdin;
+    /**
+     * Retrieve a single resource and handle errors
+     */
+    private retrieveResource;
     run(): Promise<void>;
 }

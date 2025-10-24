@@ -1,6 +1,0 @@
-{
-  "property": "Status",
-  "select": {
-    "equals": "WIP"
-  }
-}

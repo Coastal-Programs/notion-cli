@@ -9,7 +9,11 @@ class UserRetrieve extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(UserRetrieve);
         try {
-            const res = await notion.retrieveUser(args.user_id);
+            let res = await notion.retrieveUser(args.user_id);
+            // Apply minimal flag to strip metadata
+            if (flags.minimal) {
+                res = (0, helper_1.stripMetadata)(res);
+            }
             // Handle JSON output for automation
             if (flags.json) {
                 this.log(JSON.stringify({
@@ -51,12 +55,18 @@ class UserRetrieve extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'user',
+                    attemptedId: args.user_id,
+                    endpoint: 'users.retrieve'
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

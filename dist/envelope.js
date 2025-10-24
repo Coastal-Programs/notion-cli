@@ -10,7 +10,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isErrorEnvelope = exports.isSuccessEnvelope = exports.createEnvelopeFormatter = exports.EnvelopeFormatter = exports.ExitCode = void 0;
-const errors_1 = require("./errors");
+const index_1 = require("./errors/index");
 /**
  * Exit codes for consistent process termination
  */
@@ -29,7 +29,7 @@ var ExitCode;
 function getExitCodeForError(errorCode) {
     // CLI/validation errors
     const cliErrors = [
-        errors_1.ErrorCode.VALIDATION_ERROR,
+        index_1.NotionCLIErrorCode.VALIDATION_ERROR,
         'VALIDATION_ERROR',
         'CLI_ERROR',
         'CONFIG_ERROR',
@@ -47,20 +47,20 @@ function getExitCodeForError(errorCode) {
 function generateSuggestions(errorCode) {
     const suggestions = [];
     switch (errorCode) {
-        case errors_1.ErrorCode.UNAUTHORIZED:
+        case index_1.NotionCLIErrorCode.UNAUTHORIZED:
             suggestions.push('Verify your NOTION_TOKEN is set correctly');
             suggestions.push('Check token at: https://www.notion.so/my-integrations');
             break;
-        case errors_1.ErrorCode.NOT_FOUND:
+        case index_1.NotionCLIErrorCode.NOT_FOUND:
             suggestions.push('Verify the resource ID is correct');
             suggestions.push('Ensure your integration has access to the resource');
             suggestions.push('Try running: notion-cli sync');
             break;
-        case errors_1.ErrorCode.RATE_LIMITED:
+        case index_1.NotionCLIErrorCode.RATE_LIMITED:
             suggestions.push('Wait and retry - the CLI will auto-retry with backoff');
             suggestions.push('Reduce request frequency if this persists');
             break;
-        case errors_1.ErrorCode.VALIDATION_ERROR:
+        case index_1.NotionCLIErrorCode.VALIDATION_ERROR:
             suggestions.push('Check command syntax: notion-cli [command] --help');
             suggestions.push('Verify all required arguments are provided');
             break;
@@ -119,13 +119,13 @@ class EnvelopeFormatter {
         const executionTime = Date.now() - this.startTime;
         let errorDetails;
         // Handle NotionCLIError
-        if (error instanceof errors_1.NotionCLIError) {
+        if (error instanceof index_1.NotionCLIError) {
             errorDetails = {
                 code: error.code,
                 message: error.message,
-                details: { ...error.details, ...additionalContext },
-                suggestions: generateSuggestions(error.code),
-                notionError: error.notionError,
+                details: { ...error.context, ...additionalContext },
+                suggestions: error.suggestions.map(s => s.description),
+                notionError: error.context.originalError,
             };
         }
         // Handle standard Error

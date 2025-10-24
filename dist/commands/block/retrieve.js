@@ -9,7 +9,11 @@ class BlockRetrieve extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(BlockRetrieve);
         try {
-            const res = await notion.retrieveBlock(args.block_id);
+            let res = await notion.retrieveBlock(args.block_id);
+            // Apply minimal flag to strip metadata
+            if (flags.minimal) {
+                res = (0, helper_1.stripMetadata)(res);
+            }
             // Handle JSON output for automation
             if (flags.json) {
                 this.log(JSON.stringify({
@@ -46,12 +50,18 @@ class BlockRetrieve extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'block',
+                    attemptedId: args.block_id,
+                    endpoint: 'blocks.retrieve'
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

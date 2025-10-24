@@ -12,7 +12,11 @@ class DbRetrieve extends core_1.Command {
         try {
             // Resolve ID from URL, direct ID, or name (future)
             const dataSourceId = await (0, notion_resolver_1.resolveNotionId)(args.database_id, 'database');
-            const res = await notion.retrieveDataSource(dataSourceId);
+            let res = await notion.retrieveDataSource(dataSourceId);
+            // Apply minimal flag to strip metadata
+            if (flags.minimal) {
+                res = (0, helper_1.stripMetadata)(res);
+            }
             // Define columns for table output
             const columns = {
                 title: {
@@ -71,12 +75,17 @@ class DbRetrieve extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'database',
+                    endpoint: 'dataSources.retrieve'
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

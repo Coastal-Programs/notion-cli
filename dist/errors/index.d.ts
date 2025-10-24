@@ -16,4 +16,3 @@
  * ```
  */
 export { NotionCLIError, NotionCLIErrorCode, NotionCLIErrorFactory, wrapNotionError, handleCliError, ErrorSuggestion, ErrorContext, } from './enhanced-errors';
-export { ErrorCode as LegacyErrorCode, NotionCLIError as LegacyNotionCLIError, wrapNotionError as legacyWrapNotionError, } from '../errors';

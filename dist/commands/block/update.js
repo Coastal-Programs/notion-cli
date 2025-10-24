@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
 const notion = require("../../notion");
+const client_1 = require("@notionhq/client");
 const helper_1 = require("../../helper");
 const notion_resolver_1 = require("../../utils/notion-resolver");
 const base_flags_1 = require("../../base-flags");
@@ -19,19 +20,66 @@ class BlockUpdate extends core_1.Command {
             if (flags.archived !== undefined) {
                 params.archived = flags.archived;
             }
+            // Check if using simple text-based flags or complex JSON
+            const hasTextFlags = flags.text || flags['heading-1'] || flags['heading-2'] || flags['heading-3'] ||
+                flags.bullet || flags.numbered || flags.todo || flags.toggle ||
+                flags.code || flags.quote || flags.callout;
+            if (hasTextFlags && flags.content) {
+                this.error('Cannot use both text-based flags (--text, --heading-1, etc.) and --content flag together. Choose one approach.');
+            }
             // Handle content updates
-            if (flags.content) {
+            if (hasTextFlags) {
+                // Use simple text-based flags
+                const blockUpdate = (0, helper_1.buildBlockUpdateFromTextFlags)('', {
+                    text: flags.text,
+                    heading1: flags['heading-1'],
+                    heading2: flags['heading-2'],
+                    heading3: flags['heading-3'],
+                    bullet: flags.bullet,
+                    numbered: flags.numbered,
+                    todo: flags.todo,
+                    toggle: flags.toggle,
+                    code: flags.code,
+                    language: flags.language,
+                    quote: flags.quote,
+                    callout: flags.callout,
+                });
+                if (blockUpdate) {
+                    Object.assign(params, blockUpdate);
+                }
+            }
+            else if (flags.content) {
+                // Use complex JSON
                 try {
                     const content = JSON.parse(flags.content);
                     Object.assign(params, content);
                 }
                 catch (error) {
-                    this.error('Invalid JSON in --content flag. Please provide valid JSON.');
+                    throw errors_1.NotionCLIErrorFactory.invalidJson(flags.content, error);
                 }
             }
             // Handle color updates
             if (flags.color) {
-                params.color = flags.color;
+                // Retrieve the block to determine its type
+                const blockResponse = await notion.retrieveBlock(blockId);
+                // Ensure we have a full block response
+                if (!(0, client_1.isFullBlock)(blockResponse)) {
+                    throw new errors_1.NotionCLIError(errors_1.NotionCLIErrorCode.API_ERROR, 'Received partial block response. Cannot determine block type for color update.', [], { attemptedId: blockId });
+                }
+                // Color is only supported for certain block types
+                const colorSupportedTypes = [
+                    'paragraph', 'heading_1', 'heading_2', 'heading_3',
+                    'bulleted_list_item', 'numbered_list_item', 'toggle',
+                    'quote', 'callout'
+                ];
+                if (!colorSupportedTypes.includes(blockResponse.type)) {
+                    this.error(`Color property is not supported for block type: ${blockResponse.type}. Supported types: ${colorSupportedTypes.join(', ')}`);
+                }
+                // Color must be nested within the block type property
+                params[blockResponse.type] = {
+                    ...params[blockResponse.type],
+                    color: flags.color
+                };
             }
             const res = await notion.updateBlock(params);
             // Handle JSON output for automation
@@ -70,12 +118,19 @@ class BlockUpdate extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    resourceType: 'block',
+                    attemptedId: args.block_id,
+                    endpoint: 'blocks.update',
+                    userInput: flags.content
+                });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(cliError.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }
@@ -86,6 +141,18 @@ BlockUpdate.description = 'Update a block';
 BlockUpdate.aliases = ['block:u'];
 BlockUpdate.examples = [
     {
+        description: 'Update block with simple text',
+        command: `$ notion-cli block update BLOCK_ID --text "Updated content"`,
+    },
+    {
+        description: 'Update heading content',
+        command: `$ notion-cli block update BLOCK_ID --heading-1 "New Title"`,
+    },
+    {
+        description: 'Update code block',
+        command: `$ notion-cli block update BLOCK_ID --code "const x = 42;" --language javascript`,
+    },
+    {
         description: 'Archive a block',
         command: `$ notion-cli block update BLOCK_ID -a`,
     },
@@ -94,7 +161,7 @@ BlockUpdate.examples = [
         command: `$ notion-cli block update https://notion.so/BLOCK_ID -a`,
     },
     {
-        description: 'Update block content',
+        description: 'Update block content with complex JSON (for advanced cases)',
         command: `$ notion-cli block update BLOCK_ID -c '{"paragraph":{"rich_text":[{"text":{"content":"Updated text"}}]}}'`,
     },
     {
@@ -103,11 +170,11 @@ BlockUpdate.examples = [
     },
     {
         description: 'Update a block and output raw json',
-        command: `$ notion-cli block update BLOCK_ID -a -r`,
+        command: `$ notion-cli block update BLOCK_ID --text "Updated" -r`,
     },
     {
         description: 'Update a block and output JSON for automation',
-        command: `$ notion-cli block update BLOCK_ID -a --json`,
+        command: `$ notion-cli block update BLOCK_ID --text "Updated" --json`,
     },
 ];
 BlockUpdate.args = {
@@ -120,7 +187,45 @@ BlockUpdate.flags = {
     }),
     content: core_1.Flags.string({
         char: 'c',
-        description: 'Updated block content (JSON object with block type properties)',
+        description: 'Updated block content (JSON object with block type properties) - for complex cases',
+    }),
+    // Simple text-based flags
+    text: core_1.Flags.string({
+        description: 'Update paragraph text',
+    }),
+    'heading-1': core_1.Flags.string({
+        description: 'Update H1 heading text',
+    }),
+    'heading-2': core_1.Flags.string({
+        description: 'Update H2 heading text',
+    }),
+    'heading-3': core_1.Flags.string({
+        description: 'Update H3 heading text',
+    }),
+    bullet: core_1.Flags.string({
+        description: 'Update bulleted list item text',
+    }),
+    numbered: core_1.Flags.string({
+        description: 'Update numbered list item text',
+    }),
+    todo: core_1.Flags.string({
+        description: 'Update to-do item text',
+    }),
+    toggle: core_1.Flags.string({
+        description: 'Update toggle block text',
+    }),
+    code: core_1.Flags.string({
+        description: 'Update code block content',
+    }),
+    language: core_1.Flags.string({
+        description: 'Update code block language (used with --code)',
+        default: 'plain text',
+    }),
+    quote: core_1.Flags.string({
+        description: 'Update quote block text',
+    }),
+    callout: core_1.Flags.string({
+        description: 'Update callout block text',
     }),
     color: core_1.Flags.string({
         description: 'Block color (for supported block types)',

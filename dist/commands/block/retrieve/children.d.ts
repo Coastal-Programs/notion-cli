@@ -16,6 +16,7 @@ export default class BlockRetrieveChildren extends Command {
         timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         columns: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         sort: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         filter: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
@@ -25,6 +26,7 @@ export default class BlockRetrieveChildren extends Command {
         'no-truncate': import("@oclif/core/lib/interfaces").Flag<boolean>;
         'no-header': import("@oclif/core/lib/interfaces").Flag<boolean>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        'show-databases': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
     run(): Promise<void>;
 }

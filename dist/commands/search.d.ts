@@ -12,6 +12,7 @@ export default class Search extends Command {
         timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         markdown: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         'compact-json': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         pretty: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
@@ -28,6 +29,12 @@ export default class Search extends Command {
         property: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         start_cursor: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         page_size: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        database: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        'created-after': import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        'created-before': import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        'edited-after': import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        'edited-before': import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        limit: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
     run(): Promise<void>;

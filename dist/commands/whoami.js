@@ -8,37 +8,18 @@ const errors_1 = require("../errors");
 const workspace_cache_1 = require("../utils/workspace-cache");
 class Whoami extends core_1.Command {
     async run() {
-        var _a, _b;
+        var _a;
         const { flags } = await this.parse(Whoami);
         const startTime = Date.now();
         try {
             // Verify NOTION_TOKEN is set
             if (!process.env.NOTION_TOKEN) {
-                const error = new errors_1.NotionCLIError(errors_1.ErrorCode.UNAUTHORIZED, 'NOTION_TOKEN environment variable is not set', {
-                    suggestions: [
-                        'Set token: export NOTION_TOKEN="your-token-here"  # Mac/Linux',
-                        'Set token: set NOTION_TOKEN=your-token-here       # Windows CMD',
-                        'Set token: $env:NOTION_TOKEN="your-token-here"    # Windows PowerShell',
-                        'Get new token: https://developers.notion.com/docs/create-a-notion-integration',
-                    ]
-                });
+                const error = errors_1.NotionCLIErrorFactory.tokenMissing();
                 if (flags.json) {
-                    this.log(JSON.stringify({
-                        success: false,
-                        error: {
-                            code: error.code,
-                            message: error.message,
-                            suggestions: ((_a = error.details) === null || _a === void 0 ? void 0 : _a.suggestions) || [],
-                        },
-                        metadata: {
-                            timestamp: new Date().toISOString(),
-                            command: 'whoami',
-                            execution_time_ms: Date.now() - startTime,
-                        }
-                    }, null, 2));
+                    this.log(JSON.stringify(error.toJSON(), null, 2));
                 }
                 else {
-                    this.error(error.message);
+                    this.error(error.toHumanString());
                 }
                 process.exit(1);
             }
@@ -92,7 +73,7 @@ class Whoami extends core_1.Command {
                         evictions: cacheStats.evictions,
                     },
                     workspace: {
-                        databases_cached: ((_b = cache === null || cache === void 0 ? void 0 : cache.databases) === null || _b === void 0 ? void 0 : _b.length) || 0,
+                        databases_cached: ((_a = cache === null || cache === void 0 ? void 0 : cache.databases) === null || _a === void 0 ? void 0 : _a.length) || 0,
                         last_sync: (cache === null || cache === void 0 ? void 0 : cache.lastSync) || null,
                         cache_version: (cache === null || cache === void 0 ? void 0 : cache.version) || null,
                     }
@@ -166,49 +147,15 @@ class Whoami extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
-            const cliError = (0, errors_1.wrapNotionError)(error);
-            // Build suggestions based on error type
-            const suggestions = [];
-            if (cliError.code === errors_1.ErrorCode.UNAUTHORIZED) {
-                suggestions.push('Check NOTION_TOKEN: echo $NOTION_TOKEN');
-                suggestions.push('Verify token at: https://www.notion.so/my-integrations');
-                suggestions.push('Get new token: https://developers.notion.com/docs/create-a-notion-integration');
-            }
-            else if (cliError.code === errors_1.ErrorCode.RATE_LIMITED) {
-                suggestions.push('Wait a moment and try again');
-                suggestions.push('Rate limit will reset automatically');
-            }
-            else {
-                suggestions.push('Check your internet connection');
-                suggestions.push('Verify Notion API status: https://status.notion.so');
-                suggestions.push('Try again with --no-cache flag');
-            }
+            const cliError = (0, errors_1.wrapNotionError)(error, {
+                endpoint: 'users.botUser',
+                resourceType: 'user'
+            });
             if (flags.json) {
-                this.log(JSON.stringify({
-                    success: false,
-                    error: {
-                        code: cliError.code,
-                        message: cliError.message,
-                        suggestions,
-                        details: cliError.details,
-                    },
-                    metadata: {
-                        timestamp: new Date().toISOString(),
-                        command: 'whoami',
-                        execution_time_ms: Date.now() - startTime,
-                    }
-                }, null, 2));
+                this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.log('\nConnection Failed');
-                this.log('='.repeat(60));
-                this.log(`Error:       ${cliError.code}`);
-                this.log(`Message:     ${cliError.message}`);
-                this.log('\nSuggestions:');
-                suggestions.forEach(suggestion => {
-                    this.log(`  - ${suggestion}`);
-                });
-                this.log('='.repeat(60));
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

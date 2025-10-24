@@ -1,0 +1,36 @@
+Coastal Programs Notion CLI
+Copyright 2025 Coastal Programs
+
+This product includes software developed by:
+- Notion Labs, Inc. (@notionhq/client - MIT License)
+- Salesforce (oclif framework - MIT License)
+
+This software is not affiliated with or endorsed by Notion Labs, Inc.
+"Notion" is a registered trademark of Notion Labs, Inc.
+
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+
+This project incorporates components from the projects listed below. The original
+copyright notices and licenses are preserved in their respective subdirectories
+under the node_modules directory.
+
+1. @notionhq/client (MIT License)
+   Copyright (c) Notion Labs, Inc.
+   https://github.com/makenotion/notion-sdk-js
+
+2. oclif (MIT License)
+   Copyright (c) 2018 Salesforce.com
+   https://oclif.io/
+
+3. dayjs (MIT License)
+   Copyright (c) 2018-present, iamkun
+   https://github.com/iamkun/dayjs
+
+4. notion-to-md (MIT License)
+   https://github.com/souvikinator/notion-to-md
+
+5. @tryfabric/martian (MIT License)
+   https://github.com/tryfabric/martian
+
+For complete license texts, see the LICENSE files in the respective node_modules
+subdirectories.

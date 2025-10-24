@@ -55,7 +55,7 @@ const client_1 = require("@notionhq/client");
  */
 async function resolveNotionId(input, type = 'database') {
     if (!input || typeof input !== 'string') {
-        throw new errors_1.NotionCLIError(errors_1.ErrorCode.VALIDATION_ERROR, `Invalid input: expected a ${type} name, ID, or URL`);
+        throw new errors_1.NotionCLIError(errors_1.NotionCLIErrorCode.VALIDATION_ERROR, `Invalid input: expected a ${type} name, ID, or URL`, [], { resourceType: type, userInput: String(input) });
     }
     const trimmed = input.trim();
     // Stage 1: URL extraction
@@ -69,9 +69,7 @@ async function resolveNotionId(input, type = 'database') {
             return extractedId;
         }
         catch (error) {
-            throw new errors_1.NotionCLIError(errors_1.ErrorCode.VALIDATION_ERROR, `Invalid Notion URL: ${trimmed}\n\n` +
-                `Expected format: https://www.notion.so/{id}\n` +
-                `Example: https://www.notion.so/1fb79d4c71bb8032b722c82305b63a00`, { originalError: error });
+            throw errors_1.NotionCLIErrorFactory.invalidIdFormat(trimmed, type);
         }
     }
     // Stage 2: Direct ID validation
@@ -92,11 +90,10 @@ async function resolveNotionId(input, type = 'database') {
     if (fromApi)
         return fromApi;
     // Nothing found - throw helpful error
-    throw new errors_1.NotionCLIError(errors_1.ErrorCode.NOT_FOUND, `${type === 'database' ? 'Database' : 'Page'} "${input}" not found.\n\n` +
-        `Try:\n` +
-        `  1. Run 'notion-cli sync' to refresh your workspace index\n` +
-        `  2. Use the full Notion URL instead\n` +
-        `  3. Check available databases with 'notion-cli list'`);
+    if (type === 'database') {
+        throw errors_1.NotionCLIErrorFactory.workspaceNotSynced(trimmed);
+    }
+    throw errors_1.NotionCLIErrorFactory.resourceNotFound(type, trimmed);
 }
 exports.resolveNotionId = resolveNotionId;
 /**

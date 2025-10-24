@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBlockPlainText = exports.getPageTitle = exports.getDataSourceTitle = exports.getDbTitle = exports.buildOneDepthJson = exports.buildPagePropUpdateData = exports.buildDatabaseQueryFilter = exports.getFilterFields = exports.showRawFlagHint = exports.outputPrettyTable = exports.outputMarkdownTable = exports.outputCompactJson = exports.outputRawJson = void 0;
+exports.buildBlockUpdateFromTextFlags = exports.getChildDatabasesWithIds = exports.enrichChildDatabaseBlock = exports.buildBlocksFromTextFlags = exports.getBlockPlainText = exports.getPageTitle = exports.getDataSourceTitle = exports.getDbTitle = exports.buildOneDepthJson = exports.buildPagePropUpdateData = exports.buildDatabaseQueryFilter = exports.getFilterFields = exports.showRawFlagHint = exports.outputPrettyTable = exports.outputMarkdownTable = exports.stripMetadata = exports.outputCompactJson = exports.outputRawJson = void 0;
+const notion = require("./notion");
 const client_1 = require("@notionhq/client");
 const outputRawJson = async (res) => {
     console.log(JSON.stringify(res, null, 2));
@@ -14,6 +15,50 @@ const outputCompactJson = (res) => {
     console.log(JSON.stringify(res));
 };
 exports.outputCompactJson = outputCompactJson;
+/**
+ * Strip unnecessary metadata from Notion API responses to reduce size
+ * Removes created_by, last_edited_by, object fields, request_id, empty values, etc.
+ * Keeps timestamps (created_time, last_edited_time) and essential data
+ *
+ * @param data The data to strip metadata from (single object or array)
+ * @returns The stripped data
+ */
+const stripMetadata = (data) => {
+    if (Array.isArray(data)) {
+        return data.map(item => (0, exports.stripMetadata)(item));
+    }
+    if (data === null || typeof data !== 'object') {
+        return data;
+    }
+    const result = {};
+    for (const [key, value] of Object.entries(data)) {
+        // Skip fields that should be removed
+        if (key === 'created_by' ||
+            key === 'last_edited_by' ||
+            key === 'request_id' ||
+            key === 'object' ||
+            (key === 'has_more' && value === false)) {
+            continue;
+        }
+        // Skip empty arrays
+        if (Array.isArray(value) && value.length === 0) {
+            continue;
+        }
+        // Skip empty objects (but keep objects with properties)
+        if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+            continue;
+        }
+        // Recursively strip metadata from nested objects and arrays
+        if (value && typeof value === 'object') {
+            result[key] = (0, exports.stripMetadata)(value);
+        }
+        else {
+            result[key] = value;
+        }
+    }
+    return result;
+};
+exports.stripMetadata = stripMetadata;
 /**
  * Output data as a markdown table
  * Converts column data into GitHub-flavored markdown table format
@@ -548,3 +593,286 @@ const getBlockPlainText = (row) => {
     }
 };
 exports.getBlockPlainText = getBlockPlainText;
+/**
+ * Helper to create rich text array from plain text string
+ */
+const createRichText = (text) => {
+    return [
+        {
+            type: 'text',
+            text: {
+                content: text,
+            },
+        },
+    ];
+};
+/**
+ * Build block JSON from simple text-based flags
+ * Returns an array of block objects ready for Notion API
+ */
+const buildBlocksFromTextFlags = (flags) => {
+    const blocks = [];
+    if (flags.text) {
+        blocks.push({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+                rich_text: createRichText(flags.text),
+            },
+        });
+    }
+    if (flags.heading1) {
+        blocks.push({
+            object: 'block',
+            type: 'heading_1',
+            heading_1: {
+                rich_text: createRichText(flags.heading1),
+            },
+        });
+    }
+    if (flags.heading2) {
+        blocks.push({
+            object: 'block',
+            type: 'heading_2',
+            heading_2: {
+                rich_text: createRichText(flags.heading2),
+            },
+        });
+    }
+    if (flags.heading3) {
+        blocks.push({
+            object: 'block',
+            type: 'heading_3',
+            heading_3: {
+                rich_text: createRichText(flags.heading3),
+            },
+        });
+    }
+    if (flags.bullet) {
+        blocks.push({
+            object: 'block',
+            type: 'bulleted_list_item',
+            bulleted_list_item: {
+                rich_text: createRichText(flags.bullet),
+            },
+        });
+    }
+    if (flags.numbered) {
+        blocks.push({
+            object: 'block',
+            type: 'numbered_list_item',
+            numbered_list_item: {
+                rich_text: createRichText(flags.numbered),
+            },
+        });
+    }
+    if (flags.todo) {
+        blocks.push({
+            object: 'block',
+            type: 'to_do',
+            to_do: {
+                rich_text: createRichText(flags.todo),
+                checked: false,
+            },
+        });
+    }
+    if (flags.toggle) {
+        blocks.push({
+            object: 'block',
+            type: 'toggle',
+            toggle: {
+                rich_text: createRichText(flags.toggle),
+            },
+        });
+    }
+    if (flags.code) {
+        blocks.push({
+            object: 'block',
+            type: 'code',
+            code: {
+                rich_text: createRichText(flags.code),
+                language: flags.language || 'plain text',
+            },
+        });
+    }
+    if (flags.quote) {
+        blocks.push({
+            object: 'block',
+            type: 'quote',
+            quote: {
+                rich_text: createRichText(flags.quote),
+            },
+        });
+    }
+    if (flags.callout) {
+        blocks.push({
+            object: 'block',
+            type: 'callout',
+            callout: {
+                rich_text: createRichText(flags.callout),
+                icon: {
+                    type: 'emoji',
+                    emoji: '💡',
+                },
+            },
+        });
+    }
+    return blocks;
+};
+exports.buildBlocksFromTextFlags = buildBlocksFromTextFlags;
+/**
+ * Attempt to enrich a child_database block with its queryable data_source_id
+ *
+ * The Notion API returns child_database blocks without the database/data_source ID,
+ * making them unqueryable. This function attempts to resolve the block ID to a
+ * queryable data_source_id by trying to retrieve it as a data source.
+ *
+ * @param block The child_database block to enrich
+ * @returns The enriched block with data_source_id and database_id fields, or original block if resolution fails
+ */
+const enrichChildDatabaseBlock = async (block) => {
+    // Only process child_database blocks
+    if (block.type !== 'child_database') {
+        return block;
+    }
+    try {
+        // Attempt to use the block ID as a data source ID
+        // In many cases, the child_database block ID IS the data source ID
+        const dataSource = await notion.retrieveDataSource(block.id);
+        // If successful, add the IDs to the block object
+        return {
+            ...block,
+            child_database: {
+                ...block.child_database,
+                // @ts-ignore - Adding custom fields for discoverability
+                data_source_id: block.id,
+                database_id: dataSource.id,
+            },
+        };
+    }
+    catch (error) {
+        // If retrieval fails, return the original block unchanged
+        // This is expected for some child_database blocks
+        return block;
+    }
+};
+exports.enrichChildDatabaseBlock = enrichChildDatabaseBlock;
+/**
+ * Get all child_database blocks from a list of blocks and enrich them with queryable IDs
+ *
+ * @param blocks Array of blocks to filter and enrich
+ * @returns Array of enriched child_database blocks with title, block_id, data_source_id, and database_id
+ */
+const getChildDatabasesWithIds = async (blocks) => {
+    const childDatabases = blocks.filter(block => (0, client_1.isFullBlock)(block) && block.type === 'child_database');
+    const enrichedDatabases = await Promise.all(childDatabases.map(async (block) => {
+        const enriched = await (0, exports.enrichChildDatabaseBlock)(block);
+        // Type guard to ensure we have a full block with child_database property
+        if (!(0, client_1.isFullBlock)(enriched) || enriched.type !== 'child_database') {
+            return {
+                block_id: enriched.id,
+                title: 'Untitled',
+                data_source_id: null,
+                database_id: null,
+            };
+        }
+        return {
+            block_id: enriched.id,
+            title: enriched.child_database.title,
+            // @ts-ignore - Custom fields added by enrichChildDatabaseBlock
+            data_source_id: enriched.child_database.data_source_id || null,
+            // @ts-ignore
+            database_id: enriched.child_database.database_id || null,
+        };
+    }));
+    return enrichedDatabases;
+};
+exports.getChildDatabasesWithIds = getChildDatabasesWithIds;
+/**
+ * Build block update content from simple text flags
+ * Returns an object with the block type properties for updating
+ */
+const buildBlockUpdateFromTextFlags = (blockType, flags) => {
+    // For updates, we need to know the block type and provide the appropriate content
+    // The text flags can update any compatible block type
+    if (flags.text) {
+        return {
+            paragraph: {
+                rich_text: createRichText(flags.text),
+            },
+        };
+    }
+    if (flags.heading1) {
+        return {
+            heading_1: {
+                rich_text: createRichText(flags.heading1),
+            },
+        };
+    }
+    if (flags.heading2) {
+        return {
+            heading_2: {
+                rich_text: createRichText(flags.heading2),
+            },
+        };
+    }
+    if (flags.heading3) {
+        return {
+            heading_3: {
+                rich_text: createRichText(flags.heading3),
+            },
+        };
+    }
+    if (flags.bullet) {
+        return {
+            bulleted_list_item: {
+                rich_text: createRichText(flags.bullet),
+            },
+        };
+    }
+    if (flags.numbered) {
+        return {
+            numbered_list_item: {
+                rich_text: createRichText(flags.numbered),
+            },
+        };
+    }
+    if (flags.todo) {
+        return {
+            to_do: {
+                rich_text: createRichText(flags.todo),
+            },
+        };
+    }
+    if (flags.toggle) {
+        return {
+            toggle: {
+                rich_text: createRichText(flags.toggle),
+            },
+        };
+    }
+    if (flags.code) {
+        return {
+            code: {
+                rich_text: createRichText(flags.code),
+                language: flags.language || 'plain text',
+            },
+        };
+    }
+    if (flags.quote) {
+        return {
+            quote: {
+                rich_text: createRichText(flags.quote),
+            },
+        };
+    }
+    if (flags.callout) {
+        return {
+            callout: {
+                rich_text: createRichText(flags.callout),
+            },
+        };
+    }
+    return null;
+};
+exports.buildBlockUpdateFromTextFlags = buildBlockUpdateFromTextFlags;

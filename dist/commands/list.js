@@ -4,6 +4,7 @@ const core_1 = require("@oclif/core");
 const workspace_cache_1 = require("../utils/workspace-cache");
 const helper_1 = require("../helper");
 const base_flags_1 = require("../base-flags");
+const errors_1 = require("../errors");
 class List extends core_1.Command {
     async run() {
         const { flags } = await this.parse(List);
@@ -11,24 +12,8 @@ class List extends core_1.Command {
             // Load cache
             const cache = await (0, workspace_cache_1.loadCache)();
             if (!cache) {
-                const cachePath = await (0, workspace_cache_1.getCachePath)();
-                if (flags.json) {
-                    this.log(JSON.stringify({
-                        success: false,
-                        error: {
-                            code: 'WORKSPACE_NOT_SYNCED',
-                            message: 'No workspace cache found. Run: notion-cli sync',
-                            cache_path: cachePath,
-                            suggestions: ['notion-cli sync'],
-                        },
-                    }, null, 2));
-                }
-                else {
-                    this.log(`No cache found at ${cachePath}`);
-                    this.log('\nRun "notion-cli sync" to build the cache.');
-                }
-                process.exit(1);
-                return;
+                // Use enhanced error factory for workspace not synced
+                throw errors_1.NotionCLIErrorFactory.workspaceNotSynced('');
             }
             // Calculate cache age
             const lastSyncTime = new Date(cache.lastSync);
@@ -155,14 +140,16 @@ class List extends core_1.Command {
             process.exit(0);
         }
         catch (error) {
+            const cliError = error instanceof errors_1.NotionCLIError
+                ? error
+                : (0, errors_1.wrapNotionError)(error, {
+                    endpoint: 'workspace.list'
+                });
             if (flags.json) {
-                this.log(JSON.stringify({
-                    success: false,
-                    error: error.message,
-                }, null, 2));
+                this.log(JSON.stringify(cliError.toJSON(), null, 2));
             }
             else {
-                this.error(error.message);
+                this.error(cliError.toHumanString());
             }
             process.exit(1);
         }

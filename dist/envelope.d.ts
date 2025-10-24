@@ -7,7 +7,7 @@
  * - Exit code standardization (0=success, 1=API error, 2=CLI error)
  * - Proper stdout/stderr separation
  */
-import { ErrorCode } from './errors';
+import { NotionCLIErrorCode } from './errors/index';
 /**
  * Standard metadata included in all envelopes
  */
@@ -35,7 +35,7 @@ export interface SuccessEnvelope<T = any> {
  */
 export interface ErrorDetails {
     /** Semantic error code (e.g., "DATABASE_NOT_FOUND", "RATE_LIMITED") */
-    code: ErrorCode | string;
+    code: NotionCLIErrorCode | string;
     /** Human-readable error message */
     message: string;
     /** Additional context about the error */
