@@ -6,16 +6,20 @@ const retry_1 = require("../retry");
 const workspace_cache_1 = require("../utils/workspace-cache");
 const base_flags_1 = require("../base-flags");
 const errors_1 = require("../errors");
+const token_validator_1 = require("../utils/token-validator");
 class Sync extends core_1.Command {
     async run() {
         const { flags } = await this.parse(Sync);
         const startTime = Date.now();
         try {
+            // Verify NOTION_TOKEN is set (throws if not)
+            (0, token_validator_1.validateNotionToken)();
             if (!flags.json) {
                 core_1.ux.action.start('Syncing workspace databases');
             }
-            // Fetch all databases from Notion API
-            const databases = await this.fetchAllDatabases();
+            // Fetch all databases from Notion API with progress updates
+            const databases = await this.fetchAllDatabases(flags.json);
+            const fetchTime = Date.now() - startTime;
             if (!flags.json) {
                 core_1.ux.action.stop(`Found ${databases.length} database${databases.length === 1 ? '' : 's'}`);
                 core_1.ux.action.start('Generating search aliases');
@@ -76,10 +80,15 @@ class Sync extends core_1.Command {
             }
             else {
                 core_1.ux.action.stop();
-                this.log(`\n✓ Found ${databases.length} database${databases.length === 1 ? '' : 's'}`);
-                this.log(`✓ Cached at: ${new Date(cache.lastSync).toLocaleString()}`);
-                this.log(`✓ Location: ${cachePath}`);
-                this.log(`\nNext sync recommended: ${new Date(metadata.next_recommended_sync).toLocaleString()}`);
+                // Enhanced completion summary
+                const elapsedSeconds = (executionTime / 1000).toFixed(2);
+                this.log(`\n✓ Synced ${databases.length} database${databases.length === 1 ? '' : 's'} in ${elapsedSeconds}s`);
+                this.log('');
+                this.log(`📁 Cache: ${cachePath}`);
+                this.log(`🕐 Last updated: ${new Date(cache.lastSync).toLocaleString()}`);
+                this.log(`📊 Databases: ${databases.length} total`);
+                this.log('');
+                this.log(`Next sync recommended: ${new Date(metadata.next_recommended_sync).toLocaleString()}`);
                 if (databases.length > 0) {
                     this.log('\nIndexed databases:');
                     cacheEntries.slice(0, 10).forEach(db => {
@@ -89,6 +98,7 @@ class Sync extends core_1.Command {
                     if (databases.length > 10) {
                         this.log(`  ... and ${databases.length - 10} more`);
                     }
+                    this.log('\nTry: notion-cli list');
                 }
                 else {
                     this.log('\nNo databases found in workspace.');
@@ -117,9 +127,10 @@ class Sync extends core_1.Command {
     /**
      * Fetch all databases from Notion API with pagination
      */
-    async fetchAllDatabases() {
+    async fetchAllDatabases(isJsonMode) {
         const databases = [];
         let cursor = undefined;
+        let pageCount = 0;
         while (true) {
             const response = await (0, retry_1.fetchWithRetry)(() => notion_1.client.search({
                 filter: {
@@ -133,6 +144,12 @@ class Sync extends core_1.Command {
                 config: { maxRetries: 5 }, // Higher retries for sync
             });
             databases.push(...response.results);
+            pageCount++;
+            // Show progress update (only in non-JSON mode)
+            if (!isJsonMode && response.has_more) {
+                // Update the spinner text to show current count
+                core_1.ux.action.start(`Syncing workspace databases (found ${databases.length} so far)`);
+            }
             if (!response.has_more || !response.next_cursor) {
                 break;
             }

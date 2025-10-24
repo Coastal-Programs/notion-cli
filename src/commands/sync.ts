@@ -16,6 +16,7 @@ import {
   NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
+import { validateNotionToken } from '../utils/token-validator'
 import { DataSourceObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as os from 'os'
 import * as path from 'path'
@@ -54,12 +55,17 @@ export default class Sync extends Command {
     const startTime = Date.now()
 
     try {
+      // Verify NOTION_TOKEN is set (throws if not)
+      validateNotionToken()
+
       if (!flags.json) {
         ux.action.start('Syncing workspace databases')
       }
 
-      // Fetch all databases from Notion API
-      const databases = await this.fetchAllDatabases()
+      // Fetch all databases from Notion API with progress updates
+      const databases = await this.fetchAllDatabases(flags.json)
+
+      const fetchTime = Date.now() - startTime
 
       if (!flags.json) {
         ux.action.stop(`Found ${databases.length} database${databases.length === 1 ? '' : 's'}`)
@@ -127,10 +133,16 @@ export default class Sync extends Command {
         }, null, 2))
       } else {
         ux.action.stop()
-        this.log(`\n✓ Found ${databases.length} database${databases.length === 1 ? '' : 's'}`)
-        this.log(`✓ Cached at: ${new Date(cache.lastSync).toLocaleString()}`)
-        this.log(`✓ Location: ${cachePath}`)
-        this.log(`\nNext sync recommended: ${new Date(metadata.next_recommended_sync).toLocaleString()}`)
+
+        // Enhanced completion summary
+        const elapsedSeconds = (executionTime / 1000).toFixed(2)
+        this.log(`\n✓ Synced ${databases.length} database${databases.length === 1 ? '' : 's'} in ${elapsedSeconds}s`)
+        this.log('')
+        this.log(`📁 Cache: ${cachePath}`)
+        this.log(`🕐 Last updated: ${new Date(cache.lastSync).toLocaleString()}`)
+        this.log(`📊 Databases: ${databases.length} total`)
+        this.log('')
+        this.log(`Next sync recommended: ${new Date(metadata.next_recommended_sync).toLocaleString()}`)
 
         if (databases.length > 0) {
           this.log('\nIndexed databases:')
@@ -142,6 +154,8 @@ export default class Sync extends Command {
           if (databases.length > 10) {
             this.log(`  ... and ${databases.length - 10} more`)
           }
+
+          this.log('\nTry: notion-cli list')
         } else {
           this.log('\nNo databases found in workspace.')
           this.log('Make sure your integration has access to databases.')
@@ -171,9 +185,10 @@ export default class Sync extends Command {
   /**
    * Fetch all databases from Notion API with pagination
    */
-  private async fetchAllDatabases(): Promise<DataSourceObjectResponse[]> {
+  private async fetchAllDatabases(isJsonMode: boolean): Promise<DataSourceObjectResponse[]> {
     const databases: DataSourceObjectResponse[] = []
     let cursor: string | undefined = undefined
+    let pageCount = 0
 
     while (true) {
       const response = await enhancedFetchWithRetry(
@@ -192,6 +207,13 @@ export default class Sync extends Command {
       )
 
       databases.push(...response.results as DataSourceObjectResponse[])
+      pageCount++
+
+      // Show progress update (only in non-JSON mode)
+      if (!isJsonMode && response.has_more) {
+        // Update the spinner text to show current count
+        ux.action.start(`Syncing workspace databases (found ${databases.length} so far)`)
+      }
 
       if (!response.has_more || !response.next_cursor) {
         break

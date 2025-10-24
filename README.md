@@ -30,10 +30,53 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
 - 🔍 **Schema Discovery**: AI-friendly database schema extraction
 - 🗄️ **Workspace Caching**: Fast database lookups without API calls
 - 🧠 **Smart ID Resolution**: Automatic database_id → data_source_id conversion
+- 🔒 **Secure**: 0 production vulnerabilities
 
-## What's New in v5.4.0
+## What's New in v5.5.0
 
-**7 Major AI Agent Usability Features** (Issue #4) 🎉
+**Improved First-Time Experience & Enhanced Security** 🎉
+
+### 1. Interactive Setup Wizard
+- **NEW `notion-cli init` command** - Guided first-time setup in 3 easy steps
+- **Token configuration** - Clear instructions for getting and setting your API token
+- **Connection testing** - Verify API access before proceeding
+- **Workspace sync** - Optional local caching for faster operations
+- **Supports `--json`** - Automation-friendly for CI/CD environments
+
+### 2. Health Check & Diagnostics
+- **NEW `notion-cli doctor` command** - Comprehensive health checks (aliases: `diagnose`, `healthcheck`)
+- **7 diagnostic checks** - Node version, token config, API connection, workspace access, cache status, dependencies, file permissions
+- **Color-coded output** - Clear pass/fail indicators with actionable recommendations
+- **JSON support** - Monitor system health programmatically
+- **Perfect for troubleshooting** - Quickly identify and fix issues
+
+### 3. Enhanced Error Handling
+- **Token validator** - Early validation before API calls (500x faster error feedback)
+- **Platform-specific help** - Tailored instructions for Windows (CMD/PowerShell) and Unix/Mac
+- **Actionable messages** - Clear next steps instead of cryptic API errors
+- **Prevents confusion** - No more "unauthorized" errors on first run
+
+### 4. Post-Install Experience
+- **Welcome message** - Friendly introduction after installation
+- **Clear next steps** - Guides new users to run `notion-cli init`
+- **Respects `--silent`** - Honors npm's silent flag for automation
+
+### 5. Progress Indicators
+- **Real-time feedback** - `sync` command shows progress during execution
+- **Execution timing** - See how long operations take
+- **Enhanced summaries** - Rich metadata about cache state and recommendations
+
+### 6. Security Improvements
+- **0 production vulnerabilities** - Fixed all 16 security issues
+- **Removed vulnerable dependency** - Replaced @tryfabric/martian with custom markdown converter
+- **Zero-dependency parser** - No external security risks from markdown processing
+- **CVE fixes** - Addressed XSS, prototype pollution, and ReDoS vulnerabilities
+
+---
+
+### Earlier Features (v5.4.0)
+
+**7 Major AI Agent Usability Features** (Issue #4)
 
 ### 1. Simple Properties Mode
 - **NEW `--simple-properties` (`-S`) flag** - Use flat JSON instead of complex nested structures
@@ -111,12 +154,12 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
    npm install -g .
    ```
 
-2. **Set your API token** (new easy way!):
+2. **First-time setup** (new easy way!):
    ```bash
-   # Interactive setup (recommended for first-time users)
-   notion-cli config set-token
+   # Interactive setup wizard (recommended for new users)
+   notion-cli init
 
-   # Or set manually (ask the human for the token):
+   # Or set token manually if preferred:
    # Mac/Linux
    export NOTION_TOKEN="secret_your_token_here"
 
@@ -127,29 +170,35 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
    $env:NOTION_TOKEN="secret_your_token_here"
    ```
 
-3. **Verify connectivity** (health check):
+3. **Verify setup** (health check):
+   ```bash
+   notion-cli doctor
+   # Runs 7 diagnostic checks to ensure everything is configured correctly
+   ```
+
+4. **Test connectivity** (optional - doctor command includes this):
    ```bash
    notion-cli whoami
    # Returns: bot info, workspace, cache status, API latency
    ```
 
-4. **Sync your workspace** (one-time setup):
+5. **Sync your workspace** (one-time setup for faster operations):
    ```bash
    notion-cli sync
    ```
 
-5. **List your databases**:
+6. **List your databases**:
    ```bash
    notion-cli list --json
    ```
 
-6. **Discover database schema** (before creating pages):
+7. **Discover database schema** (before creating pages):
    ```bash
    # Get schema with examples for easy copy-paste
    notion-cli db schema <DATA_SOURCE_ID> --with-examples --json
    ```
 
-7. **Create a page** (using simple properties):
+8. **Create a page** (using simple properties):
    ```bash
    notion-cli page create -d <DATA_SOURCE_ID> -S --properties '{
      "Name": "My Task",
@@ -159,7 +208,7 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
    }'
    ```
 
-8. **All commands support** `--json` for machine-readable responses.
+9. **All commands support** `--json` for machine-readable responses.
 
 **Get your API token**: https://developers.notion.com/docs/create-a-notion-integration
 
@@ -356,6 +405,19 @@ fi
 - `2` = CLI error (invalid flags, etc.)
 
 ## Core Commands
+
+### Setup & Diagnostics
+
+```bash
+# First-time setup wizard
+notion-cli init
+
+# Health check and diagnostics
+notion-cli doctor
+
+# Test connectivity
+notion-cli whoami
+```
 
 ### Database Commands
 
@@ -696,6 +758,16 @@ jq -r '.[] | "- **\(.title)** (\(.page_count) pages)"' databases.json >> report.
 
 ## Troubleshooting
 
+### Setup Issues
+
+**Problem**: Not sure if everything is configured correctly
+
+**Solution**: Run the health check command
+```bash
+notion-cli doctor
+# Shows 7 diagnostic checks with clear pass/fail indicators
+```
+
 ### "Database not found" Error
 
 **Problem**: You're using a `database_id` instead of `data_source_id`
@@ -727,14 +799,17 @@ export NOTION_RETRY_MAX_DELAY=60000
 
 ### Authentication Errors
 
-**Problem**: 401 Unauthorized
+**Problem**: 401 Unauthorized or token errors
 
 **Solution**:
 ```bash
-# Verify token is set
+# Run the setup wizard
+notion-cli init
+
+# Or verify token is set
 echo $NOTION_TOKEN
 
-# Re-configure token
+# Or manually configure token
 notion-cli config set-token
 
 # Check integration has access

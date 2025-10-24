@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "5.4.0",
+  "version": "5.5.0",
   "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, and structured error handling.",
   "author": "Jake Schepis",
   "bin": {
@@ -13,6 +13,7 @@
   "files": [
     "/bin",
     "/dist",
+    "/scripts",
     "/npm-shrinkwrap.json",
     "/oclif.manifest.json"
   ],
@@ -20,7 +21,6 @@
     "@notionhq/client": "^5.2.1",
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
-    "@tryfabric/martian": "^1.2.4",
     "dayjs": "^1.11.13",
     "notion-to-md": "^3.1.6"
   },
@@ -62,6 +62,7 @@
     "build": "shx rm -rf dist && tsc -b",
     "lint": "eslint . --ext .ts",
     "postpack": "shx rm -f oclif.manifest.json",
+    "postinstall": "node scripts/postinstall.js",
     "prepack": "npm run build && oclif manifest",
     "test": "TS_NODE_PROJECT=tsconfig.test.json mocha --forbid-only \"test/**/*.test.ts\"",
     "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null"

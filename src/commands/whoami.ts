@@ -9,6 +9,7 @@ import {
   wrapNotionError
 } from '../errors'
 import { loadCache } from '../utils/workspace-cache'
+import { validateNotionToken } from '../utils/token-validator'
 
 export default class Whoami extends Command {
   static description = 'Verify API connectivity and show workspace context'
@@ -39,18 +40,8 @@ export default class Whoami extends Command {
     const startTime = Date.now()
 
     try {
-      // Verify NOTION_TOKEN is set
-      if (!process.env.NOTION_TOKEN) {
-        const error = NotionCLIErrorFactory.tokenMissing()
-
-        if (flags.json) {
-          this.log(JSON.stringify(error.toJSON(), null, 2))
-        } else {
-          this.error(error.toHumanString())
-        }
-
-        process.exit(1)
-      }
+      // Verify NOTION_TOKEN is set (throws if not)
+      validateNotionToken()
 
       // Get bot user info (with retry and caching)
       const user = await notion.botUser()

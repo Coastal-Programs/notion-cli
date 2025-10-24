@@ -6,23 +6,15 @@ const notion = require("../notion");
 const cache_1 = require("../cache");
 const errors_1 = require("../errors");
 const workspace_cache_1 = require("../utils/workspace-cache");
+const token_validator_1 = require("../utils/token-validator");
 class Whoami extends core_1.Command {
     async run() {
         var _a;
         const { flags } = await this.parse(Whoami);
         const startTime = Date.now();
         try {
-            // Verify NOTION_TOKEN is set
-            if (!process.env.NOTION_TOKEN) {
-                const error = errors_1.NotionCLIErrorFactory.tokenMissing();
-                if (flags.json) {
-                    this.log(JSON.stringify(error.toJSON(), null, 2));
-                }
-                else {
-                    this.error(error.toHumanString());
-                }
-                process.exit(1);
-            }
+            // Verify NOTION_TOKEN is set (throws if not)
+            (0, token_validator_1.validateNotionToken)();
             // Get bot user info (with retry and caching)
             const user = await notion.botUser();
             // Get cache stats from in-memory cache

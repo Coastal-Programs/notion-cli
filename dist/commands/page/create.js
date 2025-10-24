@@ -4,7 +4,7 @@ const core_1 = require("@oclif/core");
 const notion = require("../../notion");
 const fs = require("fs");
 const path = require("path");
-const martian_1 = require("@tryfabric/martian");
+const markdown_to_blocks_1 = require("../../utils/markdown-to-blocks");
 const helper_1 = require("../../helper");
 const notion_resolver_1 = require("../../utils/notion-resolver");
 const base_flags_1 = require("../../base-flags");
@@ -64,7 +64,7 @@ class PageCreate extends core_1.Command {
                 const p = path.join('./', flags.file_path);
                 const fileName = path.basename(flags.file_path);
                 const md = fs.readFileSync(p, { encoding: 'utf-8' });
-                const blocks = (0, martian_1.markdownToBlocks)(md);
+                const blocks = (0, markdown_to_blocks_1.markdownToBlocks)(md);
                 // Extract title from H1 heading or use filename without extension
                 const extractTitle = (markdown, filename) => {
                     const h1Match = markdown.match(/^#\s+(.+)$/m);

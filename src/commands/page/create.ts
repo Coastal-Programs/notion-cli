@@ -2,7 +2,7 @@ import { Args, Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
 import * as fs from 'fs'
 import * as path from 'path'
-import { markdownToBlocks } from '@tryfabric/martian'
+import { markdownToBlocks } from '../../utils/markdown-to-blocks'
 import {
   CreatePageParameters,
   PageObjectResponse,

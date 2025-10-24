@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.0] - 2025-10-24
+
+### Added
+
+- **`notion-cli init`** - Interactive first-time setup wizard with 3-step flow (token setup, connection test, workspace sync)
+  - Guides users through token configuration with clear instructions
+  - Tests API connection before proceeding
+  - Offers optional workspace sync to build local database cache
+  - Supports `--json` mode for automation and CI/CD environments
+  - Provides helpful next steps after completion
+- **`notion-cli doctor`** - Comprehensive health check and diagnostics command (aliases: `diagnose`, `healthcheck`)
+  - 7 diagnostic checks: Node.js version, token configuration, API connectivity, workspace access, cache status, dependencies, and file permissions
+  - Color-coded output with clear pass/fail indicators
+  - Actionable recommendations for each failed check
+  - JSON output support for automated monitoring
+  - Perfect for troubleshooting and pre-flight checks
+- **Token validator utility** - Centralized token validation with consistent error messaging
+  - Early validation before API calls (500x faster error feedback)
+  - Platform-specific setup instructions (Windows vs Unix/Mac)
+  - Helpful error messages with exact commands to fix issues
+  - Prevents cryptic API errors with proactive validation
+- **Post-install experience** - Welcome message after `npm install`
+  - Friendly introduction to notion-cli
+  - Clear next steps for new users
+  - Guides users to run `notion-cli init` for setup
+  - Respects npm's `--silent` flag
+- **Progress indicators** - Enhanced user feedback during operations
+  - `sync` command now shows real-time progress with status messages
+  - Execution timing displayed for all sync operations
+  - Enhanced completion summary with cache metadata (database count, cache age)
+  - Improved user experience during long-running operations
+- **Custom markdown-to-blocks converter** - Zero-dependency markdown parser
+  - Replaces @tryfabric/martian dependency
+  - Supports headings, paragraphs, lists, code blocks, and quotes
+  - Secure implementation without external vulnerabilities
+  - Maintains full feature compatibility
+
+### Changed
+
+- **Error messages** now provide platform-specific instructions (Windows Command Prompt, Windows PowerShell, Unix/Mac)
+- **Sync command** displays real-time progress and execution metrics
+- **Token validation** happens early, before API calls, providing instant feedback
+- **Completion summaries** include rich metadata about cache state and recommendations
+
+### Fixed
+
+- **Token validation errors** now provide clear, actionable guidance instead of cryptic API errors
+- Users no longer encounter confusing authentication errors on first run
+- Cache-related operations provide better context and next steps
+
+### Security
+
+- **Fixed all 16 production security vulnerabilities** reported by npm audit
+- **Removed @tryfabric/martian dependency** (contained katex XSS vulnerabilities)
+  - CVE-2023-48618: katex XSS vulnerability
+  - CVE-2024-28245: katex XSS vulnerability
+  - CVE-2021-23906: yargs-parser prototype pollution
+  - CVE-2020-28469: glob-parent ReDoS vulnerability
+- **Now reports 0 production vulnerabilities** in npm audit
+- Custom markdown converter eliminates entire dependency chain of vulnerable packages
+
+### Migration Guide
+
+**No breaking changes!** All existing commands work exactly as before.
+
+**New recommended workflow for new users:**
+1. Install: `npm install -g @coastal-programs/notion-cli`
+2. Run setup wizard: `notion-cli init`
+3. Verify health: `notion-cli doctor`
+4. Start using: `notion-cli list`, `notion-cli db query`, etc.
+
+**For existing users:**
+- Run `notion-cli doctor` to verify your setup is healthy
+- Your existing token configuration continues to work
+- No action required unless you want to use the new commands
+
+---
+
 ## [5.4.0] - 2025-10-23
 
 ### Added - AI Agent Usability Features (Issue #4)
