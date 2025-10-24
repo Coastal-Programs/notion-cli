@@ -1,7 +1,7 @@
 {
   "name": "@coastal-programs/notion-cli",
   "version": "5.4.0",
-  "description": "Notion CLI optimized for automation and AI agents (API v5.2.1) with simple properties, JSON envelopes, and enhanced usability",
+  "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, and structured error handling.",
   "author": "Jake Schepis",
   "bin": {
     "notion-cli": "./bin/run"
@@ -60,9 +60,10 @@
   },
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
-    "lint": "eslint . --ext .ts --config .eslintrc.json",
+    "lint": "eslint . --ext .ts",
     "postpack": "shx rm -f oclif.manifest.json",
-    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "prepack": "npm run build && oclif manifest",
+    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha --forbid-only \"test/**/*.test.ts\"",
     "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null"
   },
   "engines": {

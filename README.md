@@ -9,6 +9,12 @@
 </pre>
 </div>
 
+**IMPORTANT NOTICE:**
+
+This is an independent, unofficial command-line tool for working with Notion's API.
+This project is not affiliated with, endorsed by, or sponsored by Notion Labs, Inc.
+"Notion" is a registered trademark of Notion Labs, Inc.
+
 > Notion CLI for AI Agents & Automation (API v5.2.1)
 
 A non-interactive command-line interface for Notion's API, optimized for AI coding assistants and automation scripts. **Skip the MCP server** - get direct, fast access to Notion via CLI.
@@ -754,6 +760,19 @@ npm test
 # Link for local development
 npm link
 ```
+
+## Legal & Compliance
+
+### Trademark Notice
+"Notion" is a registered trademark of Notion Labs, Inc. This project is an independent,
+unofficial tool and is not affiliated with, endorsed by, or sponsored by Notion Labs, Inc.
+
+### License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### Third-Party Licenses
+This project uses various open-source dependencies. See [NOTICE](NOTICE) for complete
+third-party license information.
 
 ## Contributing
 

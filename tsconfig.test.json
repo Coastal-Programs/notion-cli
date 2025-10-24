@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2019",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "ts-node": {
+    "transpileOnly": true,
+    "files": true,
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  }
+}

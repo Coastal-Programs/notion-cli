@@ -1,0 +1,9 @@
+{
+  "extension": ["ts"],
+  "spec": "test/**/*.test.ts",
+  "require": ["ts-node/register"],
+  "forbid-only": true,
+  "node-option": [
+    "require=ts-node/register"
+  ]
+}

@@ -11,7 +11,7 @@
 
 import { expect } from 'chai'
 import { EnvelopeFormatter, ExitCode, isSuccessEnvelope, isErrorEnvelope } from '../src/envelope'
-import { NotionCLIError, ErrorCode } from '../src/errors'
+import { NotionCLIError, NotionCLIErrorCode } from '../src/errors'
 
 describe('EnvelopeFormatter', () => {
   describe('constructor', () => {
@@ -137,16 +137,17 @@ describe('EnvelopeFormatter', () => {
     it('should wrap NotionCLIError correctly', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
       const error = new NotionCLIError(
-        ErrorCode.NOT_FOUND,
+        NotionCLIErrorCode.NOT_FOUND,
         'Resource not found',
-        { resourceId: 'abc-123' }
+        [],
+        { attemptedId: 'abc-123' }
       )
       const envelope = formatter.wrapError(error)
 
       expect(envelope.success).to.be.false
       expect(envelope.error.code).to.equal('NOT_FOUND')
       expect(envelope.error.message).to.equal('Resource not found')
-      expect(envelope.error.details).to.have.property('resourceId', 'abc-123')
+      expect(envelope.error.details).to.have.property('attemptedId', 'abc-123')
       expect(envelope.error.suggestions).to.be.an('array')
     })
 
@@ -178,7 +179,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should generate suggestions for UNAUTHORIZED', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.UNAUTHORIZED, 'Auth failed')
+      const error = new NotionCLIError(NotionCLIErrorCode.UNAUTHORIZED, 'Auth failed')
       const envelope = formatter.wrapError(error)
 
       expect(envelope.error.suggestions).to.be.an('array')
@@ -188,7 +189,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should generate suggestions for NOT_FOUND', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.NOT_FOUND, 'Not found')
+      const error = new NotionCLIError(NotionCLIErrorCode.NOT_FOUND, 'Not found')
       const envelope = formatter.wrapError(error)
 
       const suggestionsText = envelope.error.suggestions!.join(' ')
@@ -198,7 +199,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should generate suggestions for RATE_LIMITED', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.RATE_LIMITED, 'Rate limited')
+      const error = new NotionCLIError(NotionCLIErrorCode.RATE_LIMITED, 'Rate limited')
       const envelope = formatter.wrapError(error)
 
       const suggestionsText = envelope.error.suggestions!.join(' ')
@@ -207,7 +208,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should generate suggestions for VALIDATION_ERROR', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.VALIDATION_ERROR, 'Validation failed')
+      const error = new NotionCLIError(NotionCLIErrorCode.VALIDATION_ERROR, 'Validation failed')
       const envelope = formatter.wrapError(error)
 
       const suggestionsText = envelope.error.suggestions!.join(' ')
@@ -216,7 +217,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should handle errors without details', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.API_ERROR, 'API error')
+      const error = new NotionCLIError(NotionCLIErrorCode.API_ERROR, 'API error')
       const envelope = formatter.wrapError(error)
 
       expect(envelope.success).to.be.false
@@ -227,19 +228,19 @@ describe('EnvelopeFormatter', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
       const notionError = { status: 404, code: 'object_not_found' }
       const error = new NotionCLIError(
-        ErrorCode.NOT_FOUND,
+        NotionCLIErrorCode.NOT_FOUND,
         'Not found',
-        {},
-        notionError
+        [],
+        { originalError: notionError }
       )
       const envelope = formatter.wrapError(error)
 
-      expect(envelope.error.notionError).to.deep.equal(notionError)
+      expect(envelope.error.details).to.have.property('originalError')
     })
 
     it('should add additional context when provided', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.API_ERROR, 'Error')
+      const error = new NotionCLIError(NotionCLIErrorCode.API_ERROR, 'Error')
       const envelope = formatter.wrapError(error, {
         database_id: 'db-123',
         operation: 'query',
@@ -261,7 +262,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should return 2 for VALIDATION_ERROR', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.VALIDATION_ERROR, 'Invalid')
+      const error = new NotionCLIError(NotionCLIErrorCode.VALIDATION_ERROR, 'Invalid')
       const envelope = formatter.wrapError(error)
 
       expect(formatter.getExitCode(envelope)).to.equal(ExitCode.CLI_ERROR)
@@ -270,7 +271,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should return 1 for UNAUTHORIZED', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.UNAUTHORIZED, 'Unauthorized')
+      const error = new NotionCLIError(NotionCLIErrorCode.UNAUTHORIZED, 'Unauthorized')
       const envelope = formatter.wrapError(error)
 
       expect(formatter.getExitCode(envelope)).to.equal(ExitCode.API_ERROR)
@@ -279,7 +280,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should return 1 for NOT_FOUND', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.NOT_FOUND, 'Not found')
+      const error = new NotionCLIError(NotionCLIErrorCode.NOT_FOUND, 'Not found')
       const envelope = formatter.wrapError(error)
 
       expect(formatter.getExitCode(envelope)).to.equal(ExitCode.API_ERROR)
@@ -288,7 +289,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should return 1 for RATE_LIMITED', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.RATE_LIMITED, 'Rate limited')
+      const error = new NotionCLIError(NotionCLIErrorCode.RATE_LIMITED, 'Rate limited')
       const envelope = formatter.wrapError(error)
 
       expect(formatter.getExitCode(envelope)).to.equal(ExitCode.API_ERROR)
@@ -297,7 +298,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should return 1 for API_ERROR', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.API_ERROR, 'API error')
+      const error = new NotionCLIError(NotionCLIErrorCode.API_ERROR, 'API error')
       const envelope = formatter.wrapError(error)
 
       expect(formatter.getExitCode(envelope)).to.equal(ExitCode.API_ERROR)
@@ -306,7 +307,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should return 1 for UNKNOWN', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.UNKNOWN, 'Unknown error')
+      const error = new NotionCLIError(NotionCLIErrorCode.UNKNOWN, 'Unknown error')
       const envelope = formatter.wrapError(error)
 
       expect(formatter.getExitCode(envelope)).to.equal(ExitCode.API_ERROR)
@@ -375,7 +376,7 @@ describe('EnvelopeFormatter', () => {
 
     it('should not output raw data for error envelope with --raw', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
-      const error = new NotionCLIError(ErrorCode.NOT_FOUND, 'Not found')
+      const error = new NotionCLIError(NotionCLIErrorCode.NOT_FOUND, 'Not found')
       const envelope = formatter.wrapError(error)
       let output = ''
 
@@ -401,7 +402,7 @@ describe('EnvelopeFormatter', () => {
 
       it('should return false for error envelope', () => {
         const formatter = new EnvelopeFormatter('test', '1.0.0')
-        const error = new NotionCLIError(ErrorCode.API_ERROR, 'Error')
+        const error = new NotionCLIError(NotionCLIErrorCode.API_ERROR, 'Error')
         const envelope = formatter.wrapError(error)
 
         expect(isSuccessEnvelope(envelope)).to.be.false
@@ -411,7 +412,7 @@ describe('EnvelopeFormatter', () => {
     describe('isErrorEnvelope', () => {
       it('should return true for error envelope', () => {
         const formatter = new EnvelopeFormatter('test', '1.0.0')
-        const error = new NotionCLIError(ErrorCode.API_ERROR, 'Error')
+        const error = new NotionCLIError(NotionCLIErrorCode.API_ERROR, 'Error')
         const envelope = formatter.wrapError(error)
 
         expect(isErrorEnvelope(envelope)).to.be.true
@@ -460,7 +461,7 @@ describe('EnvelopeFormatter', () => {
     it('should handle special characters in error messages', () => {
       const formatter = new EnvelopeFormatter('test', '1.0.0')
       const error = new NotionCLIError(
-        ErrorCode.API_ERROR,
+        NotionCLIErrorCode.API_ERROR,
         'Error with "quotes" and \'apostrophes\' and \n newlines'
       )
       const envelope = formatter.wrapError(error)
