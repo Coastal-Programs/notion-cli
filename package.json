@@ -1,15 +1,18 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "5.5.0",
-  "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, and structured error handling.",
-  "author": "Jake Schepis",
+  "version": "5.6.0",
+  "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, structured error handling, and comprehensive testing.",
+  "author": "Jake Schepis <jake@coastalprograms.com>",
   "bin": {
     "notion-cli": "./bin/run"
   },
-  "homepage": "https://github.com/Coastal-Programs/notion-cli",
+  "homepage": "https://github.com/Coastal-Programs/notion-cli#readme",
   "license": "MIT",
   "main": "dist/index.js",
-  "repository": "Coastal-Programs/notion-cli",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Coastal-Programs/notion-cli.git"
+  },
   "files": [
     "/bin",
     "/dist",
@@ -18,7 +21,7 @@
     "/oclif.manifest.json"
   ],
   "dependencies": {
-    "@notionhq/client": "^2.2.15",
+    "@notionhq/client": "^5.2.1",
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
     "dayjs": "^1.11.13",
@@ -77,18 +80,30 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "bugs": "https://github.com/Coastal-Programs/notion-cli/issues",
+  "bugs": {
+    "url": "https://github.com/Coastal-Programs/notion-cli/issues",
+    "email": "jake@coastalprograms.com"
+  },
   "keywords": [
-    "oclif",
     "notion",
     "cli",
+    "notion-api",
+    "notion-cli",
     "ai-agents",
     "automation",
+    "productivity",
+    "database",
+    "workspace",
     "schema-discovery",
     "workspace-cache",
     "database-sync",
     "simple-properties",
-    "json-envelope"
+    "json-envelope",
+    "typescript",
+    "oclif",
+    "notion-integration",
+    "command-line",
+    "developer-tools"
   ],
   "types": "dist/index.d.ts"
 }

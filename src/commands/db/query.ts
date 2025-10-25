@@ -241,7 +241,7 @@ export default class DbQuery extends Command {
         }
 
         // Build sorts
-        let sorts: QueryDataSourceParameters['sorts'] = []
+        const sorts: QueryDataSourceParameters['sorts'] = []
         const direction = flags['sort-direction'] == 'desc' ? 'descending' : 'ascending'
         if (flags['sort-property']) {
           sorts.push({

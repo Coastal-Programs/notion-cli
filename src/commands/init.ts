@@ -296,7 +296,7 @@ export default class Init extends Command {
       const latency = Date.now() - startTime
 
       // Extract bot info
-      let botInfo: any = {
+      const botInfo: any = {
         id: user.id,
         name: user.name || 'Unnamed Bot',
         type: user.type

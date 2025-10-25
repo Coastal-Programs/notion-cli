@@ -7,7 +7,7 @@
 
 import { Command, Flags, Interfaces } from '@oclif/core'
 import { EnvelopeFormatter, ExitCode, OutputFlags } from './envelope'
-import { wrapNotionError, NotionCLIError, NotionCLIErrorCode } from './errors/index'
+import { wrapNotionError, NotionCLIError } from './errors/index'
 
 /**
  * Base command configuration
@@ -47,7 +47,7 @@ export abstract class BaseCommand extends Command {
   /**
    * Determine if envelope should be used based on flags
    */
-  protected checkEnvelopeUsage(flags: any): boolean {
+  protected checkEnvelopeUsage(flags: Record<string, unknown>): boolean {
     return !!(flags.json || flags['compact-json'])
   }
 
@@ -60,8 +60,8 @@ export abstract class BaseCommand extends Command {
    */
   protected outputSuccess<T>(
     data: T,
-    flags: OutputFlags & any,
-    additionalMetadata?: Record<string, any>
+    flags: OutputFlags & Record<string, unknown>,
+    additionalMetadata?: Record<string, unknown>
   ): never {
     // Check if we should use envelope
     this.shouldUseEnvelope = this.checkEnvelopeUsage(flags)
@@ -85,9 +85,9 @@ export abstract class BaseCommand extends Command {
    * @param additionalContext - Optional error context
    */
   protected outputError(
-    error: any,
-    flags: OutputFlags & any,
-    additionalContext?: Record<string, any>
+    error: Error | NotionCLIError,
+    flags: OutputFlags & Record<string, unknown>,
+    additionalContext?: Record<string, unknown>
   ): never {
     // Wrap raw errors in NotionCLIError
     const cliError = error instanceof NotionCLIError ? error : wrapNotionError(error)
@@ -121,7 +121,7 @@ export abstract class BaseCommand extends Command {
   /**
    * Catch handler that ensures proper envelope error output
    */
-  async catch(error: Error & { exitCode?: number }): Promise<any> {
+  async catch(error: Error & { exitCode?: number }): Promise<void> {
     // If command has already handled the error via outputError, just propagate
     if (error.exitCode !== undefined) {
       throw error

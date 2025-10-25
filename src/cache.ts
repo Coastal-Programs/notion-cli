@@ -68,7 +68,7 @@ function logCacheEvent(event: CacheEvent): void {
 }
 
 export class CacheManager {
-  private cache: Map<string, CacheEntry<any>>
+  private cache: Map<string, CacheEntry<unknown>>
   private stats: CacheStats
   private config: CacheConfig
 
@@ -101,7 +101,7 @@ export class CacheManager {
   /**
    * Generate a cache key from resource type and identifiers
    */
-  private generateKey(type: string, ...identifiers: any[]): string {
+  private generateKey(type: string, ...identifiers: Array<string | number | object>): string {
     return `${type}:${identifiers.map(id =>
       typeof id === 'object' ? JSON.stringify(id) : String(id)
     ).join(':')}`
@@ -110,7 +110,7 @@ export class CacheManager {
   /**
    * Check if a cache entry is still valid
    */
-  private isValid(entry: CacheEntry<any>): boolean {
+  private isValid(entry: CacheEntry<unknown>): boolean {
     const now = Date.now()
     return now - entry.timestamp < entry.ttl
   }
@@ -119,7 +119,6 @@ export class CacheManager {
    * Evict expired entries
    */
   private evictExpired(): void {
-    const now = Date.now()
     let evictedCount = 0
 
     for (const [key, entry] of this.cache.entries()) {
@@ -180,7 +179,7 @@ export class CacheManager {
   /**
    * Get a value from cache
    */
-  get<T>(type: string, ...identifiers: any[]): T | null {
+  get<T>(type: string, ...identifiers: Array<string | number | object>): T | null {
     if (!this.config.enabled) {
       return null
     }
@@ -239,7 +238,7 @@ export class CacheManager {
   /**
    * Set a value in cache with optional custom TTL
    */
-  set<T>(type: string, data: T, customTtl?: number, ...identifiers: any[]): void {
+  set<T>(type: string, data: T, customTtl?: number, ...identifiers: Array<string | number | object>): void {
     if (!this.config.enabled) {
       return
     }
@@ -279,7 +278,7 @@ export class CacheManager {
   /**
    * Invalidate specific cache entries by type and optional identifiers
    */
-  invalidate(type: string, ...identifiers: any[]): void {
+  invalidate(type: string, ...identifiers: Array<string | number | object>): void {
     if (identifiers.length === 0) {
       // Invalidate all entries of this type
       const pattern = `${type}:`
