@@ -1,7 +1,7 @@
 {
   "extension": ["ts"],
   "spec": "test/**/*.test.ts",
-  "require": ["ts-node/register"],
+  "require": ["ts-node/register", "test/helpers/init.js", "test/setup.ts"],
   "forbid-only": true,
   "node-option": [
     "require=ts-node/register"
