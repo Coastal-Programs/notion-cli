@@ -164,9 +164,6 @@ describe('token-validator', () => {
       const masked = maskToken(token)
 
       expect(masked).to.equal('secret_***...***xyz')
-      expect(masked).to.include('secret_')
-      expect(masked).to.include('***...***')
-      expect(masked).to.include('xyz')
     })
 
     it('should mask OAuth tokens with ntn_ prefix', () => {
@@ -174,9 +171,6 @@ describe('token-validator', () => {
       const masked = maskToken(token)
 
       expect(masked).to.equal('ntn_***...***xyz')
-      expect(masked).to.include('ntn_')
-      expect(masked).to.include('***...***')
-      expect(masked).to.include('xyz')
     })
 
     it('should preserve last 3 characters', () => {
