@@ -178,6 +178,27 @@ npm run build
 npm link
 ```
 
+### Updating
+
+To update to the latest version:
+
+```bash
+# Update to latest version
+npm update -g @coastal-programs/notion-cli
+
+# Or reinstall for a specific version
+npm install -g @coastal-programs/notion-cli@latest
+```
+
+Check your current version:
+```bash
+notion-cli --version
+```
+
+**Note**: Updates are not automatic. Check for new releases at:
+- [npm package page](https://www.npmjs.com/package/@coastal-programs/notion-cli)
+- [GitHub releases](https://github.com/Coastal-Programs/notion-cli/releases)
+
 ### First-Time Setup
 
 The easiest way to get started:
