@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "5.6.0",
+  "version": "5.7.0",
   "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, structured error handling, and comprehensive testing.",
   "author": "Jake Schepis <jake@coastalprograms.com>",
   "bin": {
