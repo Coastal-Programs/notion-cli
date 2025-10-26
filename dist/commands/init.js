@@ -196,13 +196,28 @@ class Init extends core_1.Command {
                 this.log('');
                 this.log(`${terminal_banner_1.colors.dim}Note: Automatically added "secret_" prefix to token${terminal_banner_1.colors.reset}`);
             }
+            // Validate token length (Notion tokens are typically 50+ chars)
+            if (token.length < 20) {
+                throw new errors_1.NotionCLIError(errors_1.NotionCLIErrorCode.TOKEN_INVALID, 'Token appears to be too short', [
+                    {
+                        description: 'Notion integration tokens are typically 50+ characters',
+                    },
+                    {
+                        description: 'Please verify you copied the complete token from Notion',
+                        link: 'https://www.notion.so/my-integrations'
+                    },
+                    {
+                        description: 'Token should look like: secret_abc123...(40+ more characters)',
+                    }
+                ]);
+            }
             // Set token in current process for subsequent steps
             process.env.NOTION_TOKEN = token;
             this.log('');
             this.log('Token set for this session.');
             this.log('');
             this.log('Note: To persist this token, add it to your shell configuration:');
-            this.log(`  export NOTION_TOKEN="${token}"`);
+            this.log(`  export NOTION_TOKEN="${(0, token_validator_1.maskToken)(token)}"`);
             this.log('');
             this.log('Or use: notion-cli config set-token');
             this.log('');

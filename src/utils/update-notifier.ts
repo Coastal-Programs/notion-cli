@@ -7,17 +7,27 @@
  * Respects NO_UPDATE_NOTIFIER environment variable and CI environments
  */
 
-import updateNotifier = require('update-notifier')
-
 /**
  * Check for updates and notify user if a new version is available
  *
  * This runs asynchronously and won't block CLI execution.
  * Checks are cached for 1 day by default.
+ *
+ * Set DEBUG=1 environment variable to see error messages if update check fails.
+ *
+ * @example
+ * ```bash
+ * # Silent mode (default)
+ * notion-cli --version
+ *
+ * # Debug mode
+ * DEBUG=1 notion-cli --version
+ * ```
  */
 export function checkForUpdates(): void {
   try {
-    // Load package.json dynamically to avoid rootDir issues
+    // Load dependencies dynamically to avoid rootDir issues
+    const updateNotifier = require('update-notifier').default || require('update-notifier')
     const packageJson = require('../../package.json')
 
     // Initialize update notifier with package info
@@ -34,6 +44,11 @@ export function checkForUpdates(): void {
     })
   } catch (error) {
     // Silently fail - don't break CLI if update check fails
-    // This could happen if npm registry is unreachable, etc.
+    // This could happen if npm registry is unreachable, network issues, etc.
+
+    // Debug mode: Show error details for troubleshooting
+    if (process.env.DEBUG) {
+      console.error('Update check failed:', error instanceof Error ? error.message : error)
+    }
   }
 }

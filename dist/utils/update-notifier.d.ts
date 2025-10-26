@@ -11,5 +11,16 @@
  *
  * This runs asynchronously and won't block CLI execution.
  * Checks are cached for 1 day by default.
+ *
+ * Set DEBUG=1 environment variable to see error messages if update check fails.
+ *
+ * @example
+ * ```bash
+ * # Silent mode (default)
+ * notion-cli --version
+ *
+ * # Debug mode
+ * DEBUG=1 notion-cli --version
+ * ```
  */
 export declare function checkForUpdates(): void;

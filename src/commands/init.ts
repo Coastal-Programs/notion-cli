@@ -6,7 +6,7 @@ import {
   NotionCLIErrorCode,
   wrapNotionError
 } from '../errors'
-import { validateNotionToken } from '../utils/token-validator'
+import { validateNotionToken, maskToken } from '../utils/token-validator'
 import { client, botUser as fetchBotUser } from '../notion'
 import { loadCache } from '../utils/workspace-cache'
 import { colors, ASCII_BANNER } from '../utils/terminal-banner'
@@ -247,6 +247,26 @@ export default class Init extends Command {
         this.log(`${colors.dim}Note: Automatically added "secret_" prefix to token${colors.reset}`)
       }
 
+      // Validate token length (Notion tokens are typically 50+ chars)
+      if (token.length < 20) {
+        throw new NotionCLIError(
+          NotionCLIErrorCode.TOKEN_INVALID,
+          'Token appears to be too short',
+          [
+            {
+              description: 'Notion integration tokens are typically 50+ characters',
+            },
+            {
+              description: 'Please verify you copied the complete token from Notion',
+              link: 'https://www.notion.so/my-integrations'
+            },
+            {
+              description: 'Token should look like: secret_abc123...(40+ more characters)',
+            }
+          ]
+        )
+      }
+
       // Set token in current process for subsequent steps
       process.env.NOTION_TOKEN = token
 
@@ -254,7 +274,7 @@ export default class Init extends Command {
       this.log('Token set for this session.')
       this.log('')
       this.log('Note: To persist this token, add it to your shell configuration:')
-      this.log(`  export NOTION_TOKEN="${token}"`)
+      this.log(`  export NOTION_TOKEN="${maskToken(token)}"`)
       this.log('')
       this.log('Or use: notion-cli config set-token')
       this.log('')
