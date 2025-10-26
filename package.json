@@ -79,7 +79,7 @@
     "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.18.0"
   },
   "bugs": {
     "url": "https://github.com/Coastal-Programs/notion-cli/issues",
