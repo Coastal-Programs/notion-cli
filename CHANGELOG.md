@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **ASCII art banner** displayed during installation and `notion-cli init` command for enhanced branding and professional appearance
+- **PUBLISHING.md guide** with comprehensive npm release workflow and best practices
+- **Shared banner utilities** (`scripts/banner.js` and `src/utils/terminal-banner.ts`) following DRY principle
+
+### Changed
+- **README Quick Start section** simplified with clearer installation flow and removed MCP server comparisons
+- **Enhanced postinstall message** to prominently highlight `notion-cli init` as the recommended first step
+- **Banner styling** now uses terminal's default color for better consistency with README
+
+### Fixed
+- **PUBLISHING.md chicken-and-egg problem** resolved by recommending README update before first npm publish
+
 ## [5.6.0] - 2025-10-25
 
 ### Quality Improvements

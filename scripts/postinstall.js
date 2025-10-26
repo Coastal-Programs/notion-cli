@@ -11,46 +11,34 @@ if (isSilent) {
   process.exit(0);
 }
 
-// ANSI color codes for cross-platform compatibility
-const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  dim: '\x1b[2m',
-  green: '\x1b[32m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-  gray: '\x1b[90m',
-};
+// Import shared banner and colors
+const { colors, ASCII_BANNER } = require('./banner');
 
 // Graceful error handling - don't break installation
 try {
   const packageJson = require('../package.json');
   const version = packageJson.version;
 
-  // Welcome message with clear next steps
-  console.log(`
-${colors.green}✓${colors.reset} Notion CLI ${colors.bright}v${version}${colors.reset} installed successfully!
-
-${colors.blue}Next steps:${colors.reset}
-  ${colors.gray}1.${colors.reset} Set your token: ${colors.cyan}notion-cli config set-token${colors.reset}
-  ${colors.gray}2.${colors.reset} Test connection: ${colors.cyan}notion-cli whoami${colors.reset}
-  ${colors.gray}3.${colors.reset} Sync workspace: ${colors.cyan}notion-cli sync${colors.reset}
-
-${colors.blue}Resources:${colors.reset}
-  Documentation: https://github.com/Coastal-Programs/notion-cli
-  Report issues: https://github.com/Coastal-Programs/notion-cli/issues
-  Get started:   ${colors.cyan}notion-cli --help${colors.reset}
-`);
+  // Welcome message with banner and clear next steps
+  console.log(ASCII_BANNER);
+  console.log(`${colors.green}✓${colors.reset} Version ${colors.bright}${version}${colors.reset} installed successfully!\n`);
+  console.log(`${colors.blue}Quick Start:${colors.reset}`);
+  console.log(`  ${colors.cyan}notion-cli init${colors.reset}          ${colors.dim}# Interactive setup wizard${colors.reset}`);
+  console.log(`  ${colors.cyan}notion-cli --help${colors.reset}        ${colors.dim}# View all commands${colors.reset}\n`);
+  console.log(`${colors.blue}Resources:${colors.reset}`);
+  console.log(`  ${colors.gray}•${colors.reset} Documentation: ${colors.dim}https://github.com/Coastal-Programs/notion-cli${colors.reset}`);
+  console.log(`  ${colors.gray}•${colors.reset} Get API Token:  ${colors.dim}https://developers.notion.com/docs/create-a-notion-integration${colors.reset}`);
+  console.log(`  ${colors.gray}•${colors.reset} Report Issues:  ${colors.dim}https://github.com/Coastal-Programs/notion-cli/issues${colors.reset}`);
+  console.log('');
 } catch (error) {
   // Fallback to simple message if anything goes wrong
   console.log(`
 Notion CLI installed successfully!
 
-Next steps:
-  1. Set your token: notion-cli config set-token
-  2. Test connection: notion-cli whoami
-  3. Sync workspace: notion-cli sync
+Quick Start:
+  notion-cli init          # Interactive setup wizard
+  notion-cli --help        # View all commands
 
-Get help: notion-cli --help
+Get help: https://github.com/Coastal-Programs/notion-cli
 `);
 }

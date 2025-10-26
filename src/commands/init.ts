@@ -9,6 +9,7 @@ import {
 import { validateNotionToken } from '../utils/token-validator'
 import { client, botUser as fetchBotUser } from '../notion'
 import { loadCache } from '../utils/workspace-cache'
+import { colors, ASCII_BANNER } from '../utils/terminal-banner'
 
 /**
  * Interactive first-time setup wizard for Notion CLI
@@ -137,15 +138,12 @@ export default class Init extends Command {
    * Show welcome message
    */
   private showWelcome() {
-    this.log('')
-    this.log('='.repeat(60))
-    this.log('  Welcome to Notion CLI!')
-    this.log('='.repeat(60))
-    this.log('')
+    this.log(ASCII_BANNER)
+    this.log(`${colors.blue}Welcome to Notion CLI Setup!${colors.reset}\n`)
     this.log('This wizard will help you set up your Notion CLI in 3 steps:')
-    this.log('  1. Configure your Notion integration token')
-    this.log('  2. Test the connection to Notion API')
-    this.log('  3. Sync your workspace databases')
+    this.log(`  ${colors.dim}1.${colors.reset} Configure your Notion integration token`)
+    this.log(`  ${colors.dim}2.${colors.reset} Test the connection to Notion API`)
+    this.log(`  ${colors.dim}3.${colors.reset} Sync your workspace databases`)
     this.log('')
     this.log('Let\'s get started!')
     this.log('')

@@ -35,12 +35,12 @@ This project is not affiliated with, endorsed by, or sponsored by Notion Labs, I
 
 > Notion CLI for AI Agents & Automation (API v5.2.1)
 
-A non-interactive command-line interface for Notion's API, optimized for AI coding assistants and automation scripts. **Skip the MCP server** - get direct, fast access to Notion via CLI.
+A powerful command-line interface for Notion's API, optimized for AI coding assistants and automation scripts.
 
-**Why Use This Instead of MCP Servers:**
-- 🚀 **Faster**: Direct API calls without MCP overhead
-- 🤖 **AI-First**: JSON output mode, structured errors, exit codes
-- ⚡ **Non-Interactive**: No prompts - perfect for automation
+**Key Features:**
+- 🚀 **Fast & Direct**: Native API integration with intelligent caching
+- 🤖 **AI-First Design**: JSON output mode, structured errors, exit codes
+- ⚡ **Non-Interactive**: Perfect for scripts and automation
 - 📊 **Flexible Output**: JSON, CSV, YAML, or raw API responses
 - ✅ **Latest API**: Notion API v5.2.1 with data sources support
 - 🔄 **Enhanced Reliability**: Automatic retry with exponential backoff
@@ -157,76 +157,80 @@ A non-interactive command-line interface for Notion's API, optimized for AI codi
 
 **Performance** - In-memory caching (up to 100x faster for repeated reads)
 
-## Quick Start for AI Agents
+## Quick Start
 
-**If you're Claude, GPT, or another AI assistant**, here's everything you need:
+### Installation
 
-1. **Install** (choose based on platform):
-   ```bash
-   # Mac/Linux: GitHub install works
-   npm install -g Coastal-Programs/notion-cli
+```bash
+# From npm (recommended)
+npm install -g @coastal-programs/notion-cli
 
-   # Windows: Use local install (GitHub has symlink issues)
-   git clone https://github.com/Coastal-Programs/notion-cli
-   cd notion-cli
-   npm install -g .
-   ```
+# Or from source
+npm install -g Coastal-Programs/notion-cli
+```
 
-2. **First-time setup** (new easy way!):
-   ```bash
-   # Interactive setup wizard (recommended for new users)
-   notion-cli init
+**Note**: Windows users installing from source should use the local clone method due to symlink limitations:
+```bash
+git clone https://github.com/Coastal-Programs/notion-cli
+cd notion-cli
+npm install
+npm run build
+npm link
+```
 
-   # Or set token manually if preferred:
-   # Mac/Linux
-   export NOTION_TOKEN="secret_your_token_here"
+### First-Time Setup
 
-   # Windows (Command Prompt)
-   set NOTION_TOKEN=secret_your_token_here
+The easiest way to get started:
 
-   # Windows (PowerShell)
-   $env:NOTION_TOKEN="secret_your_token_here"
-   ```
+```bash
+# Run the interactive setup wizard
+notion-cli init
+```
 
-3. **Verify setup** (health check):
-   ```bash
-   notion-cli doctor
-   # Runs 7 diagnostic checks to ensure everything is configured correctly
-   ```
+This will guide you through:
+1. 🔑 Setting your Notion API token
+2. ✅ Testing the connection
+3. 🔄 Syncing your workspace
 
-4. **Test connectivity** (optional - doctor command includes this):
-   ```bash
-   notion-cli whoami
-   # Returns: bot info, workspace, cache status, API latency
-   ```
+**Manual Configuration (Optional):**
 
-5. **Sync your workspace** (one-time setup for faster operations):
-   ```bash
-   notion-cli sync
-   ```
+If you prefer to set up manually:
 
-6. **List your databases**:
-   ```bash
-   notion-cli list --json
-   ```
+```bash
+# Set your token
+export NOTION_TOKEN="secret_your_token_here"
 
-7. **Discover database schema** (before creating pages):
-   ```bash
-   # Get schema with examples for easy copy-paste
-   notion-cli db schema <DATA_SOURCE_ID> --with-examples --json
-   ```
+# Test the connection
+notion-cli whoami
 
-8. **Create a page** (using simple properties):
-   ```bash
-   notion-cli page create -d <DATA_SOURCE_ID> -S --properties '{
-     "Name": "My Task",
-     "Status": "In Progress",
-     "Priority": 5,
-     "Due Date": "tomorrow"
-   }'
-   ```
+# Sync your workspace
+notion-cli sync
+```
 
-9. **All commands support** `--json` for machine-readable responses.
+### Common Commands
+
+**List your databases:**
+```bash
+notion-cli list --json
+```
+
+**Discover database schema:**
+```bash
+# Get schema with examples for easy copy-paste
+notion-cli db schema <DATA_SOURCE_ID> --with-examples --json
+```
+
+**Create a page** (using simple properties):
+```bash
+notion-cli page create -d <DATA_SOURCE_ID> -S --properties '{
+  "Name": "My Task",
+  "Status": "In Progress",
+  "Priority": 5,
+  "Due Date": "tomorrow"
+}'
+```
+
+**All commands support** `--json` for machine-readable responses.
 
 **Get your API token**: https://developers.notion.com/docs/create-a-notion-integration
 
