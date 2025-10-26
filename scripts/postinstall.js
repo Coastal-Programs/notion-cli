@@ -11,28 +11,8 @@ if (isSilent) {
   process.exit(0);
 }
 
-// ANSI color codes for cross-platform compatibility
-const colors = {
-  reset: '\x1b[0m',
-  bright: '\x1b[1m',
-  dim: '\x1b[2m',
-  green: '\x1b[32m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-  gray: '\x1b[90m',
-  yellow: '\x1b[33m',
-  magenta: '\x1b[35m',
-};
-
-// ASCII Art Banner
-const banner = `
-${colors.cyan}███╗   ██╗ ██████╗ ████████╗██╗ ██████╗ ███╗   ██╗     ██████╗██╗     ██╗
-████╗  ██║██╔═══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║    ██╔════╝██║     ██║
-██╔██╗ ██║██║   ██║   ██║   ██║██║   ██║██╔██╗ ██║    ██║     ██║     ██║
-██║╚██╗██║██║   ██║   ██║   ██║██║   ██║██║╚██╗██║    ██║     ██║     ██║
-██║ ╚████║╚██████╔╝   ██║   ██║╚██████╔╝██║ ╚████║    ╚██████╗███████╗██║
-╚═╝  ╚═══╝ ╚═════╝    ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝     ╚═════╝╚══════╝╚═╝${colors.reset}
-`;
+// Import shared banner and colors
+const { colors, ASCII_BANNER } = require('./banner');
 
 // Graceful error handling - don't break installation
 try {
@@ -40,7 +20,7 @@ try {
   const version = packageJson.version;
 
   // Welcome message with banner and clear next steps
-  console.log(banner);
+  console.log(ASCII_BANNER);
   console.log(`${colors.green}✓${colors.reset} Version ${colors.bright}${version}${colors.reset} installed successfully!\n`);
   console.log(`${colors.blue}Quick Start:${colors.reset}`);
   console.log(`  ${colors.cyan}notion-cli init${colors.reset}          ${colors.dim}# Interactive setup wizard${colors.reset}`);

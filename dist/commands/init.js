@@ -7,6 +7,7 @@ const errors_1 = require("../errors");
 const token_validator_1 = require("../utils/token-validator");
 const notion_1 = require("../notion");
 const workspace_cache_1 = require("../utils/workspace-cache");
+const terminal_banner_1 = require("../utils/terminal-banner");
 /**
  * Interactive first-time setup wizard for Notion CLI
  *
@@ -105,24 +106,12 @@ class Init extends core_1.Command {
      * Show welcome message
      */
     showWelcome() {
-        const cyan = '\x1b[36m';
-        const reset = '\x1b[0m';
-        const blue = '\x1b[34m';
-        const dim = '\x1b[2m';
-        const banner = `
-${cyan}███╗   ██╗ ██████╗ ████████╗██╗ ██████╗ ███╗   ██╗     ██████╗██╗     ██╗
-████╗  ██║██╔═══██╗╚══██╔══╝██║██╔═══██╗████╗  ██║    ██╔════╝██║     ██║
-██╔██╗ ██║██║   ██║   ██║   ██║██║   ██║██╔██╗ ██║    ██║     ██║     ██║
-██║╚██╗██║██║   ██║   ██║   ██║██║   ██║██║╚██╗██║    ██║     ██║     ██║
-██║ ╚████║╚██████╔╝   ██║   ██║╚██████╔╝██║ ╚████║    ╚██████╗███████╗██║
-╚═╝  ╚═══╝ ╚═════╝    ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝     ╚═════╝╚══════╝╚═╝${reset}
-`;
-        this.log(banner);
-        this.log(`${blue}Welcome to Notion CLI Setup!${reset}\n`);
+        this.log(terminal_banner_1.ASCII_BANNER);
+        this.log(`${terminal_banner_1.colors.blue}Welcome to Notion CLI Setup!${terminal_banner_1.colors.reset}\n`);
         this.log('This wizard will help you set up your Notion CLI in 3 steps:');
-        this.log(`  ${dim}1.${reset} Configure your Notion integration token`);
-        this.log(`  ${dim}2.${reset} Test the connection to Notion API`);
-        this.log(`  ${dim}3.${reset} Sync your workspace databases`);
+        this.log(`  ${terminal_banner_1.colors.dim}1.${terminal_banner_1.colors.reset} Configure your Notion integration token`);
+        this.log(`  ${terminal_banner_1.colors.dim}2.${terminal_banner_1.colors.reset} Test the connection to Notion API`);
+        this.log(`  ${terminal_banner_1.colors.dim}3.${terminal_banner_1.colors.reset} Sync your workspace databases`);
         this.log('');
         this.log('Let\'s get started!');
         this.log('');

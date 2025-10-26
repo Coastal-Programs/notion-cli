@@ -15,6 +15,23 @@ npm search @coastal-programs/notion-cli
 # Should return no results or confirm your package
 ```
 
+## Before First Publish (One-Time)
+
+### Update README Installation Section
+Update the README to include npm installation as the primary method:
+
+```bash
+# From npm (recommended)
+npm install -g @coastal-programs/notion-cli
+
+# Or from source
+npm install -g Coastal-Programs/notion-cli
+```
+
+This should be done BEFORE your first publish so the README is ready when the package goes live.
+
+---
+
 ## Before Each Release
 
 ### 1. Update Version
@@ -51,22 +68,6 @@ That's it! Your package is live at:
 - **Page**: https://www.npmjs.com/package/@coastal-programs/notion-cli
 
 ## After Publishing
-
-### Update README
-Replace this in README.md:
-```bash
-# From source (recommended until npm package is published)
-npm install -g Coastal-Programs/notion-cli
-```
-
-With:
-```bash
-# From npm (recommended)
-npm install -g @coastal-programs/notion-cli
-
-# Or from source
-npm install -g Coastal-Programs/notion-cli
-```
 
 ### Create GitHub Release
 1. Go to: https://github.com/Coastal-Programs/notion-cli/releases
