@@ -50,7 +50,7 @@ A powerful command-line interface for Notion's API, optimized for AI coding assi
 - 🧠 **Smart ID Resolution**: Automatic database_id → data_source_id conversion
 - 🔒 **Secure**: 0 production vulnerabilities
 
-## What's New in v5.5.0
+## What's New in v5.6.0
 
 **Improved First-Time Experience & Enhanced Security** 🎉
 
@@ -177,6 +177,33 @@ npm install
 npm run build
 npm link
 ```
+
+### Updating
+
+To update to the latest version:
+
+```bash
+# Update to latest version
+npm update -g @coastal-programs/notion-cli
+
+# Or reinstall for a specific version
+npm install -g @coastal-programs/notion-cli@latest
+```
+
+Check your current version:
+```bash
+notion-cli --version
+```
+
+**Update Notifications:**
+- The CLI automatically checks for updates once per day
+- You'll see a notification when a new version is available
+- Updates are never applied automatically - you stay in control
+- To disable notifications: `export NO_UPDATE_NOTIFIER=1`
+
+Check for new releases at:
+- [npm package page](https://www.npmjs.com/package/@coastal-programs/notion-cli)
+- [GitHub releases](https://github.com/Coastal-Programs/notion-cli/releases)
 
 ### First-Time Setup
 

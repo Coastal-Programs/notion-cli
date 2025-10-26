@@ -6,8 +6,39 @@
  * This ensures users get helpful, actionable error messages before attempting API calls.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateNotionToken = void 0;
+exports.validateNotionToken = exports.maskToken = void 0;
 const errors_1 = require("../errors");
+/**
+ * Masks a Notion token for safe display in logs and console output
+ *
+ * Shows only the prefix and last 3 characters to prevent token leakage
+ * in screen recordings, terminal sharing, or logs.
+ *
+ * @param token - The token to mask
+ * @returns Masked token string (e.g., "secret_***...***abc")
+ *
+ * @example
+ * ```typescript
+ * const token = "secret_1234567890abcdef"
+ * const masked = maskToken(token)
+ * // Returns: "secret_***...***def"
+ * ```
+ */
+function maskToken(token) {
+    if (!token)
+        return '';
+    if (token.length <= 10) {
+        // Token too short to safely mask, obscure completely
+        return '***';
+    }
+    // Show prefix (secret_ or ntn_) and last 3 chars
+    const prefix = token.startsWith('secret_') ? 'secret_' :
+        token.startsWith('ntn_') ? 'ntn_' :
+            token.slice(0, 7);
+    const suffix = token.slice(-3);
+    return `${prefix}***...***${suffix}`;
+}
+exports.maskToken = maskToken;
 /**
  * Validates that NOTION_TOKEN environment variable is set
  *

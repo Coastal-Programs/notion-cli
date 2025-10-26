@@ -176,20 +176,38 @@ class Init extends core_1.Command {
                 output: process.stdout,
             });
             token = await new Promise((resolve) => {
-                rl.question('Enter your Notion integration token: ', (answer) => {
+                rl.question('Enter your Notion integration token (paste with or without "secret_" prefix): ', (answer) => {
                     rl.close();
                     resolve(answer.trim());
                 });
             });
-            // Validate token format
-            if (!token || !token.startsWith('secret_')) {
-                throw new errors_1.NotionCLIError(errors_1.NotionCLIErrorCode.TOKEN_INVALID, 'Invalid token format - Notion tokens must start with "secret_"', [
+            // Validate token is not empty
+            if (!token) {
+                throw new errors_1.NotionCLIError(errors_1.NotionCLIErrorCode.TOKEN_INVALID, 'Token cannot be empty', [
                     {
                         description: 'Get your integration token from Notion',
                         link: 'https://developers.notion.com/docs/create-a-notion-integration'
+                    }
+                ]);
+            }
+            // Auto-prepend "secret_" if user didn't include it
+            if (!token.startsWith('secret_')) {
+                token = `secret_${token}`;
+                this.log('');
+                this.log(`${terminal_banner_1.colors.dim}Note: Automatically added "secret_" prefix to token${terminal_banner_1.colors.reset}`);
+            }
+            // Validate token length (Notion tokens are typically 50+ chars)
+            if (token.length < 20) {
+                throw new errors_1.NotionCLIError(errors_1.NotionCLIErrorCode.TOKEN_INVALID, 'Token appears to be too short', [
+                    {
+                        description: 'Notion integration tokens are typically 50+ characters',
                     },
                     {
-                        description: 'Tokens should look like: secret_abc123...',
+                        description: 'Please verify you copied the complete token from Notion',
+                        link: 'https://www.notion.so/my-integrations'
+                    },
+                    {
+                        description: 'Token should look like: secret_abc123...(40+ more characters)',
                     }
                 ]);
             }
@@ -199,7 +217,7 @@ class Init extends core_1.Command {
             this.log('Token set for this session.');
             this.log('');
             this.log('Note: To persist this token, add it to your shell configuration:');
-            this.log(`  export NOTION_TOKEN="${token}"`);
+            this.log(`  export NOTION_TOKEN="${(0, token_validator_1.maskToken)(token)}"`);
             this.log('');
             this.log('Or use: notion-cli config set-token');
             this.log('');

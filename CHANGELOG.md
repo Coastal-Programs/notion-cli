@@ -11,14 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ASCII art banner** displayed during installation and `notion-cli init` command for enhanced branding and professional appearance
 - **PUBLISHING.md guide** with comprehensive npm release workflow and best practices
 - **Shared banner utilities** (`scripts/banner.js` and `src/utils/terminal-banner.ts`) following DRY principle
+- **Automatic update notifications** - CLI now checks npm once per day and notifies users of available updates
+  - Non-intrusive: runs asynchronously in background
+  - Respects `NO_UPDATE_NOTIFIER` environment variable
+  - Automatic in CI environments and test suites
+  - Caches results for 24 hours to minimize npm registry calls
+  - Users remain in full control - updates are never applied automatically
 
 ### Changed
 - **README Quick Start section** simplified with clearer installation flow and removed MCP server comparisons
 - **Enhanced postinstall message** to prominently highlight `notion-cli init` as the recommended first step
 - **Banner styling** now uses terminal's default color for better consistency with README
+- **Token input UX improved** - `notion-cli init` now accepts tokens with or without "secret_" prefix
+  - Automatically prepends "secret_" if user pastes just the token value
+  - Shows friendly note when prefix is added
+  - Eliminates confusing validation errors
+- **TypeScript configuration** - Enabled `resolveJsonModule` for better JSON import support
 
 ### Fixed
 - **PUBLISHING.md chicken-and-egg problem** resolved by recommending README update before first npm publish
+- **Version consistency** - All documentation now correctly references v5.6.0
 
 ## [5.6.0] - 2025-10-25
 

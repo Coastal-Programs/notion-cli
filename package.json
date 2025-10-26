@@ -25,7 +25,8 @@
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
     "dayjs": "^1.11.13",
-    "notion-to-md": "^3.1.6"
+    "notion-to-md": "^3.1.6",
+    "update-notifier": "^7.3.1"
   },
   "devDependencies": {
     "@oclif/test": "^2",

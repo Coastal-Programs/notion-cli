@@ -8,6 +8,39 @@
 import { NotionCLIErrorFactory } from '../errors'
 
 /**
+ * Masks a Notion token for safe display in logs and console output
+ *
+ * Shows only the prefix and last 3 characters to prevent token leakage
+ * in screen recordings, terminal sharing, or logs.
+ *
+ * @param token - The token to mask
+ * @returns Masked token string (e.g., "secret_***...***abc")
+ *
+ * @example
+ * ```typescript
+ * const token = "secret_1234567890abcdef"
+ * const masked = maskToken(token)
+ * // Returns: "secret_***...***def"
+ * ```
+ */
+export function maskToken(token: string): string {
+  if (!token) return ''
+
+  if (token.length <= 10) {
+    // Token too short to safely mask, obscure completely
+    return '***'
+  }
+
+  // Show prefix (secret_ or ntn_) and last 3 chars
+  const prefix = token.startsWith('secret_') ? 'secret_' :
+                 token.startsWith('ntn_') ? 'ntn_' :
+                 token.slice(0, 7)
+  const suffix = token.slice(-3)
+
+  return `${prefix}***...***${suffix}`
+}
+
+/**
  * Validates that NOTION_TOKEN environment variable is set
  *
  * @throws {NotionCLIError} If token is not set, throws with helpful suggestions
