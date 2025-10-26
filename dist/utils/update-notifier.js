@@ -39,7 +39,7 @@ function checkForUpdates() {
         // Show notification if update is available
         // This displays a yellow-bordered box with update info
         notifier.notify({
-            defer: false,
+            defer: true,
             isGlobal: true, // This is a global CLI tool
         });
     }

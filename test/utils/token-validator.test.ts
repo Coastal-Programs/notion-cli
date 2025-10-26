@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { validateNotionToken } from '../../src/utils/token-validator'
+import { validateNotionToken, maskToken } from '../../src/utils/token-validator'
 import { NotionCLIError, NotionCLIErrorCode } from '../../src/errors/enhanced-errors'
 
 /**
@@ -155,6 +155,94 @@ describe('token-validator', () => {
         const cliError = error as NotionCLIError
         expect(cliError.context.metadata?.tokenSet).to.be.false
       }
+    })
+  })
+
+  describe('maskToken', () => {
+    it('should mask standard Notion tokens with secret_ prefix', () => {
+      const token = 'secret_1234567890abcdefghijklmnopqrstuvwxyz'
+      const masked = maskToken(token)
+
+      expect(masked).to.equal('secret_***...***xyz')
+      expect(masked).to.include('secret_')
+      expect(masked).to.include('***...***')
+      expect(masked).to.include('xyz')
+    })
+
+    it('should mask OAuth tokens with ntn_ prefix', () => {
+      const token = 'ntn_1234567890abcdefghijklmnopqrstuvwxyz'
+      const masked = maskToken(token)
+
+      expect(masked).to.equal('ntn_***...***xyz')
+      expect(masked).to.include('ntn_')
+      expect(masked).to.include('***...***')
+      expect(masked).to.include('xyz')
+    })
+
+    it('should preserve last 3 characters', () => {
+      const token = 'secret_abcdefghijklmnopqrstuvwxyz123'
+      const masked = maskToken(token)
+
+      expect(masked).to.include('123')
+      expect(masked.endsWith('123')).to.be.true
+    })
+
+    it('should handle tokens with unknown prefixes', () => {
+      const token = 'custom_1234567890abcdefghijklmnopqrstuvwxyz'
+      const masked = maskToken(token)
+
+      // Should use first 7 chars as prefix
+      expect(masked).to.include('custom_')
+      expect(masked).to.include('***...***')
+      expect(masked.length).to.be.greaterThan(10)
+    })
+
+    it('should completely obscure short tokens', () => {
+      const token = 'short'
+      const masked = maskToken(token)
+
+      expect(masked).to.equal('***')
+      expect(masked).to.not.include('short')
+    })
+
+    it('should handle empty strings', () => {
+      const token = ''
+      const masked = maskToken(token)
+
+      expect(masked).to.equal('')
+    })
+
+    it('should never expose the full token', () => {
+      const token = 'secret_very_sensitive_token_value_12345'
+      const masked = maskToken(token)
+
+      expect(masked).to.not.include('sensitive')
+      expect(masked).to.not.include('token_value')
+      expect(masked.length).to.be.lessThan(token.length)
+    })
+
+    it('should be consistent for the same token', () => {
+      const token = 'secret_consistent_token_value_abc'
+      const masked1 = maskToken(token)
+      const masked2 = maskToken(token)
+
+      expect(masked1).to.equal(masked2)
+    })
+
+    it('should handle tokens at the minimum safe length boundary', () => {
+      const token = 'secret_abc' // Exactly 10 chars
+      const masked = maskToken(token)
+
+      expect(masked).to.equal('***')
+    })
+
+    it('should handle tokens just above the minimum safe length', () => {
+      const token = 'secret_abcd' // 11 chars
+      const masked = maskToken(token)
+
+      expect(masked).to.include('secret_')
+      expect(masked).to.include('bcd')
+      expect(masked).to.include('***...***')
     })
   })
 
