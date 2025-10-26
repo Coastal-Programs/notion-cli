@@ -50,7 +50,7 @@ A powerful command-line interface for Notion's API, optimized for AI coding assi
 - 🧠 **Smart ID Resolution**: Automatic database_id → data_source_id conversion
 - 🔒 **Secure**: 0 production vulnerabilities
 
-## What's New in v5.5.0
+## What's New in v5.6.0
 
 **Improved First-Time Experience & Enhanced Security** 🎉
 
