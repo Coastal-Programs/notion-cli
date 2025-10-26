@@ -7,6 +7,24 @@
 ██║ ╚████║╚██████╔╝   ██║   ██║╚██████╔╝██║ ╚████║    ╚██████╗███████╗██║
 ╚═╝  ╚═══╝ ╚═════╝    ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝     ╚═════╝╚══════╝╚═╝
 </pre>
+
+<p align="center">
+  <a href="https://github.com/Coastal-Programs/notion-cli/actions/workflows/ci.yml">
+    <img src="https://github.com/Coastal-Programs/notion-cli/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline">
+  </a>
+  <a href="https://codecov.io/gh/Coastal-Programs/notion-cli">
+    <img src="https://codecov.io/gh/Coastal-Programs/notion-cli/branch/main/graph/badge.svg" alt="Code Coverage">
+  </a>
+  <a href="https://www.npmjs.com/package/@coastal-programs/notion-cli">
+    <img src="https://img.shields.io/npm/v/@coastal-programs/notion-cli.svg" alt="npm version">
+  </a>
+  <a href="https://nodejs.org">
+    <img src="https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg" alt="Node.js Version">
+  </a>
+  <a href="https://github.com/Coastal-Programs/notion-cli/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  </a>
+</p>
 </div>
 
 **IMPORTANT NOTICE:**
@@ -820,7 +838,7 @@ notion-cli config set-token
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
+- Node.js >= 22.0.0
 - npm >= 8.0.0
 - Git
 
