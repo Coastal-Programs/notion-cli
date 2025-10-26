@@ -2,4 +2,13 @@
 
 const oclif = require('@oclif/core')
 
+// Check for updates asynchronously (doesn't block CLI execution)
+// This will notify users once per day if a new version is available
+try {
+  const { checkForUpdates } = require('../dist/utils/update-notifier')
+  checkForUpdates()
+} catch (error) {
+  // Silently fail if update check fails (e.g., during development)
+}
+
 oclif.run().then(require('@oclif/core/flush')).catch(require('@oclif/core/handle'))

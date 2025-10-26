@@ -195,7 +195,13 @@ Check your current version:
 notion-cli --version
 ```
 
-**Note**: Updates are not automatic. Check for new releases at:
+**Update Notifications:**
+- The CLI automatically checks for updates once per day
+- You'll see a notification when a new version is available
+- Updates are never applied automatically - you stay in control
+- To disable notifications: `export NO_UPDATE_NOTIFIER=1`
+
+Check for new releases at:
 - [npm package page](https://www.npmjs.com/package/@coastal-programs/notion-cli)
 - [GitHub releases](https://github.com/Coastal-Programs/notion-cli/releases)
 
