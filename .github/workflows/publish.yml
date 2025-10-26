@@ -1,0 +1,96 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty to use package.json)'
+        required: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup Node.js 22.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+        registry-url: 'https://registry.npmjs.org'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Build project
+      run: npm run build
+
+    - name: Verify build output
+      run: |
+        if [ ! -d "dist" ]; then
+          echo "❌ Build failed - dist/ directory not found"
+          exit 1
+        fi
+        echo "✅ Build successful"
+
+    - name: Check if version exists on npm
+      id: check-version
+      run: |
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+
+        if npm view @coastal-programs/notion-cli@$PACKAGE_VERSION version 2>/dev/null; then
+          echo "version_exists=true" >> $GITHUB_OUTPUT
+          echo "⚠️ Version $PACKAGE_VERSION already published to npm"
+        else
+          echo "version_exists=false" >> $GITHUB_OUTPUT
+          echo "✅ Version $PACKAGE_VERSION is new - ready to publish"
+        fi
+
+    - name: Publish to npm (dry-run)
+      if: steps.check-version.outputs.version_exists == 'true'
+      run: |
+        echo "⚠️ Skipping publish - version already exists on npm"
+        echo "To publish a new version:"
+        echo "1. Run: npm version patch|minor|major"
+        echo "2. Push tags: git push --follow-tags"
+        echo "3. Create a new GitHub Release"
+        exit 0
+
+    - name: Publish to npm
+      if: steps.check-version.outputs.version_exists == 'false'
+      run: npm publish --access public --provenance
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Create GitHub Release Tag
+      if: steps.check-version.outputs.version_exists == 'false' && github.event_name == 'workflow_dispatch'
+      run: |
+        VERSION=${{ steps.check-version.outputs.package_version }}
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "v$VERSION" -m "Release v$VERSION"
+        git push origin "v$VERSION"
+
+    - name: Publish Success
+      if: steps.check-version.outputs.version_exists == 'false'
+      run: |
+        VERSION=${{ steps.check-version.outputs.package_version }}
+        echo "✅ Successfully published @coastal-programs/notion-cli@$VERSION to npm!"
+        echo "📦 Package URL: https://www.npmjs.com/package/@coastal-programs/notion-cli"
+        echo "🚀 Users can now install: npm install -g @coastal-programs/notion-cli@$VERSION"

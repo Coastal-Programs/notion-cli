@@ -1,6 +1,72 @@
 # Publishing to npm
 
-## One-Time Setup (5 minutes)
+## 🚀 Automated Publishing (Recommended)
+
+The project now has **automated npm publishing** via GitHub Actions!
+
+### One-Time Setup (3 minutes)
+
+#### 1. Create npm Access Token
+1. Go to https://www.npmjs.com/settings/YOUR_USERNAME/tokens
+2. Click "Generate New Token" → "Granular Access Token"
+3. Name: `GitHub Actions - notion-cli`
+4. Expiration: 1 year (or No expiration)
+5. Packages and scopes:
+   - Select `@coastal-programs/notion-cli`
+   - Permission: `Read and Write`
+6. Copy the token (starts with `npm_...`)
+
+#### 2. Add Token to GitHub Secrets
+1. Go to https://github.com/Coastal-Programs/notion-cli/settings/secrets/actions
+2. Click "New repository secret"
+3. Name: `NPM_TOKEN`
+4. Value: Paste your npm token
+5. Click "Add secret"
+
+That's it! Publishing is now automated. ✅
+
+### How to Publish a New Version
+
+**Option 1: GitHub Release (Recommended)**
+```bash
+# 1. Bump version locally
+npm version patch  # 5.6.0 → 5.6.1 (bug fixes)
+npm version minor  # 5.6.0 → 5.7.0 (new features)
+npm version major  # 5.6.0 → 6.0.0 (breaking changes)
+
+# 2. Push version tag to GitHub
+git push --follow-tags
+
+# 3. Create GitHub Release
+# Go to: https://github.com/Coastal-Programs/notion-cli/releases/new
+# - Tag: Select the tag you just pushed (e.g., v5.6.1)
+# - Title: v5.6.1 - Production Polish
+# - Description: Copy from CHANGELOG
+# - Click "Publish release"
+
+# 4. GitHub Action automatically publishes to npm! 🎉
+```
+
+**Option 2: Manual Trigger**
+1. Go to Actions tab: https://github.com/Coastal-Programs/notion-cli/actions/workflows/publish.yml
+2. Click "Run workflow"
+3. Click "Run workflow" button
+4. Workflow builds, tests, and publishes to npm automatically
+
+### What Happens Automatically
+
+When you create a GitHub Release:
+- ✅ Runs full test suite
+- ✅ Builds the project
+- ✅ Checks if version already exists on npm
+- ✅ Publishes to npm with provenance (secure)
+- ✅ Shows success message with package URL
+
+---
+
+## 📝 Manual Publishing (Fallback)
+
+If you prefer manual control or automation fails:
 
 ### 1. Create npm Account
 ```bash
