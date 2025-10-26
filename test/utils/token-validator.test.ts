@@ -185,10 +185,17 @@ describe('token-validator', () => {
       const token = 'custom_1234567890abcdefghijklmnopqrstuvwxyz'
       const masked = maskToken(token)
 
-      // Should use first 7 chars as prefix
-      expect(masked).to.include('custom_')
-      expect(masked).to.include('***...***')
-      expect(masked.length).to.be.greaterThan(10)
+      // Should use max 4 chars for unknown prefixes (security: ensures at least 4 chars masked)
+      expect(masked).to.equal('cust***...***xyz')
+    })
+
+    it('should mask at least 4 characters for short unknown-prefix tokens', () => {
+      const token = 'mysecret123' // 11 chars, no standard prefix
+      const masked = maskToken(token)
+
+      // Should mask at least 4 chars: myse[cret]123
+      expect(masked).to.equal('myse***...***123')
+      expect(masked).to.not.include('mysecret')
     })
 
     it('should completely obscure short tokens', () => {
