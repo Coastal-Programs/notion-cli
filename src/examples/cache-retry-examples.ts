@@ -54,7 +54,7 @@ export async function example2_cacheStats() {
       try {
         await notion.retrieveDataSource(dbId)
         console.log(`  Retrieved ${dbId}`)
-      } catch (error) {
+      } catch {
         console.log(`  Failed to retrieve ${dbId}`)
       }
     }
@@ -356,7 +356,7 @@ export async function example9_productionPattern() {
     console.log('Success:', result.data?.id)
 
     // Get cache statistics for monitoring
-    const stats = cacheManager.getStats()
+    // Cache statistics available via cacheManager.getStats() if needed
     console.log(`Cache hit rate: ${(cacheManager.getHitRate() * 100).toFixed(2)}%`)
   } else {
     console.error('Operation failed:', result.error?.message)

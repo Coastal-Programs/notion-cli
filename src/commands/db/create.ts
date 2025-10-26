@@ -8,7 +8,6 @@ import { outputRawJson, getDbTitle } from '../../helper'
 import { AutomationFlags } from '../../base-flags'
 import {
   NotionCLIError,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'

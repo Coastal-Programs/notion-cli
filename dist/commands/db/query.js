@@ -72,7 +72,7 @@ class DbQuery extends core_1.Command {
                     };
                 }
                 // Build sorts
-                let sorts = [];
+                const sorts = [];
                 const direction = flags['sort-direction'] == 'desc' ? 'descending' : 'ascending';
                 if (flags['sort-property']) {
                     sorts.push({

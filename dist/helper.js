@@ -301,7 +301,7 @@ const buildDatabaseQueryFilter = async (name, type, field, value) => {
             };
             break;
         case 'multi_select':
-        case 'relation':
+        case 'relation': {
             const values = value;
             if (values.length == 1) {
                 filter = {
@@ -323,6 +323,7 @@ const buildDatabaseQueryFilter = async (name, type, field, value) => {
                 }
             }
             break;
+        }
         case 'files':
         case 'formula':
         case 'people':
@@ -349,7 +350,7 @@ const buildPagePropUpdateData = async (name, type, value) => {
                     },
                 },
             };
-        case 'multi_select':
+        case 'multi_select': {
             const nameObjects = [];
             for (const val of value) {
                 nameObjects.push({
@@ -361,7 +362,8 @@ const buildPagePropUpdateData = async (name, type, value) => {
                     [type]: nameObjects,
                 },
             };
-        case 'relation':
+        }
+        case 'relation': {
             const relationPageIds = [];
             for (const id of value) {
                 relationPageIds.push({ id: id });
@@ -371,6 +373,7 @@ const buildPagePropUpdateData = async (name, type, value) => {
                     [type]: relationPageIds,
                 },
             };
+        }
     }
     return null;
 };
@@ -395,14 +398,15 @@ const buildOneDepthJson = async (pages) => {
                 case 'select':
                     pageData[key] = prop.select === null ? '' : prop.select.name;
                     break;
-                case 'multi_select':
+                case 'multi_select': {
                     const multiSelects = [];
                     for (const select of prop.multi_select) {
                         multiSelects.push(select.name);
                     }
                     pageData[key] = multiSelects.join(',');
                     break;
-                case 'relation':
+                }
+                case 'relation': {
                     const relationPages = [];
                     // relationJsonにkeyがなければ作成
                     if (relationJson[key] == null) {
@@ -417,6 +421,7 @@ const buildOneDepthJson = async (pages) => {
                     }
                     pageData[key] = relationPages.join(',');
                     break;
+                }
                 case 'created_time':
                     pageData[key] = prop.created_time;
                     break;
@@ -459,38 +464,39 @@ const buildOneDepthJson = async (pages) => {
                 case 'last_edited_by':
                     pageData[key] = prop.last_edited_by.id;
                     break;
-                case 'people':
+                case 'people': {
                     const people = [];
                     for (const person of prop.people) {
                         people.push(person.id);
                     }
                     pageData[key] = people.join(',');
                     break;
-                case 'files':
+                }
+                case 'files': {
                     const files = [];
                     for (const file of prop.files) {
                         files.push(file.name);
                     }
                     pageData[key] = files.join(',');
                     break;
+                }
                 case 'checkbox':
                     pageData[key] = prop.checkbox;
                     break;
-                // @ts-ignore
                 case 'unique_id':
-                    // @ts-ignore
                     pageData[key] = `${prop.unique_id.prefix}-${prop.unique_id.number}`;
                     break;
                 case 'title':
                     pageData[key] = prop.title[0].plain_text;
                     break;
-                case 'rich_text':
+                case 'rich_text': {
                     const richTexts = [];
                     for (const richText of prop.rich_text) {
                         richTexts.push(richText.plain_text);
                     }
                     pageData[key] = richTexts.join(',');
                     break;
+                }
                 case 'status':
                     pageData[key] = prop.status === null ? '' : prop.status.name;
                     break;
@@ -522,7 +528,7 @@ const getDataSourceTitle = (row) => {
 exports.getDataSourceTitle = getDataSourceTitle;
 const getPageTitle = (row) => {
     let title = 'Untitled';
-    Object.entries(row.properties).find(([_, prop]) => {
+    Object.entries(row.properties).find(([, prop]) => {
         if (prop.type === 'title' && prop.title.length > 0) {
             title = prop.title[0].plain_text;
             return true;
@@ -576,12 +582,13 @@ const getBlockPlainText = (row) => {
             case 'paragraph':
             case 'quote':
             case 'to_do':
-            case 'toggle':
+            case 'toggle': {
                 let plainText = '';
                 if (row[row.type].rich_text.length > 0) {
                     plainText = row[row.type].rich_text[0].plain_text;
                 }
                 return plainText;
+            }
             default:
                 return row[row.type];
         }
@@ -744,13 +751,13 @@ const enrichChildDatabaseBlock = async (block) => {
             ...block,
             child_database: {
                 ...block.child_database,
-                // @ts-ignore - Adding custom fields for discoverability
+                // @ts-expect-error - Legacy type compatibility issue - Adding custom fields for discoverability
                 data_source_id: block.id,
                 database_id: dataSource.id,
             },
         };
     }
-    catch (error) {
+    catch {
         // If retrieval fails, return the original block unchanged
         // This is expected for some child_database blocks
         return block;
@@ -779,9 +786,9 @@ const getChildDatabasesWithIds = async (blocks) => {
         return {
             block_id: enriched.id,
             title: enriched.child_database.title,
-            // @ts-ignore - Custom fields added by enrichChildDatabaseBlock
+            // @ts-expect-error - Legacy type compatibility issue - Custom fields added by enrichChildDatabaseBlock
             data_source_id: enriched.child_database.data_source_id || null,
-            // @ts-ignore
+            // @ts-expect-error - Legacy type compatibility issue
             database_id: enriched.child_database.database_id || null,
         };
     }));

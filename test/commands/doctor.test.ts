@@ -1,4 +1,4 @@
-import { expect, test } from '@oclif/test'
+import { expect } from '@oclif/test'
 
 /**
  * Tests for Doctor Command
@@ -348,7 +348,6 @@ describe('doctor command', () => {
     it('should format age string correctly for hours', () => {
       const ageHours = 5
       const ageDays = Math.floor(ageHours / 24)
-      const remainingHours = Math.floor(ageHours % 24)
 
       expect(ageDays).to.equal(0)
       const ageString = `${Math.floor(ageHours)} hours ago`
@@ -358,11 +357,9 @@ describe('doctor command', () => {
     it('should format age string correctly for days', () => {
       const ageHours = 50
       const ageDays = Math.floor(ageHours / 24)
-      const remainingHours = Math.floor(ageHours % 24)
 
       expect(ageDays).to.equal(2)
-      expect(remainingHours).to.equal(2)
-      const ageString = `${ageDays} days, ${remainingHours} hours ago`
+      const ageString = `${ageDays} days, ${Math.floor(ageHours % 24)} hours ago`
       expect(ageString).to.equal('2 days, 2 hours ago')
     })
   })

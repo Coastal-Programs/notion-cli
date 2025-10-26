@@ -4,6 +4,7 @@ const core_1 = require("@oclif/core");
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
+const readline = require("readline");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
 class ConfigSetToken extends core_1.Command {
@@ -22,7 +23,6 @@ class ConfigSetToken extends core_1.Command {
                     ]);
                 }
                 // Interactive prompt
-                const readline = require('readline');
                 const rl = readline.createInterface({
                     input: process.stdin,
                     output: process.stdout,
@@ -58,7 +58,7 @@ class ConfigSetToken extends core_1.Command {
                 rcContent = await fs.readFile(rcFile, 'utf-8');
             }
             catch (error) {
-                if (error.code !== 'ENOENT') {
+                if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
                     throw error;
                 }
                 // File doesn't exist, will create it
@@ -96,7 +96,6 @@ class ConfigSetToken extends core_1.Command {
                 this.log(`  2. Or restart your terminal`);
                 this.log(`  3. Run: notion-cli sync`);
                 this.log('\nWould you like to sync your workspace now? (y/n)');
-                const readline = require('readline');
                 const rl = readline.createInterface({
                     input: process.stdin,
                     output: process.stdout,
@@ -110,9 +109,9 @@ class ConfigSetToken extends core_1.Command {
                 if (answer === 'y' || answer === 'yes') {
                     // Set token in current process
                     process.env.NOTION_TOKEN = token;
-                    // Run sync command
+                    // Run sync command - dynamic import to avoid circular dependencies
                     this.log('\nRunning sync...\n');
-                    const Sync = require('../sync').default;
+                    const { default: Sync } = await Promise.resolve().then(() => require('../sync.js'));
                     await Sync.run([]);
                 }
                 else {
@@ -124,7 +123,7 @@ class ConfigSetToken extends core_1.Command {
         catch (error) {
             const cliError = error instanceof errors_1.NotionCLIError
                 ? error
-                : (0, errors_1.wrapNotionError)(error, {
+                : (0, errors_1.wrapNotionError)(error instanceof Error ? error : new Error(String(error)), {
                     endpoint: 'config.set-token'
                 });
             if (flags.json) {

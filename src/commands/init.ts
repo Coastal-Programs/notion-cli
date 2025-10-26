@@ -1,10 +1,9 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, ux } from '@oclif/core'
 import * as readline from 'readline'
 import { AutomationFlags } from '../base-flags'
 import {
   NotionCLIError,
   NotionCLIErrorCode,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
 import { validateNotionToken } from '../utils/token-validator'
@@ -296,7 +295,7 @@ export default class Init extends Command {
       const latency = Date.now() - startTime
 
       // Extract bot info
-      let botInfo: any = {
+      const botInfo: any = {
         id: user.id,
         name: user.name || 'Unnamed Bot',
         type: user.type

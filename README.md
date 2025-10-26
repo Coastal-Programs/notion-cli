@@ -7,6 +7,24 @@
 ██║ ╚████║╚██████╔╝   ██║   ██║╚██████╔╝██║ ╚████║    ╚██████╗███████╗██║
 ╚═╝  ╚═══╝ ╚═════╝    ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝     ╚═════╝╚══════╝╚═╝
 </pre>
+
+<p align="center">
+  <a href="https://github.com/Coastal-Programs/notion-cli/actions/workflows/ci.yml">
+    <img src="https://github.com/Coastal-Programs/notion-cli/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline">
+  </a>
+  <a href="https://codecov.io/gh/Coastal-Programs/notion-cli">
+    <img src="https://codecov.io/gh/Coastal-Programs/notion-cli/branch/main/graph/badge.svg" alt="Code Coverage">
+  </a>
+  <a href="https://www.npmjs.com/package/@coastal-programs/notion-cli">
+    <img src="https://img.shields.io/npm/v/@coastal-programs/notion-cli.svg" alt="npm version">
+  </a>
+  <a href="https://nodejs.org">
+    <img src="https://img.shields.io/badge/node-%3E%3D22.0.0-brightgreen.svg" alt="Node.js Version">
+  </a>
+  <a href="https://github.com/Coastal-Programs/notion-cli/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  </a>
+</p>
 </div>
 
 **IMPORTANT NOTICE:**
@@ -818,6 +836,14 @@ notion-cli config set-token
 
 ## Development
 
+### Prerequisites
+
+- Node.js >= 22.0.0
+- npm >= 8.0.0
+- Git
+
+### Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/Coastal-Programs/notion-cli
@@ -828,13 +854,86 @@ npm install
 
 # Build TypeScript
 npm run build
+```
+
+### Development Workflow
+
+```bash
+# Build the project
+npm run build
 
 # Run tests
 npm test
 
-# Link for local development
+# Run linter
+npm run lint
+
+# Auto-fix linting issues
+npm run lint -- --fix
+
+# Link for local development (test CLI globally)
 npm link
 ```
+
+### Project Structure
+
+```
+notion-cli/
+├── src/               # TypeScript source files
+│   ├── commands/      # CLI command implementations
+│   ├── utils/         # Utility functions
+│   ├── base-command.ts   # Base command class
+│   ├── base-flags.ts     # Reusable flag definitions
+│   ├── envelope.ts       # JSON envelope formatting
+│   ├── notion.ts         # Notion API client wrapper
+│   └── cache.ts          # In-memory caching layer
+├── test/              # Test files (mocha + chai)
+├── dist/              # Compiled JavaScript (generated)
+├── docs/              # Documentation
+└── package.json       # Project configuration
+```
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with verbose output
+npm test -- --reporter spec
+
+# Run specific test file
+npm test -- test/commands/db/query.test.ts
+```
+
+### Code Quality
+
+This project uses:
+- **TypeScript** for type safety
+- **ESLint v9** for code linting (flat config)
+- **Prettier** for code formatting
+- **Mocha + Chai** for testing
+
+### Building and Publishing
+
+```bash
+# Build for production
+npm run build
+
+# Create package tarball (for testing)
+npm pack
+
+# Publish to npm (maintainers only)
+npm publish
+```
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Code style and conventions
+- Test requirements
+- Pull request process
+- Commit message format
 
 ## Legal & Compliance
 

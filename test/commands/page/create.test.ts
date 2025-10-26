@@ -108,7 +108,6 @@ describe('page:create', () => {
     describe('with --raw flags', () => {
       apiMock(createOnPageResponse)
         .command(['page:create', '-p', 'dummy-parent-page-id', '--raw'])
-        .exit(0)
         .it('shows a page object', (ctx) => {
           expect(ctx.stdout).to.contain('dummy-parent-page-id')
         })
@@ -139,7 +138,6 @@ describe('page:create', () => {
     describe('with --raw flags', () => {
       apiMock(createOnDbResponse)
         .command(['page:create', '-p', 'dummy-parent-database-id', '--raw'])
-        .exit(0)
         .it('shows a page object', (ctx) => {
           expect(ctx.stdout).to.contain('dummy-parent-database-id')
         })

@@ -5,7 +5,6 @@ import {
   getPageTitle,
   outputRawJson,
   outputCompactJson,
-  outputMarkdownTable,
   outputPrettyTable,
   showRawFlagHint,
   stripMetadata

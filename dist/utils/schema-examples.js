@@ -62,7 +62,7 @@ function generateExampleForType(name, propDef) {
                 },
                 description: 'Multi-line text with optional formatting'
             };
-        case 'number':
+        case 'number': {
             const numberFormat = ((_a = propDef.number) === null || _a === void 0 ? void 0 : _a.format) || 'number';
             return {
                 property_name: name,
@@ -73,6 +73,7 @@ function generateExampleForType(name, propDef) {
                 },
                 description: `Numeric value (format: ${numberFormat})`
             };
+        }
         case 'checkbox':
             return {
                 property_name: name,
@@ -83,7 +84,7 @@ function generateExampleForType(name, propDef) {
                 },
                 description: 'Boolean true/false value'
             };
-        case 'select':
+        case 'select': {
             const selectOptions = ((_b = propDef.select) === null || _b === void 0 ? void 0 : _b.options) || [];
             const firstOption = ((_c = selectOptions[0]) === null || _c === void 0 ? void 0 : _c.name) || 'Option Name';
             const selectOptionsList = selectOptions.map((o) => o.name).join(', ');
@@ -98,7 +99,8 @@ function generateExampleForType(name, propDef) {
                     ? `Single selection from: ${selectOptionsList}`
                     : 'Single selection (no options defined yet)'
             };
-        case 'multi_select':
+        }
+        case 'multi_select': {
             const multiOptions = ((_d = propDef.multi_select) === null || _d === void 0 ? void 0 : _d.options) || [];
             const exampleOptions = multiOptions.slice(0, 2).map((o) => o.name);
             const multiOptionsList = multiOptions.map((o) => o.name).join(', ');
@@ -115,7 +117,8 @@ function generateExampleForType(name, propDef) {
                     ? `Multiple selections from: ${multiOptionsList}`
                     : 'Multiple selections (no options defined yet)'
             };
-        case 'status':
+        }
+        case 'status': {
             const statusOptions = ((_e = propDef.status) === null || _e === void 0 ? void 0 : _e.options) || [];
             const firstStatus = ((_f = statusOptions[0]) === null || _f === void 0 ? void 0 : _f.name) || 'Status Name';
             const statusOptionsList = statusOptions.map((o) => o.name).join(', ');
@@ -130,6 +133,7 @@ function generateExampleForType(name, propDef) {
                     ? `Status from: ${statusOptionsList}`
                     : 'Status value (no options defined yet)'
             };
+        }
         case 'date':
             return {
                 property_name: name,
@@ -203,7 +207,7 @@ function generateExampleForType(name, propDef) {
                 },
                 description: 'External file URLs (Notion-hosted files cannot be set via API)'
             };
-        case 'relation':
+        case 'relation': {
             const relatedDbId = ((_g = propDef.relation) === null || _g === void 0 ? void 0 : _g.database_id) || 'related-database-id';
             return {
                 property_name: name,
@@ -219,6 +223,7 @@ function generateExampleForType(name, propDef) {
                 },
                 description: `Array of page IDs from related database (${relatedDbId})`
             };
+        }
         // Read-only property types (cannot be set via API)
         case 'created_time':
             return {
@@ -252,7 +257,7 @@ function generateExampleForType(name, propDef) {
                 notion_payload: {},
                 description: 'Read-only: Automatically set to user who last edited the page'
             };
-        case 'formula':
+        case 'formula': {
             const expression = ((_h = propDef.formula) === null || _h === void 0 ? void 0 : _h.expression) || 'unknown';
             return {
                 property_name: name,
@@ -261,7 +266,8 @@ function generateExampleForType(name, propDef) {
                 notion_payload: {},
                 description: `Read-only: Computed formula (${expression})`
             };
-        case 'rollup':
+        }
+        case 'rollup': {
             const rollupFunc = ((_j = propDef.rollup) === null || _j === void 0 ? void 0 : _j.function) || 'unknown';
             return {
                 property_name: name,
@@ -270,6 +276,7 @@ function generateExampleForType(name, propDef) {
                 notion_payload: {},
                 description: `Read-only: Rollup aggregation (${rollupFunc})`
             };
+        }
         case 'unique_id':
             return {
                 property_name: name,

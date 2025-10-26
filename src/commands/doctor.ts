@@ -1,5 +1,4 @@
 import { Command, Flags } from '@oclif/core'
-import { AutomationFlags } from '../base-flags'
 import { client } from '../notion'
 import { loadCache, getCachePath } from '../utils/workspace-cache'
 import * as fs from 'fs/promises'
@@ -104,7 +103,7 @@ export default class Doctor extends Command {
         message: passed ? undefined : 'Node.js version must be >= 18.0.0',
         recommendation: passed ? undefined : 'Please upgrade Node.js to version 18 or higher',
       })
-    } catch (error) {
+    } catch {
       checks.push({
         name: 'nodejs_version',
         passed: false,
@@ -179,7 +178,7 @@ export default class Doctor extends Command {
         name: 'network_connectivity',
         passed: true,
       })
-    } catch (error) {
+    } catch {
       checks.push({
         name: 'network_connectivity',
         passed: false,
@@ -270,7 +269,7 @@ export default class Doctor extends Command {
           recommendation: "Run 'notion-cli sync' to create cache",
         })
       }
-    } catch (error) {
+    } catch {
       checks.push({
         name: 'cache_exists',
         passed: false,
@@ -322,7 +321,7 @@ export default class Doctor extends Command {
         message: isFresh ? undefined : `Cache is outdated (last sync: ${ageString})`,
         recommendation: isFresh ? undefined : "Run 'notion-cli sync' to refresh",
       })
-    } catch (error) {
+    } catch {
       checks.push({
         name: 'cache_fresh',
         passed: false,
@@ -345,7 +344,7 @@ export default class Doctor extends Command {
         timeout: 5000,
       }
 
-      const req = https.request(options, (res) => {
+      const req = https.request(options, () => {
         resolve()
       })
 

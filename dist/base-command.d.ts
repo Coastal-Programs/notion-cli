@@ -6,6 +6,7 @@
  */
 import { Command, Interfaces } from '@oclif/core';
 import { EnvelopeFormatter, OutputFlags } from './envelope';
+import { NotionCLIError } from './errors/index';
 /**
  * Base command configuration
  */
@@ -30,7 +31,7 @@ export declare abstract class BaseCommand extends Command {
     /**
      * Determine if envelope should be used based on flags
      */
-    protected checkEnvelopeUsage(flags: any): boolean;
+    protected checkEnvelopeUsage(flags: Record<string, unknown>): boolean;
     /**
      * Output success response with automatic envelope wrapping
      *
@@ -38,7 +39,7 @@ export declare abstract class BaseCommand extends Command {
      * @param flags - Command flags
      * @param additionalMetadata - Optional metadata to include
      */
-    protected outputSuccess<T>(data: T, flags: OutputFlags & any, additionalMetadata?: Record<string, any>): never;
+    protected outputSuccess<T>(data: T, flags: OutputFlags & Record<string, unknown>, additionalMetadata?: Record<string, unknown>): never;
     /**
      * Output error response with automatic envelope wrapping
      *
@@ -46,7 +47,7 @@ export declare abstract class BaseCommand extends Command {
      * @param flags - Command flags
      * @param additionalContext - Optional error context
      */
-    protected outputError(error: any, flags: OutputFlags & any, additionalContext?: Record<string, any>): never;
+    protected outputError(error: Error | NotionCLIError, flags: OutputFlags & Record<string, unknown>, additionalContext?: Record<string, unknown>): never;
     /**
      * Get appropriate exit code for error
      */
@@ -56,7 +57,7 @@ export declare abstract class BaseCommand extends Command {
      */
     catch(error: Error & {
         exitCode?: number;
-    }): Promise<any>;
+    }): Promise<void>;
 }
 /**
  * Standard flags that all envelope-enabled commands should include

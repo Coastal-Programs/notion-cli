@@ -67,7 +67,6 @@ class CacheManager {
      * Evict expired entries
      */
     evictExpired() {
-        const now = Date.now();
         let evictedCount = 0;
         for (const [key, entry] of this.cache.entries()) {
             if (!this.isValid(entry)) {

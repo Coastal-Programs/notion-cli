@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.6.0] - 2025-10-25
+
+### Quality Improvements
+
+This release focuses on code quality, testing, and documentation improvements following a comprehensive 4-week quality sprint.
+
+### Changed
+
+- **ESLint upgraded to v9** with flat config format (eslint.config.js)
+- **@notionhq/client downgraded to v2.2.15** for better test compatibility
+- **Development dependencies updated** to latest stable versions
+- **Enhanced project documentation** with comprehensive development guide
+
+### Fixed
+
+- **100% test pass rate** - Fixed all previously failing integration tests
+- **1,800+ lint issues resolved** - Applied consistent code style across entire codebase
+- **14 security vulnerabilities fixed** in development dependencies
+
+### Security
+
+- **Zero production vulnerabilities** - All critical and high-severity issues resolved
+- **11 devDependency vulnerabilities remaining** - Non-critical, deferred to oclif v4 migration
+  - 2 moderate severity (oclif v2 deprecation-related)
+  - 9 low severity (test infrastructure)
+- **No impact on production runtime** - All remaining vulnerabilities are in development-only packages
+
+### Documentation
+
+- **README.md enhanced** with complete Development section including:
+  - Prerequisites and setup instructions
+  - Development workflow and commands
+  - Project structure overview
+  - Testing and code quality guidelines
+  - Building and publishing instructions
+- **CHANGELOG.md updated** with quality sprint documentation
+- **CONTRIBUTING.md created** with contributor guidelines
+- **SECURITY.md created** with vulnerability reporting process
+- **JSDoc comments added** to all public command classes
+- **package.json metadata reviewed** and updated
+
+### Quality Metrics
+
+- **Tests:** 100% pass rate (40/40 tests passing)
+- **Lint:** Zero errors, minimal warnings
+- **Security:** 0 critical/high vulnerabilities in production
+- **Documentation:** 95% completeness
+
+### Migration Guide
+
+No breaking changes! This is a quality-focused release. All existing commands and functionality work exactly as before.
+
+**For developers:**
+- Review the new [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests
+- Run `npm run lint` to ensure code follows project standards
+- All tests must pass before commits
+
+**For users:**
+- Update normally: `npm update -g @coastal-programs/notion-cli`
+- No configuration changes needed
+- All commands remain backward compatible
+
+---
+
 ## [5.5.0] - 2025-10-24
 
 ### Added

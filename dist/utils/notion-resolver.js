@@ -68,7 +68,7 @@ async function resolveNotionId(input, type = 'database') {
             }
             return extractedId;
         }
-        catch (error) {
+        catch {
             throw errors_1.NotionCLIErrorFactory.invalidIdFormat(trimmed, type);
         }
     }
@@ -82,7 +82,7 @@ async function resolveNotionId(input, type = 'database') {
         return extractedId;
     }
     // Stage 3: Cache lookup (exact + aliases)
-    const fromCache = await searchCache(trimmed, type);
+    const fromCache = await searchCache(trimmed);
     if (fromCache)
         return fromCache;
     // Stage 4: API search as fallback
@@ -202,10 +202,9 @@ function isValidNotionId(input) {
  * 3. Partial title match (case-insensitive substring)
  *
  * @param query - Search query (database/page name)
- * @param type - Resource type ('database' or 'page')
  * @returns Database/page ID if found, null otherwise
  */
-async function searchCache(query, type) {
+async function searchCache(query) {
     const cache = await (0, workspace_cache_1.loadCache)();
     if (!cache)
         return null;
@@ -256,7 +255,7 @@ async function searchNotionApi(query, type) {
         }
         return null;
     }
-    catch (error) {
+    catch {
         // API search failed, return null
         // The caller will throw a more helpful error message
         return null;

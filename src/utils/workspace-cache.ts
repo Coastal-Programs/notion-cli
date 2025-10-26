@@ -107,7 +107,9 @@ export async function saveCache(data: WorkspaceCache): Promise<void> {
     // Clean up temp file if it exists
     try {
       await fs.unlink(tmpPath)
-    } catch {}
+    } catch {
+      // Intentionally empty - cache directory may not exist
+    }
 
     throw new Error(`Failed to save cache: ${error.message}`)
   }

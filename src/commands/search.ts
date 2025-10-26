@@ -1,10 +1,7 @@
 import { Command, Flags, ux } from '@oclif/core'
 import * as notion from '../notion'
 import {
-  PageObjectResponse,
   SearchParameters,
-  DatabaseObjectResponse,
-  DataSourceObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
 import { isFullDatabase, isFullPage, isFullDataSource } from '@notionhq/client'
 import {
@@ -22,7 +19,6 @@ import { AutomationFlags, OutputFormatFlags } from '../base-flags'
 import {
   NotionCLIError,
   NotionCLIErrorCode,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
 import * as dayjs from 'dayjs'

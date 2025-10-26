@@ -114,7 +114,7 @@ class CacheInfo extends core_1.Command {
         catch (error) {
             const cliError = error instanceof errors_1.NotionCLIError
                 ? error
-                : (0, errors_1.wrapNotionError)(error, {
+                : (0, errors_1.wrapNotionError)(error instanceof Error ? error : new Error(String(error)), {
                     endpoint: 'cache.info'
                 });
             if (flags.json) {

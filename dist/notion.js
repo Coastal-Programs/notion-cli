@@ -167,7 +167,6 @@ const updatePage = async (pageId, blocks) => {
     // Append new blocks
     const res = await (0, retry_1.fetchWithRetry)(() => exports.client.blocks.children.append({
         block_id: pageId,
-        // @ts-ignore
         children: blocks,
     }), { context: `updatePage:append:${pageId}` });
     // Invalidate caches
@@ -371,7 +370,7 @@ const mapPageStructure = async (pageId) => {
     // Extract page title
     let pageTitle = 'Untitled';
     if (page.object === 'page' && (0, client_1.isFullPage)(page)) {
-        Object.entries(page.properties).find(([_, prop]) => {
+        Object.entries(page.properties).find(([, prop]) => {
             if (prop.type === 'title' && prop.title.length > 0) {
                 pageTitle = prop.title[0].plain_text;
                 return true;
@@ -446,7 +445,7 @@ const mapPageStructure = async (pageId) => {
                     break;
             }
         }
-        catch (e) {
+        catch {
             // If extraction fails, just include type and id
         }
         return structureItem;

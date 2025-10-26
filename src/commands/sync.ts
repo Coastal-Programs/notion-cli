@@ -2,24 +2,18 @@ import { Command, Flags, ux } from '@oclif/core'
 import { client } from '../notion'
 import { fetchWithRetry as enhancedFetchWithRetry } from '../retry'
 import {
-  loadCache,
   saveCache,
   getCachePath,
   buildCacheEntry,
-  createEmptyCache,
   WorkspaceCache,
 } from '../utils/workspace-cache'
-import { getDataSourceTitle } from '../helper'
 import { AutomationFlags } from '../base-flags'
 import {
   NotionCLIError,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
 import { validateNotionToken } from '../utils/token-validator'
 import { DataSourceObjectResponse } from '@notionhq/client/build/src/api-endpoints'
-import * as os from 'os'
-import * as path from 'path'
 
 export default class Sync extends Command {
   static description = 'Sync workspace databases to local cache for fast lookups'
@@ -65,7 +59,7 @@ export default class Sync extends Command {
       // Fetch all databases from Notion API with progress updates
       const databases = await this.fetchAllDatabases(flags.json)
 
-      const fetchTime = Date.now() - startTime
+      // const _fetchTime = Date.now() - startTime
 
       if (!flags.json) {
         ux.action.stop(`Found ${databases.length} database${databases.length === 1 ? '' : 's'}`)
@@ -188,7 +182,6 @@ export default class Sync extends Command {
   private async fetchAllDatabases(isJsonMode: boolean): Promise<DataSourceObjectResponse[]> {
     const databases: DataSourceObjectResponse[] = []
     let cursor: string | undefined = undefined
-    let pageCount = 0
 
     while (true) {
       const response = await enhancedFetchWithRetry(
@@ -207,7 +200,6 @@ export default class Sync extends Command {
       )
 
       databases.push(...response.results as DataSourceObjectResponse[])
-      pageCount++
 
       // Show progress update (only in non-JSON mode)
       if (!isJsonMode && response.has_more) {

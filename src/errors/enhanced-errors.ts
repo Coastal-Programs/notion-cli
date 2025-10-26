@@ -14,7 +14,6 @@
  * - Common scenario detection
  */
 
-import { APIResponseError } from '@notionhq/client'
 
 /**
  * Comprehensive error codes covering all common scenarios
@@ -578,7 +577,7 @@ export function wrapNotionError(error: any, context: ErrorContext = {}): NotionC
 
   // Handle Notion API errors
   if (error.code) {
-    const notionError = error as APIResponseError
+    // const _notionError = error as APIResponseError
 
     switch (error.code) {
       case 'unauthorized':
@@ -617,9 +616,10 @@ export function wrapNotionError(error: any, context: ErrorContext = {}): NotionC
           { ...context, originalError: error }
         )
 
-      case 'rate_limited':
+      case 'rate_limited': {
         const retryAfter = parseInt(error.headers?.['retry-after'] || '60', 10)
         return NotionCLIErrorFactory.rateLimited(retryAfter)
+      }
 
       case 'conflict_error':
         return new NotionCLIError(
@@ -658,11 +658,12 @@ export function wrapNotionError(error: any, context: ErrorContext = {}): NotionC
   if (error.status) {
     switch (error.status) {
       case 401:
-      case 403:
+      case 403: {
         const isTokenMissing = !process.env.NOTION_TOKEN
         return isTokenMissing
           ? NotionCLIErrorFactory.tokenMissing()
           : NotionCLIErrorFactory.tokenInvalid()
+      }
 
       case 404:
         // Only pass valid resource types to resourceNotFound
@@ -679,9 +680,10 @@ export function wrapNotionError(error: any, context: ErrorContext = {}): NotionC
           { ...context, statusCode: 404, originalError: error }
         )
 
-      case 429:
+      case 429: {
         const retryAfter = parseInt(error.headers?.['retry-after'] || '60', 10)
         return NotionCLIErrorFactory.rateLimited(retryAfter)
+      }
 
       case 500:
       case 502:

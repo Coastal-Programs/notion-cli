@@ -1,7 +1,8 @@
-import { Command, Args, Flags } from '@oclif/core'
+import { Command, Args } from '@oclif/core'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
+import * as readline from 'readline'
 import { AutomationFlags } from '../../base-flags'
 import {
   NotionCLIError,
@@ -62,7 +63,6 @@ export default class ConfigSetToken extends Command {
         }
 
         // Interactive prompt
-        const readline = require('readline')
         const rl = readline.createInterface({
           input: process.stdin,
           output: process.stdout,
@@ -105,8 +105,8 @@ export default class ConfigSetToken extends Command {
       let rcContent = ''
       try {
         rcContent = await fs.readFile(rcFile, 'utf-8')
-      } catch (error: any) {
-        if (error.code !== 'ENOENT') {
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
           throw error
         }
         // File doesn't exist, will create it
@@ -147,7 +147,6 @@ export default class ConfigSetToken extends Command {
         this.log(`  3. Run: notion-cli sync`)
         this.log('\nWould you like to sync your workspace now? (y/n)')
 
-        const readline = require('readline')
         const rl = readline.createInterface({
           input: process.stdin,
           output: process.stdout,
@@ -164,9 +163,9 @@ export default class ConfigSetToken extends Command {
           // Set token in current process
           process.env.NOTION_TOKEN = token
 
-          // Run sync command
+          // Run sync command - dynamic import to avoid circular dependencies
           this.log('\nRunning sync...\n')
-          const Sync = require('../sync').default
+          const { default: Sync } = await import('../sync.js')
           await Sync.run([])
         } else {
           this.log('\nSkipping sync. You can run it manually with: notion-cli sync')
@@ -174,10 +173,10 @@ export default class ConfigSetToken extends Command {
       }
 
       process.exit(0)
-    } catch (error: any) {
+    } catch (error: unknown) {
       const cliError = error instanceof NotionCLIError
         ? error
-        : wrapNotionError(error, {
+        : wrapNotionError(error instanceof Error ? error : new Error(String(error)), {
             endpoint: 'config.set-token'
           })
 

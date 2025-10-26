@@ -236,7 +236,7 @@ class Init extends core_1.Command {
             const user = await (0, notion_1.botUser)();
             const latency = Date.now() - startTime;
             // Extract bot info
-            let botInfo = {
+            const botInfo = {
                 id: user.id,
                 name: user.name || 'Unnamed Bot',
                 type: user.type

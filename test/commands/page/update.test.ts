@@ -110,7 +110,6 @@ describe('page:update', () => {
     describe('with --raw flags', () => {
       apiMock(responseOnPage)
         .command(['page:update', 'dummy-page-id', '--raw'])
-        .exit(0)
         .it('shows a page object', (ctx) => {
           expect(ctx.stdout).to.contain('object": "page')
           expect(ctx.stdout).to.contain('id": "dummy-page-id')
@@ -143,7 +142,6 @@ describe('page:update', () => {
     describe('with --raw flags', () => {
       apiMock(responseOnDb)
         .command(['page:update', 'dummy-page-id', '--raw'])
-        .exit(0)
         .it('shows a page object', (ctx) => {
           expect(ctx.stdout).to.contain('object": "page')
           expect(ctx.stdout).to.contain('id": "dummy-page-id')

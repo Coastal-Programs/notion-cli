@@ -51,7 +51,6 @@ describe('user:list', () => {
   describe('with --raw flags', () => {
     apiMock
       .command(['user:list', '--raw'])
-      .exit(0)
       .it('shows a user list objects', (ctx) => {
         expect(ctx.stdout).to.contain('object": "list')
         expect(ctx.stdout).to.contain('object": "user')

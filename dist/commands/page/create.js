@@ -12,7 +12,7 @@ const errors_1 = require("../../errors");
 const property_expander_1 = require("../../utils/property-expander");
 class PageCreate extends core_1.Command {
     async run() {
-        const { args, flags } = await this.parse(PageCreate);
+        const { flags } = await this.parse(PageCreate);
         try {
             let pageProps;
             let pageParent;

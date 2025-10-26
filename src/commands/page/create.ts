@@ -1,4 +1,4 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -13,7 +13,6 @@ import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
 import {
   NotionCLIError,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../../errors'
 import { expandSimpleProperties } from '../../utils/property-expander'
@@ -106,7 +105,7 @@ export default class PageCreate extends Command {
   }
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse(PageCreate)
+    const { flags } = await this.parse(PageCreate)
 
     try {
       let pageProps: CreatePageParameters

@@ -387,12 +387,10 @@ describe('Retry Logic', () => {
 
     it('should call onRetry callback', async () => {
       const retryContexts: any[] = []
-      let attempts = 0
 
       try {
         await fetchWithRetry(
           async () => {
-            attempts++
             const error: any = new Error('Service unavailable')
             error.status = 503
             throw error
@@ -412,7 +410,7 @@ describe('Retry Logic', () => {
             },
           }
         )
-      } catch (error) {
+      } catch {
         // Expected to fail
       }
 
@@ -440,7 +438,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -459,7 +457,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -484,7 +482,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -507,7 +505,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }

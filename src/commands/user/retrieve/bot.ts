@@ -1,4 +1,4 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Command, Flags, ux } from '@oclif/core'
 import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../../notion'
 import { outputRawJson } from '../../../helper'
@@ -40,7 +40,7 @@ export default class UserRetrieveBot extends Command {
   }
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse(UserRetrieveBot)
+    const { flags } = await this.parse(UserRetrieveBot)
 
     try {
       const res = await notion.botUser()

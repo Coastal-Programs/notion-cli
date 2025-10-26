@@ -6,8 +6,6 @@ import {
   NotionCLIError,
   wrapNotionError
 } from '../../errors'
-import * as os from 'os'
-import * as path from 'path'
 
 export default class CacheInfo extends Command {
   static description = 'Show cache statistics and configuration'
@@ -144,10 +142,10 @@ export default class CacheInfo extends Command {
       this.log(`  Action: ${cacheInfo.recommendations.action_needed}`)
 
       process.exit(0)
-    } catch (error: any) {
+    } catch (error: unknown) {
       const cliError = error instanceof NotionCLIError
         ? error
-        : wrapNotionError(error, {
+        : wrapNotionError(error instanceof Error ? error : new Error(String(error)), {
             endpoint: 'cache.info'
           })
 

@@ -7,7 +7,7 @@ const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
 class UserList extends core_1.Command {
     async run() {
-        const { args, flags } = await this.parse(UserList);
+        const { flags } = await this.parse(UserList);
         try {
             let res = await notion.listUser();
             // Apply minimal flag to strip metadata
