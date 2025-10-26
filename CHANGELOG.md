@@ -26,11 +26,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatically prepends "secret_" if user pastes just the token value
   - Shows friendly note when prefix is added
   - Eliminates confusing validation errors
+- **Token length validation** - Minimum 20 character requirement catches incomplete token copies early
 - **TypeScript configuration** - Enabled `resolveJsonModule` for better JSON import support
+- **Update notification timing** - Changed to `defer: true` for non-intrusive display after command execution
 
 ### Fixed
 - **PUBLISHING.md chicken-and-egg problem** resolved by recommending README update before first npm publish
 - **Version consistency** - All documentation now correctly references v5.6.0
+
+### Security
+- **Token masking** - Console output now masks tokens to prevent leakage in screen recordings, terminal sharing, or logs
+  - Format: `secret_***...***abc` (shows prefix and last 3 chars only)
+  - Applies to all token display scenarios (setup wizard, error messages, help text)
+  - Protects against accidental token exposure during demos or support sessions
+
+### Developer Experience
+- **DEBUG mode** - Set `DEBUG=1` environment variable to see verbose update check errors for troubleshooting
+  - Helps diagnose npm registry connectivity issues
+  - Shows detailed error messages when update checks fail
+  - Silent by default to avoid cluttering output
 
 ## [5.6.0] - 2025-10-25
 

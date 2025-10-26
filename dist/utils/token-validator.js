@@ -29,12 +29,14 @@ function maskToken(token) {
         return '';
     if (token.length <= 10) {
         // Token too short to safely mask, obscure completely
+        // Threshold: 10 chars ensures at least 3 chars are masked after prefix+suffix
         return '***';
     }
     // Show prefix (secret_ or ntn_) and last 3 chars
+    // For unknown prefixes: use max 4 chars to ensure at least 4 chars are masked
     const prefix = token.startsWith('secret_') ? 'secret_' :
         token.startsWith('ntn_') ? 'ntn_' :
-            token.slice(0, 7);
+            token.slice(0, Math.min(4, token.length - 7));
     const suffix = token.slice(-3);
     return `${prefix}***...***${suffix}`;
 }

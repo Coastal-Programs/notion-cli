@@ -39,7 +39,7 @@ export function checkForUpdates(): void {
     // Show notification if update is available
     // This displays a yellow-bordered box with update info
     notifier.notify({
-      defer: false, // Show notification immediately if available
+      defer: true, // Show notification after command completes (non-intrusive)
       isGlobal: true, // This is a global CLI tool
     })
   } catch (error) {
