@@ -88,7 +88,9 @@ async function saveCache(data) {
         try {
             await fs.unlink(tmpPath);
         }
-        catch { }
+        catch {
+            // Intentionally empty - cache directory may not exist
+        }
         throw new Error(`Failed to save cache: ${error.message}`);
     }
 }

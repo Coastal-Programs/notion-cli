@@ -452,7 +452,7 @@ function wrapNotionError(error, context = {}) {
     }
     // Handle Notion API errors
     if (error.code) {
-        const notionError = error;
+        // const _notionError = error as APIResponseError
         switch (error.code) {
             case 'unauthorized':
             case 'restricted_resource':
@@ -473,9 +473,10 @@ function wrapNotionError(error, context = {}) {
                         link: 'https://developers.notion.com/reference/intro'
                     }
                 ], { ...context, originalError: error });
-            case 'rate_limited':
+            case 'rate_limited': {
                 const retryAfter = parseInt(((_b = error.headers) === null || _b === void 0 ? void 0 : _b['retry-after']) || '60', 10);
                 return NotionCLIErrorFactory.rateLimited(retryAfter);
+            }
             case 'conflict_error':
                 return new NotionCLIError(NotionCLIErrorCode.API_ERROR, 'Conflict error - the resource is being modified by another request', [
                     {
@@ -501,20 +502,22 @@ function wrapNotionError(error, context = {}) {
     if (error.status) {
         switch (error.status) {
             case 401:
-            case 403:
+            case 403: {
                 const isTokenMissing = !process.env.NOTION_TOKEN;
                 return isTokenMissing
                     ? NotionCLIErrorFactory.tokenMissing()
                     : NotionCLIErrorFactory.tokenInvalid();
+            }
             case 404:
                 // Only pass valid resource types to resourceNotFound
                 if (context.resourceType && ['database', 'page', 'block'].includes(context.resourceType)) {
                     return NotionCLIErrorFactory.resourceNotFound(context.resourceType, context.attemptedId || context.userInput || 'unknown');
                 }
                 return new NotionCLIError(NotionCLIErrorCode.NOT_FOUND, 'Resource not found', [], { ...context, statusCode: 404, originalError: error });
-            case 429:
+            case 429: {
                 const retryAfter = parseInt(((_c = error.headers) === null || _c === void 0 ? void 0 : _c['retry-after']) || '60', 10);
                 return NotionCLIErrorFactory.rateLimited(retryAfter);
+            }
             case 500:
             case 502:
             case 503:

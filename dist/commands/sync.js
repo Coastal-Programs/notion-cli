@@ -19,7 +19,7 @@ class Sync extends core_1.Command {
             }
             // Fetch all databases from Notion API with progress updates
             const databases = await this.fetchAllDatabases(flags.json);
-            const fetchTime = Date.now() - startTime;
+            // const _fetchTime = Date.now() - startTime
             if (!flags.json) {
                 core_1.ux.action.stop(`Found ${databases.length} database${databases.length === 1 ? '' : 's'}`);
                 core_1.ux.action.start('Generating search aliases');
@@ -130,7 +130,6 @@ class Sync extends core_1.Command {
     async fetchAllDatabases(isJsonMode) {
         const databases = [];
         let cursor = undefined;
-        let pageCount = 0;
         while (true) {
             const response = await (0, retry_1.fetchWithRetry)(() => notion_1.client.search({
                 filter: {
@@ -144,7 +143,6 @@ class Sync extends core_1.Command {
                 config: { maxRetries: 5 }, // Higher retries for sync
             });
             databases.push(...response.results);
-            pageCount++;
             // Show progress update (only in non-JSON mode)
             if (!isJsonMode && response.has_more) {
                 // Update the spinner text to show current count

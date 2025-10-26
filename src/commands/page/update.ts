@@ -6,7 +6,6 @@ import { resolveNotionId } from '../../utils/notion-resolver'
 import { AutomationFlags } from '../../base-flags'
 import {
   NotionCLIError,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../../errors'
 import { expandSimpleProperties } from '../../utils/property-expander'

@@ -81,7 +81,7 @@ export async function resolveNotionId(
         return await trySmartDatabaseResolution(extractedId)
       }
       return extractedId
-    } catch (error) {
+    } catch {
       throw NotionCLIErrorFactory.invalidIdFormat(trimmed, type)
     }
   }
@@ -97,7 +97,7 @@ export async function resolveNotionId(
   }
 
   // Stage 3: Cache lookup (exact + aliases)
-  const fromCache = await searchCache(trimmed, type)
+  const fromCache = await searchCache(trimmed)
   if (fromCache) return fromCache
 
   // Stage 4: API search as fallback
@@ -198,7 +198,7 @@ async function resolveDatabaseIdToDataSourceId(databaseId: string): Promise<stri
     }
 
     return null
-  } catch (error) {
+  } catch (error: any) {
     // If search fails, return null and let the main error handling deal with it
     if (process.env.DEBUG) {
       console.error('Debug: Failed to resolve database_id to data_source_id:', error)
@@ -224,10 +224,9 @@ function isValidNotionId(input: string): boolean {
  * 3. Partial title match (case-insensitive substring)
  *
  * @param query - Search query (database/page name)
- * @param type - Resource type ('database' or 'page')
  * @returns Database/page ID if found, null otherwise
  */
-async function searchCache(query: string, type: 'database' | 'page'): Promise<string | null> {
+async function searchCache(query: string): Promise<string | null> {
   const cache = await loadCache()
   if (!cache) return null
 
@@ -284,7 +283,7 @@ async function searchNotionApi(query: string, type: 'database' | 'page'): Promis
     }
 
     return null
-  } catch (error) {
+  } catch {
     // API search failed, return null
     // The caller will throw a more helpful error message
     return null

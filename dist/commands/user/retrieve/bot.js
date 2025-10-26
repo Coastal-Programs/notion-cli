@@ -7,7 +7,7 @@ const base_flags_1 = require("../../../base-flags");
 const errors_1 = require("../../../errors");
 class UserRetrieveBot extends core_1.Command {
     async run() {
-        const { args, flags } = await this.parse(UserRetrieveBot);
+        const { flags } = await this.parse(UserRetrieveBot);
         try {
             const res = await notion.botUser();
             // Handle JSON output for automation

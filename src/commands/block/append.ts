@@ -1,4 +1,4 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
 import {
   AppendBlockChildrenParameters,

@@ -263,7 +263,7 @@ export const updatePage = async (pageId: string, blocks: BlockObjectRequest[]) =
   const res = await enhancedFetchWithRetry(
     () => client.blocks.children.append({
       block_id: pageId,
-      // @ts-ignore
+
       children: blocks,
     }),
     { context: `updatePage:append:${pageId}` }
@@ -550,7 +550,7 @@ export const mapPageStructure = async (pageId: string): Promise<{
   // Extract page title
   let pageTitle = 'Untitled'
   if (page.object === 'page' && isFullPage(page)) {
-    Object.entries(page.properties).find(([_, prop]: [string, any]) => {
+    Object.entries(page.properties).find(([, prop]: [string, any]) => {
       if (prop.type === 'title' && prop.title.length > 0) {
         pageTitle = prop.title[0].plain_text
         return true
@@ -624,7 +624,7 @@ export const mapPageStructure = async (pageId: string): Promise<{
         default:
           break
       }
-    } catch (e) {
+    } catch {
       // If extraction fails, just include type and id
     }
 

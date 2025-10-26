@@ -818,6 +818,14 @@ notion-cli config set-token
 
 ## Development
 
+### Prerequisites
+
+- Node.js >= 18.0.0
+- npm >= 8.0.0
+- Git
+
+### Setup
+
 ```bash
 # Clone repository
 git clone https://github.com/Coastal-Programs/notion-cli
@@ -828,13 +836,86 @@ npm install
 
 # Build TypeScript
 npm run build
+```
+
+### Development Workflow
+
+```bash
+# Build the project
+npm run build
 
 # Run tests
 npm test
 
-# Link for local development
+# Run linter
+npm run lint
+
+# Auto-fix linting issues
+npm run lint -- --fix
+
+# Link for local development (test CLI globally)
 npm link
 ```
+
+### Project Structure
+
+```
+notion-cli/
+├── src/               # TypeScript source files
+│   ├── commands/      # CLI command implementations
+│   ├── utils/         # Utility functions
+│   ├── base-command.ts   # Base command class
+│   ├── base-flags.ts     # Reusable flag definitions
+│   ├── envelope.ts       # JSON envelope formatting
+│   ├── notion.ts         # Notion API client wrapper
+│   └── cache.ts          # In-memory caching layer
+├── test/              # Test files (mocha + chai)
+├── dist/              # Compiled JavaScript (generated)
+├── docs/              # Documentation
+└── package.json       # Project configuration
+```
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with verbose output
+npm test -- --reporter spec
+
+# Run specific test file
+npm test -- test/commands/db/query.test.ts
+```
+
+### Code Quality
+
+This project uses:
+- **TypeScript** for type safety
+- **ESLint v9** for code linting (flat config)
+- **Prettier** for code formatting
+- **Mocha + Chai** for testing
+
+### Building and Publishing
+
+```bash
+# Build for production
+npm run build
+
+# Create package tarball (for testing)
+npm pack
+
+# Publish to npm (maintainers only)
+npm publish
+```
+
+### Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Code style and conventions
+- Test requirements
+- Pull request process
+- Commit message format
 
 ## Legal & Compliance
 

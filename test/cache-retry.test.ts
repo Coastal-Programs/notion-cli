@@ -412,7 +412,7 @@ describe('Retry Logic', () => {
             },
           }
         )
-      } catch (error) {
+      } catch {
         // Expected to fail
       }
 
@@ -440,7 +440,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -459,7 +459,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -484,7 +484,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }
@@ -507,7 +507,7 @@ describe('Retry Logic', () => {
           await breaker.execute(async () => {
             throw new Error('Failure')
           })
-        } catch (error) {
+        } catch {
           // Expected
         }
       }

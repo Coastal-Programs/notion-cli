@@ -1,10 +1,9 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, ux } from '@oclif/core'
 import * as readline from 'readline'
 import { AutomationFlags } from '../base-flags'
 import {
   NotionCLIError,
   NotionCLIErrorCode,
-  NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
 import { validateNotionToken } from '../utils/token-validator'

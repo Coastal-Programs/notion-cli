@@ -38,7 +38,7 @@ export default class UserList extends Command {
   }
 
   public async run(): Promise<void> {
-    const { args, flags } = await this.parse(UserList)
+    const { flags } = await this.parse(UserList)
 
     try {
       let res = await notion.listUser()

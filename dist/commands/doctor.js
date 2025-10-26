@@ -54,7 +54,7 @@ class Doctor extends core_1.Command {
                 recommendation: passed ? undefined : 'Please upgrade Node.js to version 18 or higher',
             });
         }
-        catch (error) {
+        catch {
             checks.push({
                 name: 'nodejs_version',
                 passed: false,
@@ -122,7 +122,7 @@ class Doctor extends core_1.Command {
                 passed: true,
             });
         }
-        catch (error) {
+        catch {
             checks.push({
                 name: 'network_connectivity',
                 passed: false,
@@ -205,7 +205,7 @@ class Doctor extends core_1.Command {
                 });
             }
         }
-        catch (error) {
+        catch {
             checks.push({
                 name: 'cache_exists',
                 passed: false,
@@ -254,7 +254,7 @@ class Doctor extends core_1.Command {
                 recommendation: isFresh ? undefined : "Run 'notion-cli sync' to refresh",
             });
         }
-        catch (error) {
+        catch {
             checks.push({
                 name: 'cache_fresh',
                 passed: false,
@@ -275,7 +275,7 @@ class Doctor extends core_1.Command {
                 path: '/',
                 timeout: 5000,
             };
-            const req = https.request(options, (res) => {
+            const req = https.request(options, () => {
                 resolve();
             });
             req.on('error', (error) => {

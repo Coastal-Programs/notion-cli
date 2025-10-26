@@ -3,13 +3,11 @@ import * as notion from '../../notion'
 import {
   extractSchema,
   filterProperties,
-  formatSchemaForTable,
   formatSchemaAsMarkdown,
   DataSourceSchema,
 } from '../../utils/schema-extractor'
 import {
   generatePropertyExamples,
-  formatExamplesForConsole,
   groupExamplesByWritability,
   PropertyExample,
 } from '../../utils/schema-examples'

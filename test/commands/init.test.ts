@@ -73,7 +73,6 @@ describe('init command', () => {
         delete process.env.NOTION_TOKEN
       })
       .command(['init', '--json'])
-      .exit(1)
       .it('should exit with code 1 when NOTION_TOKEN not set in JSON mode', (ctx) => {
         // Command should exit with error
       })

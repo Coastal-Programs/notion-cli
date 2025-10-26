@@ -1,15 +1,13 @@
 import {
   QueryDataSourceResponse,
-  GetDatabaseResponse,
   GetDataSourceResponse,
   DatabaseObjectResponse,
   DataSourceObjectResponse,
   PageObjectResponse,
   BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
-import { IPromptChoice } from './interface'
 import * as notion from './notion'
-import { isFullPage, isFullDatabase, isFullDataSource, isFullBlock } from '@notionhq/client'
+import { isFullPage, isFullDataSource, isFullBlock } from '@notionhq/client'
 
 export const outputRawJson = async (res: any) => {
   console.log(JSON.stringify(res, null, 2))
@@ -345,7 +343,7 @@ export const buildDatabaseQueryFilter = async (
       }
       break
     case 'multi_select':
-    case 'relation':
+    case 'relation': {
       const values = value as string[]
       if (values.length == 1) {
         filter = {
@@ -366,6 +364,7 @@ export const buildDatabaseQueryFilter = async (
         }
       }
       break
+    }
 
     case 'files':
     case 'formula':
@@ -397,7 +396,7 @@ export const buildPagePropUpdateData = async (
           },
         },
       }
-    case 'multi_select':
+    case 'multi_select': {
       const nameObjects = []
       for (const val of value) {
         nameObjects.push({
@@ -409,7 +408,8 @@ export const buildPagePropUpdateData = async (
           [type]: nameObjects,
         },
       }
-    case 'relation':
+    }
+    case 'relation': {
       const relationPageIds = []
       for (const id of value) {
         relationPageIds.push({ id: id })
@@ -419,6 +419,7 @@ export const buildPagePropUpdateData = async (
           [type]: relationPageIds,
         },
       }
+    }
   }
   return null
 }
@@ -443,14 +444,15 @@ export const buildOneDepthJson = async (pages: QueryDataSourceResponse['results'
         case 'select':
           pageData[key] = prop.select === null ? '' : prop.select.name
           break
-        case 'multi_select':
+        case 'multi_select': {
           const multiSelects = []
           for (const select of prop.multi_select) {
             multiSelects.push(select.name)
           }
           pageData[key] = multiSelects.join(',')
           break
-        case 'relation':
+        }
+        case 'relation': {
           const relationPages = []
           // relationJsonにkeyがなければ作成
           if (relationJson[key] == null) {
@@ -465,6 +467,7 @@ export const buildOneDepthJson = async (pages: QueryDataSourceResponse['results'
           }
           pageData[key] = relationPages.join(',')
           break
+        }
         case 'created_time':
           pageData[key] = prop.created_time
           break
@@ -507,38 +510,41 @@ export const buildOneDepthJson = async (pages: QueryDataSourceResponse['results'
         case 'last_edited_by':
           pageData[key] = prop.last_edited_by.id
           break
-        case 'people':
+        case 'people': {
           const people = []
           for (const person of prop.people) {
             people.push(person.id)
           }
           pageData[key] = people.join(',')
           break
-        case 'files':
+        }
+        case 'files': {
           const files = []
           for (const file of prop.files) {
             files.push(file.name)
           }
           pageData[key] = files.join(',')
           break
+        }
         case 'checkbox':
           pageData[key] = prop.checkbox
           break
-        // @ts-ignore
+
         case 'unique_id':
-          // @ts-ignore
+
           pageData[key] = `${prop.unique_id.prefix}-${prop.unique_id.number}`
           break
         case 'title':
           pageData[key] = prop.title[0].plain_text
           break
-        case 'rich_text':
+        case 'rich_text': {
           const richTexts = []
           for (const richText of prop.rich_text) {
             richTexts.push(richText.plain_text)
           }
           pageData[key] = richTexts.join(',')
           break
+        }
         case 'status':
           pageData[key] = prop.status === null ? '' : prop.status.name
           break
@@ -572,7 +578,7 @@ export const getDataSourceTitle = (row: GetDataSourceResponse | DataSourceObject
 
 export const getPageTitle = (row: PageObjectResponse) => {
   let title = 'Untitled'
-  Object.entries(row.properties).find(([_, prop]) => {
+  Object.entries(row.properties).find(([, prop]) => {
     if (prop.type === 'title' && prop.title.length > 0) {
       title = prop.title[0].plain_text
       return true
@@ -626,12 +632,13 @@ export const getBlockPlainText = (row: BlockObjectResponse) => {
       case 'paragraph':
       case 'quote':
       case 'to_do':
-      case 'toggle':
+      case 'toggle': {
         let plainText = ''
         if (row[row.type].rich_text.length > 0) {
           plainText = row[row.type].rich_text[0].plain_text
         }
         return plainText
+      }
 
       default:
         return row[row.type]
@@ -822,12 +829,12 @@ export const enrichChildDatabaseBlock = async (block: BlockObjectResponse): Prom
       ...block,
       child_database: {
         ...block.child_database,
-        // @ts-ignore - Adding custom fields for discoverability
+        // @ts-expect-error - Legacy type compatibility issue - Adding custom fields for discoverability
         data_source_id: block.id,
         database_id: dataSource.id,
       },
     }
-  } catch (error) {
+  } catch {
     // If retrieval fails, return the original block unchanged
     // This is expected for some child_database blocks
     return block
@@ -860,9 +867,9 @@ export const getChildDatabasesWithIds = async (blocks: BlockObjectResponse[]): P
       return {
         block_id: enriched.id,
         title: enriched.child_database.title,
-        // @ts-ignore - Custom fields added by enrichChildDatabaseBlock
+        // @ts-expect-error - Legacy type compatibility issue - Custom fields added by enrichChildDatabaseBlock
         data_source_id: enriched.child_database.data_source_id || null,
-        // @ts-ignore
+        // @ts-expect-error - Legacy type compatibility issue
         database_id: enriched.child_database.database_id || null,
       }
     })

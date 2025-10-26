@@ -1,19 +1,17 @@
 import { expect, test } from '@oclif/test'
+import * as nock from 'nock'
+import * as sinon from 'sinon'
 
-const apiMock = (response: any) => {
-  return test
-    .nock('https://api.notion.com', (api) =>
-      api.get('/v1/blocks/dummy-block-id').reply(200, response)
-    )
-    .stdout({ print: process.env.TEST_DEBUG ? true : false })
-}
+// Use a valid UUID format for block ID
+const BLOCK_ID = '12345678-1234-1234-1234-123456789012'
+const BLOCK_ID_NO_DASHES = BLOCK_ID.replace(/-/g, '')
 
 const response = {
   object: 'block',
-  id: 'dummy-block-id',
+  id: BLOCK_ID,
   parent: {
     type: 'page_id',
-    page_id: 'dummy-page-id',
+    page_id: '12345678-1234-1234-1234-123456789013',
   },
   has_children: true,
   archived: false,
@@ -24,19 +22,43 @@ const response = {
 }
 
 describe('block:retrieve', () => {
+  let processExitStub: sinon.SinonStub
+
+  beforeEach(() => {
+    nock.cleanAll()
+    // Stub process.exit to prevent tests from hanging
+    processExitStub = sinon.stub(process, 'exit' as any)
+  })
+
+  afterEach(() => {
+    nock.cleanAll()
+    processExitStub.restore()
+  })
+
   describe('shows ux.table result', () => {
-    apiMock(response)
-      .command(['block:retrieve', 'dummy-block-id'])
+    test
+      .do(() => {
+        nock('https://api.notion.com')
+          .get(`/v1/blocks/${BLOCK_ID}`)
+          .reply(200, response)
+      })
+      .stdout({ print: process.env.TEST_DEBUG ? true : false })
+      .command(['block:retrieve', BLOCK_ID])
       .it('shows retrieved block object when success', (ctx) => {
         expect(ctx.stdout).to.match(/Object.*Id.*Type.*Parent.*Content/)
-        expect(ctx.stdout).to.match(/block.*dummy-block-id.*child_page.*dummy child page title/)
+        expect(ctx.stdout).to.match(new RegExp(`block.*${BLOCK_ID}.*child_page.*dummy child page title`))
       })
   })
 
   describe('shows raw json result', () => {
-    apiMock(response)
-      .command(['block:retrieve', 'dummy-block-id', '--raw'])
-      .exit(0)
+    test
+      .do(() => {
+        nock('https://api.notion.com')
+          .get(`/v1/blocks/${BLOCK_ID}`)
+          .reply(200, response)
+      })
+      .stdout({ print: process.env.TEST_DEBUG ? true : false })
+      .command(['block:retrieve', BLOCK_ID, '--raw'])
       .it('shows retrieved block object when success', (ctx) => {
         expect(ctx.stdout).to.contain('object": "block')
         expect(ctx.stdout).to.contain('type": "child_page')

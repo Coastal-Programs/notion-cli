@@ -1,23 +1,16 @@
 import { Args, Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
 import {
-  PageObjectResponse,
-  DatabaseObjectResponse,
-  DataSourceObjectResponse,
-  QueryDataSourceResponse,
   QueryDataSourceParameters,
 } from '@notionhq/client/build/src/api-endpoints'
 import { isFullDataSource, isFullPage } from '@notionhq/client'
 import * as fs from 'fs'
 import * as path from 'path'
 import {
-  buildDatabaseQueryFilter,
-  getFilterFields,
   outputRawJson,
   outputCompactJson,
   outputMarkdownTable,
   outputPrettyTable,
-  getDbTitle,
   getDataSourceTitle,
   getPageTitle,
   showRawFlagHint,

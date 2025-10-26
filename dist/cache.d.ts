@@ -50,15 +50,15 @@ export declare class CacheManager {
     /**
      * Get a value from cache
      */
-    get<T>(type: string, ...identifiers: any[]): T | null;
+    get<T>(type: string, ...identifiers: Array<string | number | object>): T | null;
     /**
      * Set a value in cache with optional custom TTL
      */
-    set<T>(type: string, data: T, customTtl?: number, ...identifiers: any[]): void;
+    set<T>(type: string, data: T, customTtl?: number, ...identifiers: Array<string | number | object>): void;
     /**
      * Invalidate specific cache entries by type and optional identifiers
      */
-    invalidate(type: string, ...identifiers: any[]): void;
+    invalidate(type: string, ...identifiers: Array<string | number | object>): void;
     /**
      * Clear all cache entries
      */

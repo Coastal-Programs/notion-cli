@@ -1,4 +1,4 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, ux } from '@oclif/core'
 import { loadCache, getCachePath } from '../utils/workspace-cache'
 import { outputMarkdownTable, outputPrettyTable, outputCompactJson } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
@@ -7,8 +7,6 @@ import {
   NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
-import * as path from 'path'
-import * as os from 'os'
 
 export default class List extends Command {
   static description = 'List all cached databases from your workspace'

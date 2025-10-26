@@ -99,14 +99,15 @@ function expandProperty(value: any, type: string, propDef: any): any {
         rich_text: [{ text: { content: String(value) } }]
       }
 
-    case 'number':
+    case 'number': {
       const num = Number(value)
       if (isNaN(num)) {
         throw new Error(`Invalid number value: "${value}"`)
       }
       return { number: num }
+    }
 
-    case 'checkbox':
+    case 'checkbox': {
       // Handle boolean or string representations
       let boolValue: boolean
       if (typeof value === 'boolean') {
@@ -124,6 +125,7 @@ function expandProperty(value: any, type: string, propDef: any): any {
         boolValue = Boolean(value)
       }
       return { checkbox: boolValue }
+    }
 
     case 'select':
       return expandSelectProperty(value, propDef)
@@ -137,21 +139,23 @@ function expandProperty(value: any, type: string, propDef: any): any {
     case 'date':
       return expandDateProperty(value)
 
-    case 'url':
+    case 'url': {
       const urlStr = String(value)
       // Basic URL validation
       if (!urlStr.match(/^https?:\/\/.+/)) {
         throw new Error(`Invalid URL: "${value}". Must start with http:// or https://`)
       }
       return { url: urlStr }
+    }
 
-    case 'email':
+    case 'email': {
       const emailStr = String(value)
       // Basic email validation
       if (!emailStr.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
         throw new Error(`Invalid email: "${value}"`)
       }
       return { email: emailStr }
+    }
 
     case 'phone_number':
       return { phone_number: String(value) }
@@ -159,7 +163,7 @@ function expandProperty(value: any, type: string, propDef: any): any {
     case 'people':
       return expandPeopleProperty(value)
 
-    case 'files':
+    case 'files': {
       // Files need external URLs
       const files = Array.isArray(value) ? value : [value]
       return {
@@ -170,13 +174,15 @@ function expandProperty(value: any, type: string, propDef: any): any {
           return f
         })
       }
+    }
 
-    case 'relation':
+    case 'relation': {
       // Relations need page IDs
       const relations = Array.isArray(value) ? value : [value]
       return {
         relation: relations.map(id => ({ id: String(id) }))
       }
+    }
 
     default:
       throw new Error(

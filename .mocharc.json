@@ -1,9 +1,10 @@
 {
   "extension": ["ts"],
   "spec": "test/**/*.test.ts",
-  "require": ["ts-node/register", "test/helpers/init.js", "test/setup.ts"],
+  "require": ["test/helpers/init.js", "ts-node/register", "test/setup.ts"],
   "forbid-only": true,
+  "timeout": 5000,
   "node-option": [
-    "require=ts-node/register"
+    "no-experimental-fetch"
   ]
 }

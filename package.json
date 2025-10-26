@@ -44,6 +44,7 @@
     "eslint-plugin-unicorn": "^61.0.2",
     "globby": "^11",
     "mocha": "^11.7.4",
+    "node-fetch": "^2.7.0",
     "oclif": "^3",
     "prettier": "^3.6.2",
     "shx": "^0.4.0",
