@@ -5,7 +5,7 @@
  * NOTE: fetch polyfill is in test/helpers/init.js which loads FIRST
  */
 
-const nock = require('nock')
+import * as nock from 'nock'
 
 // Set test environment
 process.env.NODE_ENV = 'test'

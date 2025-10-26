@@ -5,7 +5,6 @@ import * as sinon from 'sinon'
 const DATABASE_ID = '11111111-2222-3333-4444-555555555555'
 const DATABASE_ID_NO_DASHES = DATABASE_ID.replace(/-/g, '')
 const PAGE_ID = '11111111-2222-3333-4444-555555555556'
-const PAGE_ID_NO_DASHES = PAGE_ID.replace(/-/g, '')
 
 describe('db:create', () => {
   let processExitStub: sinon.SinonStub

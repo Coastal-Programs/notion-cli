@@ -53,7 +53,7 @@ describe('block:append', () => {
     test
       .do(() => {
         nock('https://api.notion.com')
-          .patch(`/v1/blocks/${BLOCK_ID_NO_DASHES}/children`, (body) => {
+          .patch(`/v1/blocks/${BLOCK_ID_NO_DASHES}/children`, (_body) => {
             // Accept any valid request body
             return true
           })
@@ -78,7 +78,7 @@ describe('block:append', () => {
     test
       .do(() => {
         nock('https://api.notion.com')
-          .patch(`/v1/blocks/${BLOCK_ID_NO_DASHES}/children`, (body) => {
+          .patch(`/v1/blocks/${BLOCK_ID_NO_DASHES}/children`, (_body) => {
             // Accept any valid request body
             return true
           })

@@ -59,7 +59,13 @@ export default tseslint.config(
     rules: {
       // TypeScript rules - match previous config
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
 
       // Disable type-checked rules that are too strict for current codebase
       '@typescript-eslint/no-unsafe-assignment': 'off',

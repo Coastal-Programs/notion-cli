@@ -4,7 +4,6 @@ import * as sinon from 'sinon'
 
 // Use a valid UUID format for block ID
 const BLOCK_ID = '12345678-1234-1234-1234-123456789012'
-const BLOCK_ID_NO_DASHES = BLOCK_ID.replace(/-/g, '')
 
 const response = {
   object: 'block',

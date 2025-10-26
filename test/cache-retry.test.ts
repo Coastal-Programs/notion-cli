@@ -387,12 +387,10 @@ describe('Retry Logic', () => {
 
     it('should call onRetry callback', async () => {
       const retryContexts: any[] = []
-      let attempts = 0
 
       try {
         await fetchWithRetry(
           async () => {
-            attempts++
             const error: any = new Error('Service unavailable')
             error.status = 503
             throw error
