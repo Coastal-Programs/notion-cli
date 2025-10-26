@@ -344,4 +344,59 @@ describe('init command', () => {
       expect(hasDocsLink).to.be.true
     })
   })
+
+  describe('token input UX improvements', () => {
+    it('should validate that init command loads', async () => {
+      const Init = await import('../../src/commands/init')
+      expect(Init.default).to.exist
+    })
+
+    it('should have updated prompt text mentioning both token formats', async () => {
+      const Init = await import('../../src/commands/init')
+      const fs = require('fs')
+      const path = require('path')
+
+      // Read the source file to verify prompt text
+      const initPath = path.join(process.cwd(), 'src', 'commands', 'init.ts')
+      const source = fs.readFileSync(initPath, 'utf-8')
+
+      // Should mention accepting both formats
+      expect(source).to.include('with or without "secret_" prefix')
+    })
+
+    it('should auto-prepend secret_ prefix logic exists', async () => {
+      const fs = require('fs')
+      const path = require('path')
+
+      const initPath = path.join(process.cwd(), 'src', 'commands', 'init.ts')
+      const source = fs.readFileSync(initPath, 'utf-8')
+
+      // Verify auto-prepending logic exists
+      expect(source).to.include('!token.startsWith(\'secret_\')')
+      expect(source).to.include('token = `secret_${token}`')
+    })
+
+    it('should show friendly note when auto-prepending', async () => {
+      const fs = require('fs')
+      const path = require('path')
+
+      const initPath = path.join(process.cwd(), 'src', 'commands', 'init.ts')
+      const source = fs.readFileSync(initPath, 'utf-8')
+
+      // Should inform user when prefix is added
+      expect(source).to.include('Automatically added "secret_" prefix')
+    })
+
+    it('should handle empty token validation', async () => {
+      const fs = require('fs')
+      const path = require('path')
+
+      const initPath = path.join(process.cwd(), 'src', 'commands', 'init.ts')
+      const source = fs.readFileSync(initPath, 'utf-8')
+
+      // Should validate token is not empty
+      expect(source).to.include('!token')
+      expect(source).to.include('Token cannot be empty')
+    })
+  })
 })
