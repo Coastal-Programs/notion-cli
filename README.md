@@ -162,10 +162,10 @@ A powerful command-line interface for Notion's API, optimized for AI coding assi
 ### Installation
 
 ```bash
-# From npm (coming soon!)
+# From npm (recommended)
 npm install -g @coastal-programs/notion-cli
 
-# From source (current method)
+# Or from source
 npm install -g Coastal-Programs/notion-cli
 ```
 
