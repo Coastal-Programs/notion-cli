@@ -220,27 +220,31 @@ export default class Init extends Command {
       })
 
       token = await new Promise<string>((resolve) => {
-        rl.question('Enter your Notion integration token: ', (answer: string) => {
+        rl.question('Enter your Notion integration token (paste with or without "secret_" prefix): ', (answer: string) => {
           rl.close()
           resolve(answer.trim())
         })
       })
 
-      // Validate token format
-      if (!token || !token.startsWith('secret_')) {
+      // Validate token is not empty
+      if (!token) {
         throw new NotionCLIError(
           NotionCLIErrorCode.TOKEN_INVALID,
-          'Invalid token format - Notion tokens must start with "secret_"',
+          'Token cannot be empty',
           [
             {
               description: 'Get your integration token from Notion',
               link: 'https://developers.notion.com/docs/create-a-notion-integration'
-            },
-            {
-              description: 'Tokens should look like: secret_abc123...',
             }
           ]
         )
+      }
+
+      // Auto-prepend "secret_" if user didn't include it
+      if (!token.startsWith('secret_')) {
+        token = `secret_${token}`
+        this.log('')
+        this.log(`${colors.dim}Note: Automatically added "secret_" prefix to token${colors.reset}`)
       }
 
       // Set token in current process for subsequent steps
