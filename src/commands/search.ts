@@ -1,4 +1,4 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, Flags } from '@oclif/core'
 import * as notion from '../notion'
 import {
   SearchParameters,
@@ -22,6 +22,7 @@ import {
   wrapNotionError
 } from '../errors'
 import * as dayjs from 'dayjs'
+import { tableFlags, formatTable } from '../utils/table-formatter'
 
 export default class Search extends Command {
   static description = 'Search by title'
@@ -154,7 +155,7 @@ export default class Search extends Command {
       char: 'r',
       description: 'output raw json (recommended for AI assistants - returns all search results)',
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...OutputFormatFlags,
     ...AutomationFlags,
   }
@@ -383,7 +384,7 @@ export default class Search extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table(res.results, columns, options)
+      formatTable(res.results, columns, options)
 
       // Show hint after table output to make -r flag discoverable
       // Use first result as sample to count fields

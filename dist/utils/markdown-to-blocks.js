@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.markdownToBlocks = void 0;
+exports.markdownToBlocks = markdownToBlocks;
 /**
  * Converts markdown text to Notion block objects
  *
@@ -131,7 +131,6 @@ function markdownToBlocks(markdown) {
     }
     return blocks;
 }
-exports.markdownToBlocks = markdownToBlocks;
 /**
  * Parse markdown text into Notion rich text format
  * Supports: **bold**, *italic*, `code`, and [links](url)

@@ -1,4 +1,5 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Args, Command, Flags } from '@oclif/core'
+import { tableFlags, formatTable } from '../../utils/table-formatter'
 import * as notion from '../../notion'
 import {
   outputRawJson,
@@ -73,7 +74,7 @@ export default class BatchRetrieve extends Command {
       char: 'r',
       description: 'output raw json (recommended for AI assistants - returns all fields)',
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...OutputFormatFlags,
     ...AutomationFlags,
   }
@@ -300,7 +301,7 @@ export default class BatchRetrieve extends Command {
         ...flags,
       }
 
-      ux.table(tableData, columns, options)
+      formatTable(tableData, columns, options)
 
       // Print summary
       this.log(`\nTotal: ${results.length} | Succeeded: ${successCount} | Failed: ${failureCount}`)

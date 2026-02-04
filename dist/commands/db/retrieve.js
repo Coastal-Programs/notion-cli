@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
+const table_formatter_1 = require("../../utils/table-formatter");
 const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
@@ -69,7 +70,7 @@ class DbRetrieve extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table([res], columns, options);
+            (0, table_formatter_1.formatTable)([res], columns, options);
             // Show hint after table output to make -r flag discoverable
             (0, helper_1.showRawFlagHint)(1, res);
             process.exit(0);
@@ -91,7 +92,6 @@ class DbRetrieve extends core_1.Command {
         }
     }
 }
-exports.default = DbRetrieve;
 DbRetrieve.description = 'Retrieve a data source (table) schema and properties';
 DbRetrieve.aliases = ['db:r', 'ds:retrieve', 'ds:r'];
 DbRetrieve.examples = [
@@ -127,7 +127,8 @@ DbRetrieve.flags = {
         char: 'r',
         description: 'output raw json (recommended for AI assistants - returns full schema)',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
     ...base_flags_1.OutputFormatFlags,
 };
+exports.default = DbRetrieve;

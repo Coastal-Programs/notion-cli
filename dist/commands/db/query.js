@@ -10,6 +10,7 @@ const notion_1 = require("../../notion");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
 const notion_resolver_1 = require("../../utils/notion-resolver");
+const table_formatter_1 = require("../../utils/table-formatter");
 class DbQuery extends core_1.Command {
     async run() {
         const { flags, args } = await this.parse(DbQuery);
@@ -193,7 +194,7 @@ class DbQuery extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table(pages, columns, options);
+            (0, table_formatter_1.formatTable)(pages, columns, options);
             // Show hint after table output to make -r flag discoverable
             // Use first page as sample to count fields
             if (pages.length > 0) {
@@ -219,7 +220,6 @@ class DbQuery extends core_1.Command {
         }
     }
 }
-exports.default = DbQuery;
 DbQuery.description = 'Query a database';
 DbQuery.aliases = ['db:q'];
 DbQuery.examples = [
@@ -316,7 +316,7 @@ DbQuery.flags = {
         description: 'Output raw JSON (recommended for AI assistants - returns all page data)',
         default: false,
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
     ...base_flags_1.OutputFormatFlags,
     // New simplified filter interface (placed AFTER table flags to override)
@@ -352,3 +352,4 @@ DbQuery.flags = {
         exclusive: ['filter', 'search', 'file-filter', 'rawFilter'],
     }),
 };
+exports.default = DbQuery;

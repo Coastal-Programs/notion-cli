@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
+const table_formatter_1 = require("../../utils/table-formatter");
 const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const notion_resolver_1 = require("../../utils/notion-resolver");
@@ -87,7 +88,7 @@ class PageUpdate extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table([res], columns, options);
+            (0, table_formatter_1.formatTable)([res], columns, options);
             process.exit(0);
         }
         catch (error) {
@@ -108,7 +109,6 @@ class PageUpdate extends core_1.Command {
         }
     }
 }
-exports.default = PageUpdate;
 PageUpdate.description = 'Update a page';
 PageUpdate.aliases = ['page:u'];
 PageUpdate.examples = [
@@ -178,6 +178,7 @@ PageUpdate.flags = {
         char: 'r',
         description: 'output raw json',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = PageUpdate;

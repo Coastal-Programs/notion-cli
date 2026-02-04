@@ -6,7 +6,17 @@
  * These examples can be adapted to your specific use cases.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.runAllExamples = exports.example10_configurationShowcase = exports.example9_productionPattern = exports.example8_delayCalculation = exports.example7_errorCategorization = exports.example6_batchOperations = exports.example5_circuitBreaker = exports.example4_customRetry = exports.example3_cacheInvalidation = exports.example2_cacheStats = exports.example1_basicUsage = void 0;
+exports.example1_basicUsage = example1_basicUsage;
+exports.example2_cacheStats = example2_cacheStats;
+exports.example3_cacheInvalidation = example3_cacheInvalidation;
+exports.example4_customRetry = example4_customRetry;
+exports.example5_circuitBreaker = example5_circuitBreaker;
+exports.example6_batchOperations = example6_batchOperations;
+exports.example7_errorCategorization = example7_errorCategorization;
+exports.example8_delayCalculation = example8_delayCalculation;
+exports.example9_productionPattern = example9_productionPattern;
+exports.example10_configurationShowcase = example10_configurationShowcase;
+exports.runAllExamples = runAllExamples;
 const notion = require("../notion");
 const cache_1 = require("../cache");
 const retry_1 = require("../retry");
@@ -32,7 +42,6 @@ async function example1_basicUsage() {
         console.error('Error:', error.message);
     }
 }
-exports.example1_basicUsage = example1_basicUsage;
 /**
  * Example 2: Monitoring cache performance
  */
@@ -66,7 +75,6 @@ async function example2_cacheStats() {
     console.log(`Current Size: ${stats.size} entries`);
     console.log(`Evictions: ${stats.evictions}`);
 }
-exports.example2_cacheStats = example2_cacheStats;
 /**
  * Example 3: Manual cache invalidation
  */
@@ -101,7 +109,6 @@ async function example3_cacheInvalidation() {
         console.error('Error:', error.message);
     }
 }
-exports.example3_cacheInvalidation = example3_cacheInvalidation;
 /**
  * Example 4: Custom retry configuration
  */
@@ -115,9 +122,9 @@ async function example4_customRetry() {
         }, {
             config: {
                 maxRetries: 5,
-                baseDelay: 2000,
-                maxDelay: 60000,
-                exponentialBase: 2.5,
+                baseDelay: 2000, // Start with 2 second delay
+                maxDelay: 60000, // Cap at 60 seconds
+                exponentialBase: 2.5, // Increase delay by 2.5x each time
                 jitterFactor: 0.2, // Add 20% random variation
             },
             onRetry: (context) => {
@@ -133,7 +140,6 @@ async function example4_customRetry() {
         console.error('Final error after all retries:', error.message);
     }
 }
-exports.example4_customRetry = example4_customRetry;
 /**
  * Example 5: Circuit breaker pattern
  */
@@ -165,7 +171,6 @@ async function example5_circuitBreaker() {
     const finalState = breaker.getState();
     console.log('\nFinal circuit breaker state:', finalState);
 }
-exports.example5_circuitBreaker = example5_circuitBreaker;
 /**
  * Example 6: Batch operations with retry
  */
@@ -175,7 +180,7 @@ async function example6_batchOperations() {
     const operations = databaseIds.map(dbId => () => notion.retrieveDataSource(dbId));
     console.log('Processing batch with concurrency limit...');
     const results = await (0, retry_1.batchWithRetry)(operations, {
-        concurrency: 2,
+        concurrency: 2, // Process 2 at a time
         config: {
             maxRetries: 3,
             baseDelay: 1000,
@@ -201,7 +206,6 @@ async function example6_batchOperations() {
         });
     }
 }
-exports.example6_batchOperations = example6_batchOperations;
 /**
  * Example 7: Error categorization
  */
@@ -225,7 +229,6 @@ async function example7_errorCategorization() {
             `${retryable ? 'RETRYABLE ✓' : 'NON-RETRYABLE ✗'}`);
     }
 }
-exports.example7_errorCategorization = example7_errorCategorization;
 /**
  * Example 8: Delay calculation visualization
  */
@@ -254,7 +257,6 @@ async function example8_delayCalculation() {
         }
     }
 }
-exports.example8_delayCalculation = example8_delayCalculation;
 /**
  * Example 9: Production-ready pattern
  */
@@ -306,7 +308,6 @@ async function example9_productionPattern() {
         console.error('Operation failed:', (_b = result.error) === null || _b === void 0 ? void 0 : _b.message);
     }
 }
-exports.example9_productionPattern = example9_productionPattern;
 /**
  * Example 10: Configuration showcase
  */
@@ -331,7 +332,6 @@ async function example10_configurationShowcase() {
     console.log(`  NOTION_CLI_CACHE_ENABLED: ${process.env.NOTION_CLI_CACHE_ENABLED || 'default (true)'}`);
     console.log(`  DEBUG: ${process.env.DEBUG || 'false'}`);
 }
-exports.example10_configurationShowcase = example10_configurationShowcase;
 /**
  * Run all examples
  */
@@ -355,7 +355,6 @@ async function runAllExamples() {
     console.log('All examples completed!');
     console.log('='.repeat(60));
 }
-exports.runAllExamples = runAllExamples;
 // Export all examples
 exports.default = {
     example1_basicUsage,

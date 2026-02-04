@@ -4,14 +4,18 @@
  * Handles rate limiting, network errors, and transient failures
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CircuitBreaker = exports.batchWithRetry = exports.fetchWithRetry = exports.calculateDelay = exports.isRetryableError = void 0;
+exports.CircuitBreaker = void 0;
+exports.isRetryableError = isRetryableError;
+exports.calculateDelay = calculateDelay;
+exports.fetchWithRetry = fetchWithRetry;
+exports.batchWithRetry = batchWithRetry;
 /**
  * Default retry configuration
  */
 const DEFAULT_CONFIG = {
     maxRetries: parseInt(process.env.NOTION_CLI_MAX_RETRIES || '3', 10),
-    baseDelay: parseInt(process.env.NOTION_CLI_BASE_DELAY || '1000', 10),
-    maxDelay: parseInt(process.env.NOTION_CLI_MAX_DELAY || '30000', 10),
+    baseDelay: parseInt(process.env.NOTION_CLI_BASE_DELAY || '1000', 10), // 1 second
+    maxDelay: parseInt(process.env.NOTION_CLI_MAX_DELAY || '30000', 10), // 30 seconds
     exponentialBase: parseFloat(process.env.NOTION_CLI_EXP_BASE || '2'),
     jitterFactor: parseFloat(process.env.NOTION_CLI_JITTER_FACTOR || '0.1'),
     // HTTP status codes that should trigger a retry
@@ -112,7 +116,6 @@ function isRetryableError(error, config = DEFAULT_CONFIG) {
     }
     return false;
 }
-exports.isRetryableError = isRetryableError;
 /**
  * Calculate delay with exponential backoff and jitter
  */
@@ -133,7 +136,6 @@ function calculateDelay(attempt, config = DEFAULT_CONFIG, retryAfterHeader) {
     const finalDelay = Math.max(0, cappedDelay + jitter);
     return Math.round(finalDelay);
 }
-exports.calculateDelay = calculateDelay;
 /**
  * Sleep for specified milliseconds
  */
@@ -238,7 +240,6 @@ async function fetchWithRetry(fn, options = {}) {
     // Should never reach here, but TypeScript needs it
     throw lastError;
 }
-exports.fetchWithRetry = fetchWithRetry;
 /**
  * Batch retry wrapper for multiple operations
  * Executes operations with retry logic and collects results
@@ -266,7 +267,6 @@ async function batchWithRetry(operations, options = {}) {
     }
     return results;
 }
-exports.batchWithRetry = batchWithRetry;
 /**
  * Retry wrapper with circuit breaker pattern
  * Prevents cascading failures by stopping retries after too many failures

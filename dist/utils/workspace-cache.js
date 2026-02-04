@@ -6,7 +6,14 @@
  * Cache is stored at ~/.notion-cli/databases.json
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createEmptyCache = exports.buildCacheEntry = exports.generateAliases = exports.saveCache = exports.loadCache = exports.ensureCacheDir = exports.getCachePath = exports.getCacheDir = void 0;
+exports.getCacheDir = getCacheDir;
+exports.getCachePath = getCachePath;
+exports.ensureCacheDir = ensureCacheDir;
+exports.loadCache = loadCache;
+exports.saveCache = saveCache;
+exports.generateAliases = generateAliases;
+exports.buildCacheEntry = buildCacheEntry;
+exports.createEmptyCache = createEmptyCache;
 const fs = require("fs/promises");
 const path = require("path");
 const os = require("os");
@@ -20,14 +27,12 @@ const CACHE_FILE_NAME = 'databases.json';
 function getCacheDir() {
     return path.join(os.homedir(), CACHE_DIR_NAME);
 }
-exports.getCacheDir = getCacheDir;
 /**
  * Get the cache file path
  */
 async function getCachePath() {
     return path.join(getCacheDir(), CACHE_FILE_NAME);
 }
-exports.getCachePath = getCachePath;
 /**
  * Ensure cache directory exists
  */
@@ -42,7 +47,6 @@ async function ensureCacheDir() {
         }
     }
 }
-exports.ensureCacheDir = ensureCacheDir;
 /**
  * Load cache from disk
  * Returns null if cache doesn't exist or is corrupted
@@ -69,7 +73,6 @@ async function loadCache() {
         return null;
     }
 }
-exports.loadCache = loadCache;
 /**
  * Save cache to disk (atomic write)
  */
@@ -94,7 +97,6 @@ async function saveCache(data) {
         throw new Error(`Failed to save cache: ${error.message}`);
     }
 }
-exports.saveCache = saveCache;
 /**
  * Generate search aliases from a database title
  *
@@ -134,7 +136,6 @@ function generateAliases(title) {
     }
     return Array.from(aliases);
 }
-exports.generateAliases = generateAliases;
 /**
  * Build a cached database entry from a data source response
  */
@@ -172,7 +173,6 @@ function buildCacheEntry(dataSource) {
         properties,
     };
 }
-exports.buildCacheEntry = buildCacheEntry;
 /**
  * Create an empty cache
  */
@@ -183,4 +183,3 @@ function createEmptyCache() {
         databases: [],
     };
 }
-exports.createEmptyCache = createEmptyCache;

@@ -5,6 +5,7 @@ const notion = require("../../../notion");
 const helper_1 = require("../../../helper");
 const base_flags_1 = require("../../../base-flags");
 const errors_1 = require("../../../errors");
+const table_formatter_1 = require("../../../utils/table-formatter");
 class BlockRetrieveChildren extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(BlockRetrieveChildren);
@@ -49,7 +50,7 @@ class BlockRetrieveChildren extends core_1.Command {
                     printLine: this.log.bind(this),
                     ...flags,
                 };
-                core_1.ux.table(databases, columns, options);
+                (0, table_formatter_1.formatTable)(databases, columns, options);
                 // Show helpful tip
                 if (databases.length > 0) {
                     this.log('\nTip: Use the data_source_id to query databases:');
@@ -106,7 +107,7 @@ class BlockRetrieveChildren extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table(res.results, columns, options);
+            (0, table_formatter_1.formatTable)(res.results, columns, options);
             process.exit(0);
         }
         catch (error) {
@@ -127,7 +128,6 @@ class BlockRetrieveChildren extends core_1.Command {
         }
     }
 }
-exports.default = BlockRetrieveChildren;
 BlockRetrieveChildren.description = 'Retrieve block children (supports database discovery via --show-databases)';
 BlockRetrieveChildren.aliases = ['block:r:c'];
 BlockRetrieveChildren.examples = [
@@ -168,6 +168,7 @@ BlockRetrieveChildren.flags = {
         description: 'show only child databases with their queryable IDs (data_source_id)',
         default: false,
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = BlockRetrieveChildren;

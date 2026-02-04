@@ -1,6 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateAgainstSchema = exports.formatSchemaAsMarkdown = exports.formatSchemaForTable = exports.filterProperties = exports.extractSchema = void 0;
+exports.extractSchema = extractSchema;
+exports.filterProperties = filterProperties;
+exports.formatSchemaForTable = formatSchemaForTable;
+exports.formatSchemaAsMarkdown = formatSchemaAsMarkdown;
+exports.validateAgainstSchema = validateAgainstSchema;
 /**
  * Extract clean, AI-parseable schema from Notion data source response
  *
@@ -33,7 +37,6 @@ function extractSchema(dataSource) {
         url: 'url' in dataSource ? dataSource.url : undefined,
     };
 }
-exports.extractSchema = extractSchema;
 /**
  * Extract title from data source
  */
@@ -137,7 +140,6 @@ function filterProperties(schema, propertyNames) {
         properties: schema.properties.filter(p => lowerNames.includes(p.name.toLowerCase())),
     };
 }
-exports.filterProperties = filterProperties;
 /**
  * Format schema as human-readable table data
  *
@@ -156,7 +158,6 @@ function formatSchemaForTable(schema) {
         });
     });
 }
-exports.formatSchemaForTable = formatSchemaForTable;
 /**
  * Format schema as markdown documentation
  *
@@ -188,7 +189,6 @@ function formatSchemaAsMarkdown(schema) {
     }
     return lines.join('\n');
 }
-exports.formatSchemaAsMarkdown = formatSchemaAsMarkdown;
 /**
  * Validate that a data object matches the schema
  *
@@ -233,4 +233,3 @@ function validateAgainstSchema(schema, data) {
         errors,
     };
 }
-exports.validateAgainstSchema = validateAgainstSchema;

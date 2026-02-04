@@ -24,6 +24,7 @@ import {
   wrapNotionError
 } from '../../errors'
 import { resolveNotionId } from '../../utils/notion-resolver'
+import { tableFlags, formatTable } from '../../utils/table-formatter'
 
 export default class DbQuery extends Command {
   static description = 'Query a database'
@@ -126,7 +127,7 @@ export default class DbQuery extends Command {
       description: 'Output raw JSON (recommended for AI assistants - returns all page data)',
       default: false,
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
     ...OutputFormatFlags,
 
@@ -364,7 +365,7 @@ export default class DbQuery extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table(pages, columns, options)
+      formatTable(pages, columns, options)
 
       // Show hint after table output to make -r flag discoverable
       // Use first page as sample to count fields

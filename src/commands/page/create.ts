@@ -1,4 +1,5 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, Flags } from '@oclif/core'
+import { tableFlags, formatTable } from '../../utils/table-formatter'
 import * as notion from '../../notion'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -100,7 +101,7 @@ export default class PageCreate extends Command {
       char: 'r',
       description: 'output raw json',
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
   }
 
@@ -243,7 +244,7 @@ export default class PageCreate extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table([res], columns, options)
+      formatTable([res], columns, options)
       process.exit(0)
     } catch (error) {
       const cliError = error instanceof NotionCLIError

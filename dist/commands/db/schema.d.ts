@@ -7,11 +7,11 @@ export default class DbSchema extends Command {
         command: string;
     }[];
     static args: {
-        data_source_id: import("@oclif/core/lib/interfaces/parser").Arg<string, Record<string, unknown>>;
+        data_source_id: import("@oclif/core/lib/interfaces").Arg<string, Record<string, unknown>>;
     };
     static flags: {
-        output: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
-        properties: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        output: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces").CustomOptions>;
+        properties: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces").CustomOptions>;
         markdown: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         json: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         'with-examples': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;

@@ -6,7 +6,8 @@
  * This ensures users get helpful, actionable error messages before attempting API calls.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateNotionToken = exports.maskToken = void 0;
+exports.maskToken = maskToken;
+exports.validateNotionToken = validateNotionToken;
 const errors_1 = require("../errors");
 /**
  * Masks a Notion token for safe display in logs and console output
@@ -40,7 +41,6 @@ function maskToken(token) {
     const suffix = token.slice(-3);
     return `${prefix}***...***${suffix}`;
 }
-exports.maskToken = maskToken;
 /**
  * Validates that NOTION_TOKEN environment variable is set
  *
@@ -64,4 +64,3 @@ function validateNotionToken() {
         throw errors_1.NotionCLIErrorFactory.tokenMissing();
     }
 }
-exports.validateNotionToken = validateNotionToken;

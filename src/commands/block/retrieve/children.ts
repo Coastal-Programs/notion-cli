@@ -1,4 +1,4 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Args, Command, Flags } from '@oclif/core'
 import * as notion from '../../../notion'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import { getBlockPlainText, outputRawJson, stripMetadata, enrichChildDatabaseBlock, getChildDatabasesWithIds } from '../../../helper'
@@ -7,6 +7,7 @@ import {
   NotionCLIError,
   wrapNotionError
 } from '../../../errors'
+import { tableFlags, formatTable } from '../../../utils/table-formatter'
 
 export default class BlockRetrieveChildren extends Command {
   static description = 'Retrieve block children (supports database discovery via --show-databases)'
@@ -53,7 +54,7 @@ export default class BlockRetrieveChildren extends Command {
       description: 'show only child databases with their queryable IDs (data_source_id)',
       default: false,
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
   }
 
@@ -107,7 +108,7 @@ export default class BlockRetrieveChildren extends Command {
           ...flags,
         }
 
-        ux.table(databases, columns, options)
+        formatTable(databases, columns, options)
 
         // Show helpful tip
         if (databases.length > 0) {
@@ -172,7 +173,7 @@ export default class BlockRetrieveChildren extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table(res.results, columns, options)
+      formatTable(res.results, columns, options)
       process.exit(0)
     } catch (error) {
       const cliError = error instanceof NotionCLIError

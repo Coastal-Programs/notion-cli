@@ -127,7 +127,6 @@ class CacheInfo extends core_1.Command {
         }
     }
 }
-exports.default = CacheInfo;
 CacheInfo.description = 'Show cache statistics and configuration';
 CacheInfo.aliases = ['cache:stats', 'cache:status'];
 CacheInfo.examples = [
@@ -143,3 +142,4 @@ CacheInfo.examples = [
 CacheInfo.flags = {
     ...base_flags_1.AutomationFlags,
 };
+exports.default = CacheInfo;

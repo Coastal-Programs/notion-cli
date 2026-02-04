@@ -153,7 +153,6 @@ class Whoami extends core_1.Command {
         }
     }
 }
-exports.default = Whoami;
 Whoami.description = 'Verify API connectivity and show workspace context';
 Whoami.aliases = ['test', 'health', 'connectivity'];
 Whoami.examples = [
@@ -173,3 +172,4 @@ Whoami.examples = [
 Whoami.flags = {
     ...base_flags_1.AutomationFlags,
 };
+exports.default = Whoami;

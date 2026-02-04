@@ -8,7 +8,7 @@
  * Respects NO_UPDATE_NOTIFIER environment variable and CI environments
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkForUpdates = void 0;
+exports.checkForUpdates = checkForUpdates;
 /**
  * Check for updates and notify user if a new version is available
  *
@@ -39,7 +39,7 @@ function checkForUpdates() {
         // Show notification if update is available
         // This displays a yellow-bordered box with update info
         notifier.notify({
-            defer: true,
+            defer: true, // Show notification after command completes (non-intrusive)
             isGlobal: true, // This is a global CLI tool
         });
     }
@@ -52,4 +52,3 @@ function checkForUpdates() {
         }
     }
 }
-exports.checkForUpdates = checkForUpdates;

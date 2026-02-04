@@ -1,4 +1,5 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Args, Command, Flags } from '@oclif/core'
+import { tableFlags, formatTable } from '../../utils/table-formatter'
 import { GetDataSourceResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../notion'
 import {
@@ -54,7 +55,7 @@ export default class DbRetrieve extends Command {
       char: 'r',
       description: 'output raw json (recommended for AI assistants - returns full schema)',
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
     ...OutputFormatFlags,
   }
@@ -131,7 +132,7 @@ export default class DbRetrieve extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table([res], columns, options)
+      formatTable([res], columns, options)
 
       // Show hint after table output to make -r flag discoverable
       showRawFlagHint(1, res)

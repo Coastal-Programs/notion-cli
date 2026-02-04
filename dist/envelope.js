@@ -9,7 +9,10 @@
  * - Proper stdout/stderr separation
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isErrorEnvelope = exports.isSuccessEnvelope = exports.createEnvelopeFormatter = exports.EnvelopeFormatter = exports.ExitCode = void 0;
+exports.EnvelopeFormatter = exports.ExitCode = void 0;
+exports.createEnvelopeFormatter = createEnvelopeFormatter;
+exports.isSuccessEnvelope = isSuccessEnvelope;
+exports.isErrorEnvelope = isErrorEnvelope;
 const index_1 = require("./errors/index");
 /**
  * Exit codes for consistent process termination
@@ -22,7 +25,7 @@ var ExitCode;
     ExitCode[ExitCode["API_ERROR"] = 1] = "API_ERROR";
     /** CLI/validation error (invalid args, syntax, config issues) */
     ExitCode[ExitCode["CLI_ERROR"] = 2] = "CLI_ERROR";
-})(ExitCode = exports.ExitCode || (exports.ExitCode = {}));
+})(ExitCode || (exports.ExitCode = ExitCode = {}));
 /**
  * Maps error codes to appropriate exit codes
  */
@@ -240,18 +243,15 @@ exports.EnvelopeFormatter = EnvelopeFormatter;
 function createEnvelopeFormatter(commandName, version) {
     return new EnvelopeFormatter(commandName, version);
 }
-exports.createEnvelopeFormatter = createEnvelopeFormatter;
 /**
  * Type guard to check if envelope is a success envelope
  */
 function isSuccessEnvelope(envelope) {
     return envelope.success === true;
 }
-exports.isSuccessEnvelope = isSuccessEnvelope;
 /**
  * Type guard to check if envelope is an error envelope
  */
 function isErrorEnvelope(envelope) {
     return envelope.success === false;
 }
-exports.isErrorEnvelope = isErrorEnvelope;

@@ -1,4 +1,5 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, Flags } from '@oclif/core'
+import { tableFlags, formatTable } from '../../utils/table-formatter'
 import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../notion'
 import { outputRawJson, stripMetadata } from '../../helper'
@@ -33,7 +34,7 @@ export default class UserList extends Command {
       char: 'r',
       description: 'output raw json',
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
   }
 
@@ -87,7 +88,7 @@ export default class UserList extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table(res.results, columns, options)
+      formatTable(res.results, columns, options)
       process.exit(0)
     } catch (error) {
       const cliError = error instanceof NotionCLIError

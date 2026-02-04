@@ -1,4 +1,4 @@
-import { Command, ux } from '@oclif/core'
+import { Command } from '@oclif/core'
 import { loadCache, getCachePath } from '../utils/workspace-cache'
 import { outputMarkdownTable, outputPrettyTable, outputCompactJson } from '../helper'
 import { AutomationFlags, OutputFormatFlags } from '../base-flags'
@@ -7,6 +7,7 @@ import {
   NotionCLIErrorFactory,
   wrapNotionError
 } from '../errors'
+import { tableFlags, formatTable } from '../utils/table-formatter'
 
 export default class List extends Command {
   static description = 'List all cached databases from your workspace'
@@ -33,7 +34,7 @@ export default class List extends Command {
   ]
 
   static flags = {
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
     ...OutputFormatFlags,
   }
@@ -181,7 +182,7 @@ export default class List extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table(databases, columns, options)
+      formatTable(databases, columns, options)
 
       this.log(`\nTip: Run "notion-cli sync" to refresh the cache.`)
       process.exit(0)

@@ -9,7 +9,7 @@ export declare const fetchWithRetry: (fn: () => Promise<any>, retries?: number) 
 /**
  * Fetch all pages in a data source with pagination
  */
-export declare const fetchAllPagesInDS: (databaseId: string, filter?: object | undefined) => Promise<QueryDataSourceResponse['results']>;
+export declare const fetchAllPagesInDS: (databaseId: string, filter?: object | undefined) => Promise<QueryDataSourceResponse["results"]>;
 /**
  * Create a database
  */
@@ -86,7 +86,7 @@ export declare const botUser: () => Promise<import("@notionhq/client").UserObjec
 /**
  * Search for databases (cached with medium TTL)
  */
-export declare const searchDb: () => Promise<(import("@notionhq/client").PageObjectResponse | import("@notionhq/client").PartialPageObjectResponse | import("@notionhq/client").PartialDataSourceObjectResponse | import("@notionhq/client").DataSourceObjectResponse)[]>;
+export declare const searchDb: () => Promise<(import("@notionhq/client").DataSourceObjectResponse | import("@notionhq/client").PageObjectResponse | import("@notionhq/client").PartialDataSourceObjectResponse | import("@notionhq/client").PartialPageObjectResponse)[]>;
 /**
  * General search (not cached due to variable parameters)
  */

@@ -1,4 +1,5 @@
-import { Args, Command, Flags, ux } from '@oclif/core'
+import { Args, Command, Flags } from '@oclif/core'
+import { tableFlags, formatTable } from '../../utils/table-formatter'
 import * as notion from '../../notion'
 import { GetPageParameters, PageObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import {
@@ -103,7 +104,7 @@ export default class PageRetrieve extends Command {
       max: 10,
       dependsOn: ['recursive'],
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...OutputFormatFlags,
     ...AutomationFlags,
   }
@@ -254,7 +255,7 @@ export default class PageRetrieve extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table([res], columns, options)
+      formatTable([res], columns, options)
 
       // Show hint after table output to make -r flag discoverable
       showRawFlagHint(1, res)

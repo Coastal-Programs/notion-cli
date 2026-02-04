@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateSimpleProperties = exports.expandSimpleProperties = void 0;
+exports.expandSimpleProperties = expandSimpleProperties;
+exports.validateSimpleProperties = validateSimpleProperties;
 /**
  * Expand simple flat properties to Notion API format
  *
@@ -41,7 +42,6 @@ async function expandSimpleProperties(simple, schema) {
     }
     return expanded;
 }
-exports.expandSimpleProperties = expandSimpleProperties;
 /**
  * Find property in schema with case-insensitive matching
  */
@@ -321,4 +321,3 @@ function validateSimpleProperties(simple, schema) {
         errors
     };
 }
-exports.validateSimpleProperties = validateSimpleProperties;

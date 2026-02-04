@@ -5,6 +5,7 @@ const notion = require("../../../notion");
 const helper_1 = require("../../../helper");
 const base_flags_1 = require("../../../base-flags");
 const errors_1 = require("../../../errors");
+const table_formatter_1 = require("../../../utils/table-formatter");
 class UserRetrieveBot extends core_1.Command {
     async run() {
         const { flags } = await this.parse(UserRetrieveBot);
@@ -47,7 +48,7 @@ class UserRetrieveBot extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table([res], columns, options);
+            (0, table_formatter_1.formatTable)([res], columns, options);
             process.exit(0);
         }
         catch (error) {
@@ -67,7 +68,6 @@ class UserRetrieveBot extends core_1.Command {
         }
     }
 }
-exports.default = UserRetrieveBot;
 UserRetrieveBot.description = 'Retrieve a bot user';
 UserRetrieveBot.aliases = ['user:r:b'];
 UserRetrieveBot.examples = [
@@ -90,6 +90,7 @@ UserRetrieveBot.flags = {
         char: 'r',
         description: 'output raw json',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = UserRetrieveBot;

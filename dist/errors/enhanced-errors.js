@@ -15,7 +15,9 @@
  * - Common scenario detection
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleCliError = exports.wrapNotionError = exports.NotionCLIErrorFactory = exports.NotionCLIError = exports.NotionCLIErrorCode = void 0;
+exports.NotionCLIErrorFactory = exports.NotionCLIError = exports.NotionCLIErrorCode = void 0;
+exports.wrapNotionError = wrapNotionError;
+exports.handleCliError = handleCliError;
 /**
  * Comprehensive error codes covering all common scenarios
  */
@@ -61,7 +63,7 @@ var NotionCLIErrorCode;
     // General
     NotionCLIErrorCode["UNKNOWN"] = "UNKNOWN";
     NotionCLIErrorCode["INTERNAL_ERROR"] = "INTERNAL_ERROR";
-})(NotionCLIErrorCode = exports.NotionCLIErrorCode || (exports.NotionCLIErrorCode = {}));
+})(NotionCLIErrorCode || (exports.NotionCLIErrorCode = NotionCLIErrorCode = {}));
 /**
  * Enhanced CLI Error with AI-friendly formatting
  */
@@ -548,7 +550,6 @@ function wrapNotionError(error, context = {}) {
         }
     ], { ...context, originalError: error });
 }
-exports.wrapNotionError = wrapNotionError;
 /**
  * Handle CLI errors with proper formatting based on output mode
  */
@@ -564,4 +565,3 @@ function handleCliError(error, outputJson = false, context = {}) {
     }
     process.exit(1);
 }
-exports.handleCliError = handleCliError;

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
+const table_formatter_1 = require("../../utils/table-formatter");
 const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
@@ -193,7 +194,7 @@ class BatchRetrieve extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table(tableData, columns, options);
+            (0, table_formatter_1.formatTable)(tableData, columns, options);
             // Print summary
             this.log(`\nTotal: ${results.length} | Succeeded: ${successCount} | Failed: ${failureCount}`);
             process.exit(failureCount === 0 ? 0 : 1);
@@ -214,7 +215,6 @@ class BatchRetrieve extends core_1.Command {
         }
     }
 }
-exports.default = BatchRetrieve;
 BatchRetrieve.description = 'Batch retrieve multiple pages, blocks, or data sources';
 BatchRetrieve.aliases = ['batch:r'];
 BatchRetrieve.examples = [
@@ -258,7 +258,8 @@ BatchRetrieve.flags = {
         char: 'r',
         description: 'output raw json (recommended for AI assistants - returns all fields)',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.OutputFormatFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = BatchRetrieve;
