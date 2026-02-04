@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-02-04
+
+### Changed
+- **Major dependency updates** - Updated 24 packages with comprehensive testing
+  - **oclif framework v4**: Core CLI framework updated from v2 to v4
+    - Migrated from deprecated `ux.table` to new `cli-table3`-based table formatter
+    - Created backward-compatible table utility maintaining all CLI flags
+    - Updated 18 command files with new table rendering approach
+  - **TypeScript 5.9**: Upgraded from 4.9 with full type checking compatibility
+  - **Notion SDK 5.9**: Updated from 5.2.1 with latest API improvements
+  - **Node.js 22 types**: Updated @types/node from v16 to v22
+  - **Testing framework updates**: mocha 11.7, sinon 21.0, @types/sinon 21.0
+  - **Linting updates**: eslint 9.39, typescript-eslint 8.54, eslint-plugin-unicorn 62.0
+  - **Other updates**: dayjs 1.11.19, prettier 3.8.1, undici 7.20.0
+
+### Security
+- **Eliminated all production vulnerabilities** - 0 vulnerabilities in production dependencies (down from 2)
+- **Reduced total vulnerabilities by 87%** - From 31 to 4 (all low-priority devDependencies)
+- **Resolved 27 security issues** in oclif v2/v3 tooling by upgrading to v4
+
+### Technical
+- All 471 tests passing with >95% code coverage maintained
+- Backward compatible - no breaking changes for CLI users
+- Deferred ESM-only packages (chai v5+, node-fetch v3+, globby v14+) to v6.0.0
+
+## [5.7.0] - 2026-01-28
+
 ### Added
 - **ASCII art banner** displayed during installation and `notion-cli init` command for enhanced branding and professional appearance
 - **PUBLISHING.md guide** with comprehensive npm release workflow and best practices
