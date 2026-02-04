@@ -21,7 +21,7 @@
     "/oclif.manifest.json"
   ],
   "dependencies": {
-    "@notionhq/client": "^5.2.1",
+    "@notionhq/client": "^5.9.0",
     "@oclif/core": "^2",
     "@oclif/plugin-help": "^5",
     "dayjs": "^1.11.19",
