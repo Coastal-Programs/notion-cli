@@ -56,7 +56,7 @@ describe('db:update', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:update', '--no-truncate', '-t dummy database title', DATABASE_ID])
       .it('shows updated result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`dummy database title.*data_source.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
         )
@@ -98,7 +98,7 @@ describe('db:update', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:update', '--no-truncate', '-t dummy database title', DATABASE_ID])
       .it('shows updated result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`Untitled.*data_source.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
         )

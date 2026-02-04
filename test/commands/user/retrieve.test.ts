@@ -37,7 +37,7 @@ describe('user:retrieve', () => {
       apiMockPerson
         .command(['user:retrieve', '--no-truncate', 'dummy-user-id'])
         .it('shows retrieved user table', (ctx) => {
-          expect(ctx.stdout).to.match(/Id.*Name.*Object.*Type.*person\/bot.*Avatar url/)
+          expect(ctx.stdout).to.match(/id.*name.*object.*type.*person\/bot.*avatar_url/)
           expect(ctx.stdout).to.match(
             /dummy-user-id.*dummy-user-name.*user.*person.*dummy-user-avatar-url/
           )
@@ -65,7 +65,7 @@ describe('user:retrieve', () => {
       apiMockBot
         .command(['user:retrieve', '--no-truncate', 'dummy-user-id'])
         .it('shows retrieved user table', (ctx) => {
-          expect(ctx.stdout).to.match(/Id.*Name.*Object.*Type.*person\/bot.*Avatar url/)
+          expect(ctx.stdout).to.match(/id.*name.*object.*type.*person\/bot.*avatar_url/)
           expect(ctx.stdout).to.match(
             /dummy-bot-id.*dummy-bot-name.*user.*bot.*dummy-bot-avatar-url/
           )

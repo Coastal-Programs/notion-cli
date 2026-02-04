@@ -49,7 +49,7 @@ describe('block:delete', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['block:delete', BLOCK_ID])
       .it('shows deleted block object when success', (ctx) => {
-        expect(ctx.stdout).to.match(/Object.*Id.*Type.*Parent.*Content/)
+        expect(ctx.stdout).to.match(/object.*id.*type.*parent.*content/)
         expect(ctx.stdout).to.match(new RegExp(`block.*${BLOCK_ID}.*heading_2.*dummy-heading-2-content`))
       })
   })

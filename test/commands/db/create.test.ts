@@ -45,7 +45,7 @@ describe('db:create', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:create', '--no-truncate', '-t', 'dummy database title', PAGE_ID])
       .it('shows created result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`dummy database title.*database.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
         )
@@ -84,7 +84,7 @@ describe('db:create', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:create', '--no-truncate', '-t', 'dummy database title', PAGE_ID])
       .it('shows created result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`Untitled.*database.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
         )

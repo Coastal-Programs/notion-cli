@@ -3,7 +3,7 @@
  */
 
 import { expect } from 'chai'
-import { CacheManager } from '../src/cache'
+import { CacheManager } from '../dist/cache.js'
 import {
   calculateDelay,
   isRetryableError,

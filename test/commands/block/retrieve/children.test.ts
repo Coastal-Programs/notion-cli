@@ -58,7 +58,7 @@ describe('block:retrieve:children', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['block:retrieve:children', BLOCK_ID, '--no-truncate'])
       .it('shows retrieved block children when success', (ctx) => {
-        expect(ctx.stdout).to.match(/Object.*Id.*Type.*Content/)
+        expect(ctx.stdout).to.match(/object.*id.*type.*content/)
         expect(ctx.stdout).to.match(new RegExp(`block.*${BLOCK_ID}.*heading_2.*dummy-heading-2-content`))
       })
   })

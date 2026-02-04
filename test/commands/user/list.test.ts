@@ -40,7 +40,7 @@ describe('user:list', () => {
 
   describe('with no flags', () => {
     apiMock.command(['user:list', '--no-truncate']).it('shows user list table', (ctx) => {
-      expect(ctx.stdout).to.match(/Id.*Name.*Object.*Type.*person\/bot.*Avatar url/)
+      expect(ctx.stdout).to.match(/id.*name.*object.*type.*person\/bot.*avatar_url/)
       expect(ctx.stdout).to.match(
         /dummy-user-id.*dummy-user-name.*user.*person.*dummy-user-avatar-url/
       )
