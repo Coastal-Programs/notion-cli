@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import { DeduplicationManager, deduplicationManager } from '../src/deduplication'
+import { DeduplicationManager, deduplicationManager } from '../dist/deduplication.js'
 
 describe('DeduplicationManager', () => {
   let dedup: DeduplicationManager
@@ -34,6 +34,37 @@ describe('DeduplicationManager', () => {
       expect(r3).to.equal('result')
       expect(r1).to.equal(r2, 'All results should be identical')
       expect(r2).to.equal(r3, 'All results should be identical')
+
+      // Verify stats show 1 miss and 2 hits
+      const stats = dedup.getStats()
+      expect(stats.hits).to.equal(2, 'Should have 2 hits from deduplicated calls')
+      expect(stats.misses).to.equal(1, 'Should have 1 miss from first call')
+    })
+
+    it('should return existing promise when key already exists', async () => {
+      let callCount = 0
+      const fn = async () => {
+        callCount++
+        await new Promise(resolve => setTimeout(resolve, 100))
+        return 'result'
+      }
+
+      // Start first request
+      const promise1 = dedup.execute('key1', fn)
+
+      // Check that we have 1 miss and 0 hits initially
+      expect(dedup.getStats().hits).to.equal(0)
+      expect(dedup.getStats().misses).to.equal(1)
+
+      // Request with same key should return existing promise and increment hits
+      const promise2 = dedup.execute('key1', fn)
+      expect(dedup.getStats().hits).to.equal(1, 'Should increment hits')
+
+      // Both should resolve to same value
+      const [r1, r2] = await Promise.all([promise1, promise2])
+      expect(r1).to.equal(r2)
+      expect(r1).to.equal('result')
+      expect(callCount).to.equal(1, 'Should only call function once')
     })
 
     it('should not deduplicate requests with different keys', async () => {
@@ -104,6 +135,72 @@ describe('DeduplicationManager', () => {
         expect(results[1].reason).to.equal(error)
         expect(results[2].reason).to.equal(error)
       }
+
+      // Verify stats were still tracked
+      const stats = dedup.getStats()
+      expect(stats.hits).to.equal(2, 'Should have 2 hits even for errors')
+      expect(stats.misses).to.equal(1, 'Should have 1 miss even for errors')
+    })
+
+    it('should propagate different error types', async () => {
+      // String error
+      const stringError = 'String error'
+      const fn1 = async () => { throw stringError }
+      try {
+        await dedup.execute('key1', fn1)
+        expect.fail('Should have thrown')
+      } catch (err) {
+        expect(err).to.equal(stringError)
+      }
+
+      // Object error
+      const objError = { code: 'ERROR', message: 'Object error' }
+      const fn2 = async () => { throw objError }
+      try {
+        await dedup.execute('key2', fn2)
+        expect.fail('Should have thrown')
+      } catch (err) {
+        expect(err).to.deep.equal(objError)
+      }
+
+      // Number error
+      const numberError = 42
+      const fn3 = async () => { throw numberError }
+      try {
+        await dedup.execute('key3', fn3)
+        expect.fail('Should have thrown')
+      } catch (err) {
+        expect(err).to.equal(numberError)
+      }
+    })
+
+    it('should handle error followed by success with same key', async () => {
+      const error = new Error('First attempt failed')
+      let attemptCount = 0
+
+      const fn = async () => {
+        attemptCount++
+        await new Promise(resolve => setTimeout(resolve, 50))
+        if (attemptCount === 1) {
+          throw error
+        }
+        return 'success'
+      }
+
+      // First attempt should fail
+      try {
+        await dedup.execute('key1', fn)
+        expect.fail('Should have thrown')
+      } catch (err) {
+        expect(err).to.equal(error)
+      }
+
+      // Entry should be cleaned up after rejection
+      expect(dedup.getStats().pending).to.equal(0)
+
+      // Second attempt should succeed
+      const result = await dedup.execute('key1', fn)
+      expect(result).to.equal('success')
     })
 
     it('should clean up pending entry after promise resolves', async () => {
@@ -240,6 +337,60 @@ describe('DeduplicationManager', () => {
       const stats2 = dedup.getStats()
       expect(stats2.hits).to.equal(0, 'Should not be affected by mutation')
     })
+
+    it('should return all stats fields', () => {
+      const stats = dedup.getStats()
+      expect(stats).to.have.property('hits')
+      expect(stats).to.have.property('misses')
+      expect(stats).to.have.property('pending')
+      expect(typeof stats.hits).to.equal('number')
+      expect(typeof stats.misses).to.equal('number')
+      expect(typeof stats.pending).to.equal('number')
+    })
+
+    it('should calculate pending count dynamically', async () => {
+      const fn = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        return 'result'
+      }
+
+      // Check initial state
+      expect(dedup.getStats().pending).to.equal(0)
+
+      // Start first request
+      const p1 = dedup.execute('key1', fn)
+      expect(dedup.getStats().pending).to.equal(1)
+
+      // Start second request (different key)
+      const p2 = dedup.execute('key2', fn)
+      expect(dedup.getStats().pending).to.equal(2)
+
+      // Start third request (same as first key, should not increase pending)
+      const p3 = dedup.execute('key1', fn)
+      expect(dedup.getStats().pending).to.equal(2, 'Should not add duplicate pending entry')
+
+      // Wait for all
+      await Promise.all([p1, p2, p3])
+      expect(dedup.getStats().pending).to.equal(0)
+    })
+
+    it('should preserve hits/misses across getStats calls', async () => {
+      const fn = async () => 'result'
+
+      await Promise.all([
+        dedup.execute('key1', fn),
+        dedup.execute('key1', fn),
+      ])
+
+      const stats1 = dedup.getStats()
+      const stats2 = dedup.getStats()
+      const stats3 = dedup.getStats()
+
+      expect(stats1.hits).to.equal(stats2.hits)
+      expect(stats2.hits).to.equal(stats3.hits)
+      expect(stats1.misses).to.equal(stats2.misses)
+      expect(stats2.misses).to.equal(stats3.misses)
+    })
   })
 
   describe('clear()', () => {
@@ -284,6 +435,94 @@ describe('DeduplicationManager', () => {
 
     it('should accept maxAge parameter', () => {
       expect(() => dedup.cleanup(60000)).to.not.throw()
+    })
+
+    it('should log warning when called with pending requests', () => {
+      const fn = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        return 'result'
+      }
+
+      // Create a pending request
+      dedup.execute('key1', fn)
+      expect(dedup.getStats().pending).to.equal(1)
+
+      // Capture console.warn calls
+      const originalWarn = console.warn
+      let warnCalled = false
+      let warnMessage = ''
+      console.warn = (msg: string) => {
+        warnCalled = true
+        warnMessage = msg
+      }
+
+      try {
+        dedup.cleanup()
+        expect(warnCalled).to.be.true
+        expect(warnMessage).to.include('DeduplicationManager cleanup called with 1 pending requests')
+      } finally {
+        console.warn = originalWarn
+      }
+    })
+
+    it('should not log warning when called with no pending requests', () => {
+      expect(dedup.getStats().pending).to.equal(0)
+
+      // Capture console.warn calls
+      const originalWarn = console.warn
+      let warnCalled = false
+      console.warn = () => {
+        warnCalled = true
+      }
+
+      try {
+        dedup.cleanup()
+        expect(warnCalled).to.be.false
+      } finally {
+        console.warn = originalWarn
+      }
+    })
+
+    it('should use default maxAge when not provided', () => {
+      // This tests the default parameter value
+      expect(() => dedup.cleanup()).to.not.throw()
+    })
+
+    it('should accept custom maxAge values', () => {
+      expect(() => dedup.cleanup(0)).to.not.throw()
+      expect(() => dedup.cleanup(1000)).to.not.throw()
+      expect(() => dedup.cleanup(60000)).to.not.throw()
+      expect(() => dedup.cleanup(300000)).to.not.throw()
+    })
+
+    it('should handle cleanup with multiple pending requests', () => {
+      const fn = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        return 'result'
+      }
+
+      // Create multiple pending requests
+      dedup.execute('key1', fn)
+      dedup.execute('key2', fn)
+      dedup.execute('key3', fn)
+      expect(dedup.getStats().pending).to.equal(3)
+
+      // Capture console.warn calls
+      const originalWarn = console.warn
+      let warnCalled = false
+      let warnMessage = ''
+      console.warn = (msg: string) => {
+        warnCalled = true
+        warnMessage = msg
+      }
+
+      try {
+        dedup.cleanup(5000)
+        expect(warnCalled).to.be.true
+        expect(warnMessage).to.include('DeduplicationManager cleanup called with 3 pending requests')
+      } finally {
+        console.warn = originalWarn
+      }
     })
   })
 
@@ -363,6 +602,108 @@ describe('DeduplicationManager', () => {
 
       expect(r1).to.equal('result')
       expect(r2).to.equal('result')
+    })
+
+    it('should handle promises that resolve immediately', async () => {
+      const fn = async () => 'immediate'
+
+      const [r1, r2, r3] = await Promise.all([
+        dedup.execute('key1', fn),
+        dedup.execute('key1', fn),
+        dedup.execute('key1', fn),
+      ])
+
+      expect(r1).to.equal('immediate')
+      expect(r2).to.equal('immediate')
+      expect(r3).to.equal('immediate')
+    })
+
+    it('should handle multiple keys with different completion times', async () => {
+      const fastFn = async () => {
+        await new Promise(resolve => setTimeout(resolve, 10))
+        return 'fast'
+      }
+
+      const slowFn = async () => {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        return 'slow'
+      }
+
+      // Start slow request first
+      const slowPromise = dedup.execute('slow', slowFn)
+
+      // Start fast requests
+      const [fast1, fast2] = await Promise.all([
+        dedup.execute('fast', fastFn),
+        dedup.execute('fast', fastFn),
+      ])
+
+      expect(fast1).to.equal('fast')
+      expect(fast2).to.equal('fast')
+
+      // Slow promise should still be pending
+      expect(dedup.getStats().pending).to.equal(1)
+
+      // Wait for slow promise
+      const slow = await slowPromise
+      expect(slow).to.equal('slow')
+
+      // All should be cleaned up
+      expect(dedup.getStats().pending).to.equal(0)
+    })
+
+    it('should maintain stats across multiple operations', async () => {
+      const fn = async () => {
+        await new Promise(resolve => setTimeout(resolve, 50))
+        return 'result'
+      }
+
+      // First set of concurrent calls
+      await Promise.all([
+        dedup.execute('key1', fn),
+        dedup.execute('key1', fn),
+      ])
+      expect(dedup.getStats().hits).to.equal(1)
+      expect(dedup.getStats().misses).to.equal(1)
+
+      // Second set with different key
+      await Promise.all([
+        dedup.execute('key2', fn),
+        dedup.execute('key2', fn),
+        dedup.execute('key2', fn),
+      ])
+      expect(dedup.getStats().hits).to.equal(3)
+      expect(dedup.getStats().misses).to.equal(2)
+
+      // Third set with mix of keys
+      await Promise.all([
+        dedup.execute('key3', fn),
+        dedup.execute('key3', fn),
+      ])
+      expect(dedup.getStats().hits).to.equal(4)
+      expect(dedup.getStats().misses).to.equal(3)
+    })
+
+    it('should handle function that returns falsy values', async () => {
+      // Test 0
+      const r1 = await dedup.execute('zero', async () => 0)
+      expect(r1).to.equal(0)
+
+      // Test false
+      const r2 = await dedup.execute('false', async () => false)
+      expect(r2).to.equal(false)
+
+      // Test empty string
+      const r3 = await dedup.execute('empty', async () => '')
+      expect(r3).to.equal('')
+
+      // Test null
+      const r4 = await dedup.execute('null', async () => null)
+      expect(r4).to.be.null
+
+      // Test undefined
+      const r5 = await dedup.execute('undefined', async () => undefined)
+      expect(r5).to.be.undefined
     })
   })
 

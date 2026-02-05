@@ -134,6 +134,26 @@ describe('HTTP Agent', () => {
     it('should be a callable function', () => {
       expect(destroyAgents).to.be.a('function')
     })
+
+    it('should actually call destroy on the agent', () => {
+      // Verify that destroyAgents can be called without errors
+      // This covers the actual function body execution
+      let destroyCallCount = 0
+      const originalDestroy = httpsAgent.destroy.bind(httpsAgent)
+
+      // Mock the destroy method temporarily
+      ;(httpsAgent as any).destroy = () => {
+        destroyCallCount++
+        originalDestroy()
+      }
+
+      destroyAgents()
+
+      expect(destroyCallCount).to.equal(1)
+
+      // Restore original destroy
+      ;(httpsAgent as any).destroy = originalDestroy
+    })
   })
 
   describe('Configuration Validation', () => {
@@ -254,6 +274,244 @@ describe('HTTP Agent', () => {
       expect(stats.sockets).to.be.at.least(0)
       expect(stats.freeSockets).to.be.at.least(0)
       expect(stats.requests).to.be.at.least(0)
+    })
+
+    it('should handle agent with populated sockets', () => {
+      // Mock agent with sockets
+      const agent = httpsAgent as any
+      const originalSockets = agent.sockets
+      const originalFreeSockets = agent.freeSockets
+      const originalRequests = agent.requests
+
+      try {
+        // Simulate some active sockets
+        agent.sockets = {
+          'localhost:443': [{ id: 1 }, { id: 2 }],
+          'api.notion.com:443': [{ id: 3 }],
+        }
+
+        agent.freeSockets = {
+          'localhost:443': [{ id: 4 }],
+        }
+
+        agent.requests = {
+          'api.notion.com:443': [{ id: 5 }, { id: 6 }, { id: 7 }],
+        }
+
+        const stats = getAgentStats()
+
+        // Should count all sockets correctly
+        expect(stats.sockets).to.equal(3) // 2 + 1
+        expect(stats.freeSockets).to.equal(1) // 1
+        expect(stats.requests).to.equal(3) // 3
+      } finally {
+        // Restore original state
+        agent.sockets = originalSockets
+        agent.freeSockets = originalFreeSockets
+        agent.requests = originalRequests
+      }
+    })
+
+    it('should handle agent with empty arrays', () => {
+      const agent = httpsAgent as any
+      const originalSockets = agent.sockets
+      const originalFreeSockets = agent.freeSockets
+      const originalRequests = agent.requests
+
+      try {
+        // Simulate empty arrays
+        agent.sockets = {
+          'localhost:443': [],
+        }
+
+        agent.freeSockets = {
+          'api.notion.com:443': [],
+        }
+
+        agent.requests = {
+          'example.com:443': [],
+        }
+
+        const stats = getAgentStats()
+
+        // Should handle empty arrays
+        expect(stats.sockets).to.equal(0)
+        expect(stats.freeSockets).to.equal(0)
+        expect(stats.requests).to.equal(0)
+      } finally {
+        agent.sockets = originalSockets
+        agent.freeSockets = originalFreeSockets
+        agent.requests = originalRequests
+      }
+    })
+
+    it('should handle agent with null/undefined socket arrays', () => {
+      const agent = httpsAgent as any
+      const originalSockets = agent.sockets
+      const originalFreeSockets = agent.freeSockets
+      const originalRequests = agent.requests
+
+      try {
+        // Simulate null/undefined values
+        agent.sockets = {
+          'localhost:443': null,
+          'api.notion.com:443': undefined,
+        }
+
+        agent.freeSockets = {
+          'localhost:443': null,
+        }
+
+        agent.requests = {
+          'api.notion.com:443': undefined,
+        }
+
+        const stats = getAgentStats()
+
+        // Should handle null/undefined gracefully
+        expect(stats.sockets).to.equal(0)
+        expect(stats.freeSockets).to.equal(0)
+        expect(stats.requests).to.equal(0)
+      } finally {
+        agent.sockets = originalSockets
+        agent.freeSockets = originalFreeSockets
+        agent.requests = originalRequests
+      }
+    })
+
+    it('should handle completely missing socket objects', () => {
+      const agent = httpsAgent as any
+      const originalSockets = agent.sockets
+      const originalFreeSockets = agent.freeSockets
+      const originalRequests = agent.requests
+
+      try {
+        // Remove socket objects entirely
+        delete agent.sockets
+        delete agent.freeSockets
+        delete agent.requests
+
+        const stats = getAgentStats()
+
+        // Should handle missing objects gracefully
+        expect(stats.sockets).to.equal(0)
+        expect(stats.freeSockets).to.equal(0)
+        expect(stats.requests).to.equal(0)
+      } finally {
+        agent.sockets = originalSockets
+        agent.freeSockets = originalFreeSockets
+        agent.requests = originalRequests
+      }
+    })
+  })
+
+  describe('getAgentConfig() with nullish coalescing', () => {
+    it('should use fallback values when agent properties are undefined', () => {
+      const agent = httpsAgent as any
+      const originalKeepAlive = agent.keepAlive
+      const originalKeepAliveMsecs = agent.keepAliveMsecs
+      const originalMaxSockets = agent.maxSockets
+      const originalMaxFreeSockets = agent.maxFreeSockets
+
+      try {
+        // Set properties to undefined
+        agent.keepAlive = undefined
+        agent.keepAliveMsecs = undefined
+        agent.maxSockets = undefined
+        agent.maxFreeSockets = undefined
+
+        const config = getAgentConfig()
+
+        // Should use fallback values
+        expect(config.keepAlive).to.equal(false)
+        expect(config.keepAliveMsecs).to.equal(1000)
+        expect(config.maxSockets).to.equal(Infinity)
+        expect(config.maxFreeSockets).to.equal(256)
+      } finally {
+        agent.keepAlive = originalKeepAlive
+        agent.keepAliveMsecs = originalKeepAliveMsecs
+        agent.maxSockets = originalMaxSockets
+        agent.maxFreeSockets = originalMaxFreeSockets
+      }
+    })
+
+    it('should use fallback values when agent properties are null', () => {
+      const agent = httpsAgent as any
+      const originalKeepAlive = agent.keepAlive
+      const originalKeepAliveMsecs = agent.keepAliveMsecs
+      const originalMaxSockets = agent.maxSockets
+      const originalMaxFreeSockets = agent.maxFreeSockets
+
+      try {
+        // Set properties to null
+        agent.keepAlive = null
+        agent.keepAliveMsecs = null
+        agent.maxSockets = null
+        agent.maxFreeSockets = null
+
+        const config = getAgentConfig()
+
+        // Should use fallback values
+        expect(config.keepAlive).to.equal(false)
+        expect(config.keepAliveMsecs).to.equal(1000)
+        expect(config.maxSockets).to.equal(Infinity)
+        expect(config.maxFreeSockets).to.equal(256)
+      } finally {
+        agent.keepAlive = originalKeepAlive
+        agent.keepAliveMsecs = originalKeepAliveMsecs
+        agent.maxSockets = originalMaxSockets
+        agent.maxFreeSockets = originalMaxFreeSockets
+      }
+    })
+
+    it('should preserve falsy values that are not null/undefined', () => {
+      const agent = httpsAgent as any
+      const originalKeepAlive = agent.keepAlive
+      const originalKeepAliveMsecs = agent.keepAliveMsecs
+      const originalMaxSockets = agent.maxSockets
+      const originalMaxFreeSockets = agent.maxFreeSockets
+
+      try {
+        // Set properties to falsy values (0, false)
+        agent.keepAlive = false
+        agent.keepAliveMsecs = 0
+        agent.maxSockets = 0
+        agent.maxFreeSockets = 0
+
+        const config = getAgentConfig()
+
+        // Should preserve these values (nullish coalescing only checks null/undefined)
+        expect(config.keepAlive).to.equal(false)
+        expect(config.keepAliveMsecs).to.equal(0)
+        expect(config.maxSockets).to.equal(0)
+        expect(config.maxFreeSockets).to.equal(0)
+      } finally {
+        agent.keepAlive = originalKeepAlive
+        agent.keepAliveMsecs = originalKeepAliveMsecs
+        agent.maxSockets = originalMaxSockets
+        agent.maxFreeSockets = originalMaxFreeSockets
+      }
+    })
+  })
+
+  describe('REQUEST_TIMEOUT constant', () => {
+    it('should be exported and accessible', () => {
+      expect(REQUEST_TIMEOUT).to.exist
+      expect(REQUEST_TIMEOUT).to.be.a('number')
+    })
+
+    it('should match the value in getAgentConfig', () => {
+      const config = getAgentConfig()
+      expect(config.requestTimeout).to.equal(REQUEST_TIMEOUT)
+    })
+
+    it('should be greater than zero', () => {
+      expect(REQUEST_TIMEOUT).to.be.greaterThan(0)
+    })
+
+    it('should match parsed environment variable or default', () => {
+      const expected = parseInt(process.env.NOTION_CLI_HTTP_TIMEOUT || '30000', 10)
+      expect(REQUEST_TIMEOUT).to.equal(expected)
     })
   })
 })
