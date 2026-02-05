@@ -9,12 +9,20 @@ The project now has **automated npm publishing** via GitHub Actions!
 #### 1. Create npm Access Token
 1. Go to https://www.npmjs.com/settings/YOUR_USERNAME/tokens
 2. Click "Generate New Token" → "Granular Access Token"
-3. Name: `GitHub Actions - notion-cli`
-4. Expiration: 1 year (or No expiration)
-5. Packages and scopes:
-   - Select `@coastal-programs/notion-cli`
-   - Permission: `Read and Write`
-6. Copy the token (starts with `npm_...`)
+3. Fill out the form:
+   - **Token name**: `GitHub Actions - notion-cli CI/CD`
+   - **Description**: `Automated publishing token for CI/CD`
+   - **✅ Bypass two-factor authentication (2FA)**: **CHECK THIS BOX** ← Critical for automation!
+   - **Allowed IP ranges**: Leave empty (GitHub Actions uses dynamic IPs)
+   - **Expiration**: 90 days (maximum for write tokens)
+4. **Packages and scopes**:
+   - Change permissions dropdown to: **"Read and write"**
+   - Select package: `@coastal-programs/notion-cli`
+5. **Organizations**: Leave as "No access"
+6. Click "Generate token"
+7. **Copy the token immediately** (starts with `npm_...`) - you won't see it again!
+
+**⚠️ Important**: The "Bypass 2FA" checkbox is essential! Without it, automated publishing will fail with OTP errors even if you have a valid token.
 
 #### 2. Add Token to GitHub Secrets
 1. Go to https://github.com/Coastal-Programs/notion-cli/settings/secrets/actions
