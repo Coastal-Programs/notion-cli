@@ -4,6 +4,7 @@ exports.mapPageStructure = exports.retrievePageRecursive = exports.CircuitBreake
 const client_1 = require("@notionhq/client");
 const cache_1 = require("./cache");
 const retry_1 = require("./retry");
+const deduplication_1 = require("./deduplication");
 exports.client = new client_1.Client({
     auth: process.env.NOTION_TOKEN,
     logLevel: process.env.DEBUG ? client_1.LogLevel.DEBUG : null,
@@ -19,10 +20,10 @@ const fetchWithRetry = async (fn, retries = 3) => {
 };
 exports.fetchWithRetry = fetchWithRetry;
 /**
- * Cached wrapper for API calls with retry logic
+ * Cached wrapper for API calls with retry logic and deduplication
  */
 async function cachedFetch(cacheType, cacheKey, fetchFn, options = {}) {
-    const { cacheTtl, skipCache = false, retryConfig } = options;
+    const { cacheTtl, skipCache = false, skipDedup = false, retryConfig } = options;
     // Check cache first (unless skipped or cache disabled)
     if (!skipCache) {
         const cached = cache_1.cacheManager.get(cacheType, cacheKey);
@@ -36,11 +37,26 @@ async function cachedFetch(cacheType, cacheKey, fetchFn, options = {}) {
             console.log(`Cache MISS: ${cacheType}:${cacheKey}`);
         }
     }
-    // Fetch with retry logic
-    const data = await (0, retry_1.fetchWithRetry)(fetchFn, {
-        config: retryConfig,
-        context: `${cacheType}:${cacheKey}`,
-    });
+    // Generate deduplication key
+    const dedupKey = `${cacheType}:${JSON.stringify(cacheKey)}`;
+    // Wrap fetch function with deduplication (unless disabled)
+    const dedupEnabled = process.env.NOTION_CLI_DEDUP_ENABLED !== 'false' && !skipDedup;
+    const fetchWithDedup = dedupEnabled
+        ? () => deduplication_1.deduplicationManager.execute(dedupKey, async () => {
+            if (process.env.DEBUG) {
+                console.log(`Dedup MISS: ${dedupKey}`);
+            }
+            return (0, retry_1.fetchWithRetry)(fetchFn, {
+                config: retryConfig,
+                context: `${cacheType}:${cacheKey}`,
+            });
+        })
+        : () => (0, retry_1.fetchWithRetry)(fetchFn, {
+            config: retryConfig,
+            context: `${cacheType}:${cacheKey}`,
+        });
+    // Execute fetch (with or without deduplication)
+    const data = await fetchWithDedup();
     // Store in cache
     if (!skipCache) {
         cache_1.cacheManager.set(cacheType, data, cacheTtl, cacheKey);

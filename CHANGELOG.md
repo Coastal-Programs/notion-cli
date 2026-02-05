@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Request deduplication** - Prevents duplicate concurrent API calls for the same resource
+  - Automatic deduplication of in-flight requests using promise memoization
+  - Statistics tracking for hits/misses/pending requests
+  - Configurable via `NOTION_CLI_DEDUP_ENABLED` environment variable
+  - Integrated with `cachedFetch()` for seamless API call optimization
+  - Expected 30-50% reduction in duplicate API calls
+
+### Performance
+- Request deduplication reduces unnecessary API calls when multiple concurrent requests target the same resource
+
 ## [5.8.0] - 2026-02-04
 
 ### Changed

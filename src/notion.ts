@@ -18,6 +18,7 @@ import {
 } from '@notionhq/client/build/src/api-endpoints'
 import { cacheManager } from './cache'
 import { fetchWithRetry as enhancedFetchWithRetry, RetryConfig } from './retry'
+import { deduplicationManager } from './deduplication'
 
 export const client = new Client({
   auth: process.env.NOTION_TOKEN,
@@ -38,7 +39,7 @@ export const fetchWithRetry = async (
 }
 
 /**
- * Cached wrapper for API calls with retry logic
+ * Cached wrapper for API calls with retry logic and deduplication
  */
 async function cachedFetch<T>(
   cacheType: string,
@@ -47,10 +48,11 @@ async function cachedFetch<T>(
   options: {
     cacheTtl?: number
     skipCache?: boolean
+    skipDedup?: boolean
     retryConfig?: Partial<RetryConfig>
   } = {}
 ): Promise<T> {
-  const { cacheTtl, skipCache = false, retryConfig } = options
+  const { cacheTtl, skipCache = false, skipDedup = false, retryConfig } = options
 
   // Check cache first (unless skipped or cache disabled)
   if (!skipCache) {
@@ -66,11 +68,28 @@ async function cachedFetch<T>(
     }
   }
 
-  // Fetch with retry logic
-  const data = await enhancedFetchWithRetry(fetchFn, {
-    config: retryConfig,
-    context: `${cacheType}:${cacheKey}`,
-  })
+  // Generate deduplication key
+  const dedupKey = `${cacheType}:${JSON.stringify(cacheKey)}`
+
+  // Wrap fetch function with deduplication (unless disabled)
+  const dedupEnabled = process.env.NOTION_CLI_DEDUP_ENABLED !== 'false' && !skipDedup
+  const fetchWithDedup = dedupEnabled
+    ? () => deduplicationManager.execute(dedupKey, async () => {
+        if (process.env.DEBUG) {
+          console.log(`Dedup MISS: ${dedupKey}`)
+        }
+        return enhancedFetchWithRetry(fetchFn, {
+          config: retryConfig,
+          context: `${cacheType}:${cacheKey}`,
+        })
+      })
+    : () => enhancedFetchWithRetry(fetchFn, {
+        config: retryConfig,
+        context: `${cacheType}:${cacheKey}`,
+      })
+
+  // Execute fetch (with or without deduplication)
+  const data = await fetchWithDedup()
 
   // Store in cache
   if (!skipCache) {
