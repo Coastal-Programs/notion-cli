@@ -13,6 +13,22 @@ import {
 
 describe('Cache Manager', () => {
   let cache: CacheManager
+  let originalDiskCacheEnabled: string | undefined
+
+  before(() => {
+    // Disable disk cache for unit tests
+    originalDiskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED
+    process.env.NOTION_CLI_DISK_CACHE_ENABLED = 'false'
+  })
+
+  after(() => {
+    // Restore original disk cache setting
+    if (originalDiskCacheEnabled === undefined) {
+      delete process.env.NOTION_CLI_DISK_CACHE_ENABLED
+    } else {
+      process.env.NOTION_CLI_DISK_CACHE_ENABLED = originalDiskCacheEnabled
+    }
+  })
 
   beforeEach(() => {
     // Create a fresh cache instance for each test
@@ -31,24 +47,24 @@ describe('Cache Manager', () => {
   })
 
   describe('Basic Operations', () => {
-    it('should store and retrieve values', () => {
+    it('should store and retrieve values', async () => {
       const data = { id: '123', name: 'test' }
       cache.set('dataSource', data, undefined, '123')
 
-      const retrieved = cache.get('dataSource', '123')
+      const retrieved = await cache.get('dataSource', '123')
       expect(retrieved).to.deep.equal(data)
     })
 
-    it('should return null for non-existent keys', () => {
-      const retrieved = cache.get('dataSource', 'non-existent')
+    it('should return null for non-existent keys', async () => {
+      const retrieved = await cache.get('dataSource', 'non-existent')
       expect(retrieved).to.be.null
     })
 
-    it('should handle multiple identifiers', () => {
+    it('should handle multiple identifiers', async () => {
       const data = { content: 'test' }
       cache.set('block', data, undefined, 'parent-id', 'block-id')
 
-      const retrieved = cache.get('block', 'parent-id', 'block-id')
+      const retrieved = await cache.get('block', 'parent-id', 'block-id')
       expect(retrieved).to.deep.equal(data)
     })
   })
@@ -59,14 +75,14 @@ describe('Cache Manager', () => {
       cache.set('dataSource', data, 100, '123') // 100ms TTL
 
       // Should be available immediately
-      let retrieved = cache.get('dataSource', '123')
+      let retrieved = await cache.get('dataSource', '123')
       expect(retrieved).to.not.be.null
 
       // Wait for TTL to expire
       await new Promise(resolve => setTimeout(resolve, 150))
 
       // Should be expired
-      retrieved = cache.get('dataSource', '123')
+      retrieved = await cache.get('dataSource', '123')
       expect(retrieved).to.be.null
     })
 
@@ -76,68 +92,68 @@ describe('Cache Manager', () => {
 
       await new Promise(resolve => setTimeout(resolve, 75))
 
-      const retrieved = cache.get('dataSource', '123')
+      const retrieved = await cache.get('dataSource', '123')
       expect(retrieved).to.be.null
     })
   })
 
   describe('Cache Invalidation', () => {
-    it('should invalidate specific entries', () => {
+    it('should invalidate specific entries', async () => {
       cache.set('dataSource', { id: '1' }, undefined, '1')
       cache.set('dataSource', { id: '2' }, undefined, '2')
 
       cache.invalidate('dataSource', '1')
 
-      expect(cache.get('dataSource', '1')).to.be.null
-      expect(cache.get('dataSource', '2')).to.not.be.null
+      expect(await cache.get('dataSource', '1')).to.be.null
+      expect(await cache.get('dataSource', '2')).to.not.be.null
     })
 
-    it('should invalidate all entries of a type', () => {
+    it('should invalidate all entries of a type', async () => {
       cache.set('dataSource', { id: '1' }, undefined, '1')
       cache.set('dataSource', { id: '2' }, undefined, '2')
       cache.set('user', { id: '3' }, undefined, '3')
 
       cache.invalidate('dataSource')
 
-      expect(cache.get('dataSource', '1')).to.be.null
-      expect(cache.get('dataSource', '2')).to.be.null
-      expect(cache.get('user', '3')).to.not.be.null
+      expect(await cache.get('dataSource', '1')).to.be.null
+      expect(await cache.get('dataSource', '2')).to.be.null
+      expect(await cache.get('user', '3')).to.not.be.null
     })
 
-    it('should clear all entries', () => {
+    it('should clear all entries', async () => {
       cache.set('dataSource', { id: '1' }, undefined, '1')
       cache.set('user', { id: '2' }, undefined, '2')
 
       cache.clear()
 
-      expect(cache.get('dataSource', '1')).to.be.null
-      expect(cache.get('user', '2')).to.be.null
+      expect(await cache.get('dataSource', '1')).to.be.null
+      expect(await cache.get('user', '2')).to.be.null
       expect(cache.getStats().size).to.equal(0)
     })
   })
 
   describe('Cache Statistics', () => {
-    it('should track hits and misses', () => {
+    it('should track hits and misses', async () => {
       cache.set('dataSource', { id: '1' }, undefined, '1')
 
       // Hit
-      cache.get('dataSource', '1')
+      await cache.get('dataSource', '1')
       // Miss
-      cache.get('dataSource', '2')
+      await cache.get('dataSource', '2')
       // Hit
-      cache.get('dataSource', '1')
+      await cache.get('dataSource', '1')
 
       const stats = cache.getStats()
       expect(stats.hits).to.equal(2)
       expect(stats.misses).to.equal(1)
     })
 
-    it('should calculate hit rate correctly', () => {
+    it('should calculate hit rate correctly', async () => {
       cache.set('dataSource', { id: '1' }, undefined, '1')
 
-      cache.get('dataSource', '1') // Hit
-      cache.get('dataSource', '1') // Hit
-      cache.get('dataSource', '2') // Miss
+      await cache.get('dataSource', '1') // Hit
+      await cache.get('dataSource', '1') // Hit
+      await cache.get('dataSource', '2') // Miss
 
       const hitRate = cache.getHitRate()
       expect(hitRate).to.be.closeTo(0.667, 0.01) // 2/3
@@ -158,7 +174,7 @@ describe('Cache Manager', () => {
   })
 
   describe('Size Limits', () => {
-    it('should evict oldest entries when full', () => {
+    it('should evict oldest entries when full', async () => {
       // Fill cache to capacity (10 entries)
       for (let i = 0; i < 10; i++) {
         cache.set('dataSource', { id: i }, undefined, String(i))
@@ -170,17 +186,17 @@ describe('Cache Manager', () => {
       cache.set('dataSource', { id: 10 }, undefined, '10')
 
       expect(cache.getStats().size).to.equal(10)
-      expect(cache.get('dataSource', '0')).to.be.null // Oldest evicted
-      expect(cache.get('dataSource', '10')).to.not.be.null // Newest exists
+      expect(await cache.get('dataSource', '0')).to.be.null // Oldest evicted
+      expect(await cache.get('dataSource', '10')).to.not.be.null // Newest exists
     })
   })
 
   describe('Configuration', () => {
-    it('should respect enabled flag', () => {
+    it('should respect enabled flag', async () => {
       const disabledCache = new CacheManager({ enabled: false })
 
       disabledCache.set('dataSource', { id: '1' }, undefined, '1')
-      const retrieved = disabledCache.get('dataSource', '1')
+      const retrieved = await disabledCache.get('dataSource', '1')
 
       expect(retrieved).to.be.null
     })
