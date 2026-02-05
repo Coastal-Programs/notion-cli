@@ -29,6 +29,10 @@ export declare abstract class BaseCommand extends Command {
      */
     init(): Promise<void>;
     /**
+     * Cleanup hook - flushes disk cache before exit
+     */
+    finally(error?: Error): Promise<void>;
+    /**
      * Determine if envelope should be used based on flags
      */
     protected checkEnvelopeUsage(flags: Record<string, unknown>): boolean;

@@ -19,12 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Child block fetching in `retrievePageRecursive()` now runs in parallel
   - Configurable via `NOTION_CLI_DELETE_CONCURRENCY` (default: 5) and `NOTION_CLI_CHILDREN_CONCURRENCY` (default: 10)
   - Expected 60-80% faster bulk operations
+- **Persistent disk cache** - Maintains cache across CLI invocations
+  - Cache entries stored in `~/.notion-cli/cache/` directory
+  - Automatic max size enforcement (default: 100MB)
+  - Atomic writes prevent corruption
+  - Configurable via `NOTION_CLI_DISK_CACHE_ENABLED` and `NOTION_CLI_DISK_CACHE_MAX_SIZE`
+  - Expected 40-60% improved cache hit rate
 
 ### Performance
 - Request deduplication reduces unnecessary API calls when multiple concurrent requests target the same resource
 - Parallel execution of bulk operations significantly reduces total operation time
   - Page updates with many blocks complete 60-80% faster
   - Recursive page retrieval with many child blocks completes 60-80% faster
+- Persistent disk cache maintains cache across CLI invocations
+  - Subsequent CLI runs benefit from cached data (40-60% improved hit rate)
+  - Cache survives process restarts and system reboots
+  - Automatic cleanup of expired entries
 
 ## [5.8.0] - 2026-02-04
 

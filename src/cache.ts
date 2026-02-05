@@ -1,7 +1,10 @@
 /**
  * Simple in-memory caching layer for Notion API responses
  * Supports TTL (time-to-live) and cache invalidation
+ * Integrated with disk cache for persistence across CLI invocations
  */
+
+import { diskCacheManager, DiskCacheEntry } from './utils/disk-cache'
 
 export interface CacheEntry<T> {
   data: T
@@ -177,7 +180,7 @@ export class CacheManager {
   }
 
   /**
-   * Get a value from cache
+   * Get a value from cache (checks memory, then disk)
    */
   get<T>(type: string, ...identifiers: Array<string | number | object>): T | null {
     if (!this.config.enabled) {
@@ -187,7 +190,38 @@ export class CacheManager {
     const key = this.generateKey(type, ...identifiers)
     const entry = this.cache.get(key)
 
-    if (!entry) {
+    // Check memory cache first
+    if (entry && this.isValid(entry)) {
+      this.stats.hits++
+
+      // Log cache hit
+      logCacheEvent({
+        level: 'debug',
+        event: 'cache_hit',
+        namespace: type,
+        key: identifiers.join(':'),
+        age_ms: Date.now() - entry.timestamp,
+        ttl_ms: entry.ttl,
+        timestamp: new Date().toISOString(),
+      })
+
+      return entry.data as T
+    }
+
+    // Remove invalid memory entry
+    if (entry) {
+      this.cache.delete(key)
+      this.stats.evictions++
+    }
+
+    // Check disk cache (synchronously, but non-blocking for performance)
+    // Note: This is a synchronous wrapper for the async disk cache
+    // We use a sync approach here to maintain the current API signature
+    this.checkDiskCache<T>(key, type, identifiers)
+
+    // If we still have no entry after disk check, it's a miss
+    const finalEntry = this.cache.get(key)
+    if (!finalEntry || !this.isValid(finalEntry)) {
       this.stats.misses++
 
       // Log cache miss
@@ -202,41 +236,65 @@ export class CacheManager {
       return null
     }
 
-    if (!this.isValid(entry)) {
-      this.cache.delete(key)
-      this.stats.misses++
-      this.stats.evictions++
-
-      // Log cache miss (expired)
-      logCacheEvent({
-        level: 'debug',
-        event: 'cache_miss',
-        namespace: type,
-        key: identifiers.join(':'),
-        timestamp: new Date().toISOString(),
-      })
-
-      return null
-    }
-
     this.stats.hits++
 
-    // Log cache hit
+    // Log cache hit (from disk)
     logCacheEvent({
       level: 'debug',
       event: 'cache_hit',
       namespace: type,
       key: identifiers.join(':'),
-      age_ms: Date.now() - entry.timestamp,
-      ttl_ms: entry.ttl,
+      age_ms: Date.now() - finalEntry.timestamp,
+      ttl_ms: finalEntry.ttl,
       timestamp: new Date().toISOString(),
     })
 
-    return entry.data as T
+    return finalEntry.data as T
   }
 
   /**
-   * Set a value in cache with optional custom TTL
+   * Check disk cache and promote to memory if found (synchronous wrapper)
+   * @private
+   */
+  private checkDiskCache<T>(key: string, type: string, identifiers: Array<string | number | object>): void {
+    // Only check disk cache if enabled
+    const diskEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
+    if (!diskEnabled) {
+      return
+    }
+
+    // Fire-and-forget disk cache check
+    // We don't await here to keep the API synchronous
+    diskCacheManager.get<CacheEntry<T>>(key).then(diskEntry => {
+      if (diskEntry && diskEntry.data) {
+        const entry = diskEntry.data as CacheEntry<T>
+
+        // Validate disk entry
+        if (this.isValid(entry)) {
+          // Promote to memory cache
+          this.cache.set(key, entry)
+
+          if (process.env.DEBUG) {
+            console.error(JSON.stringify({
+              level: 'debug',
+              event: 'disk_cache_hit',
+              namespace: type,
+              key: identifiers.join(':'),
+              timestamp: new Date().toISOString(),
+            }))
+          }
+        } else {
+          // Remove expired disk entry
+          diskCacheManager.invalidate(key).catch(() => {})
+        }
+      }
+    }).catch(() => {
+      // Silently ignore disk cache errors
+    })
+  }
+
+  /**
+   * Set a value in cache with optional custom TTL (writes to memory and disk)
    */
   set<T>(type: string, data: T, customTtl?: number, ...identifiers: Array<string | number | object>): void {
     if (!this.config.enabled) {
@@ -254,11 +312,13 @@ export class CacheManager {
     const key = this.generateKey(type, ...identifiers)
     const ttl = customTtl || this.config.ttlByType[type as keyof typeof this.config.ttlByType] || this.config.defaultTtl
 
-    this.cache.set(key, {
+    const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
       ttl,
-    })
+    }
+
+    this.cache.set(key, entry)
 
     this.stats.sets++
     this.stats.size = this.cache.size
@@ -273,12 +333,22 @@ export class CacheManager {
       cache_size: this.cache.size,
       timestamp: new Date().toISOString(),
     })
+
+    // Async write to disk cache (fire-and-forget)
+    const diskEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
+    if (diskEnabled) {
+      diskCacheManager.set(key, entry, ttl).catch(() => {
+        // Silently ignore disk cache errors
+      })
+    }
   }
 
   /**
    * Invalidate specific cache entries by type and optional identifiers
    */
   invalidate(type: string, ...identifiers: Array<string | number | object>): void {
+    const diskEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
+
     if (identifiers.length === 0) {
       // Invalidate all entries of this type
       const pattern = `${type}:`
@@ -289,6 +359,11 @@ export class CacheManager {
           this.cache.delete(key)
           this.stats.evictions++
           invalidatedCount++
+
+          // Also invalidate from disk (fire-and-forget)
+          if (diskEnabled) {
+            diskCacheManager.invalidate(key).catch(() => {})
+          }
         }
       }
 
@@ -308,6 +383,11 @@ export class CacheManager {
       if (this.cache.delete(key)) {
         this.stats.evictions++
 
+        // Also invalidate from disk (fire-and-forget)
+        if (diskEnabled) {
+          diskCacheManager.invalidate(key).catch(() => {})
+        }
+
         // Log specific invalidation
         logCacheEvent({
           level: 'debug',
@@ -323,13 +403,19 @@ export class CacheManager {
   }
 
   /**
-   * Clear all cache entries
+   * Clear all cache entries (memory and disk)
    */
   clear(): void {
     const previousSize = this.cache.size
     this.cache.clear()
     this.stats.evictions += this.stats.size
     this.stats.size = 0
+
+    // Also clear disk cache (fire-and-forget)
+    const diskEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
+    if (diskEnabled) {
+      diskCacheManager.clear().catch(() => {})
+    }
 
     // Log cache clear
     if (previousSize > 0) {

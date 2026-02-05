@@ -1,0 +1,291 @@
+"use strict";
+/**
+ * Disk Cache Manager
+ *
+ * Provides persistent caching to disk, maintaining cache across CLI invocations.
+ * Cache entries are stored in ~/.notion-cli/cache/ directory.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.diskCacheManager = exports.DiskCacheManager = void 0;
+const fs = require("fs/promises");
+const path = require("path");
+const os = require("os");
+const crypto = require("crypto");
+const CACHE_DIR_NAME = '.notion-cli';
+const CACHE_SUBDIR = 'cache';
+const DEFAULT_MAX_SIZE = 100 * 1024 * 1024; // 100MB
+const DEFAULT_SYNC_INTERVAL = 5000; // 5 seconds
+class DiskCacheManager {
+    constructor(options = {}) {
+        this.dirtyKeys = new Set();
+        this.syncTimer = null;
+        this.initialized = false;
+        this.cacheDir = options.cacheDir || path.join(os.homedir(), CACHE_DIR_NAME, CACHE_SUBDIR);
+        this.maxSize = options.maxSize || parseInt(process.env.NOTION_CLI_DISK_CACHE_MAX_SIZE || String(DEFAULT_MAX_SIZE), 10);
+        this.syncInterval = options.syncInterval || parseInt(process.env.NOTION_CLI_DISK_CACHE_SYNC_INTERVAL || String(DEFAULT_SYNC_INTERVAL), 10);
+    }
+    /**
+     * Initialize disk cache (create directory, start sync timer)
+     */
+    async initialize() {
+        if (this.initialized) {
+            return;
+        }
+        await this.ensureCacheDir();
+        await this.enforceMaxSize();
+        // Start periodic sync timer
+        if (this.syncInterval > 0) {
+            this.syncTimer = setInterval(() => {
+                this.sync().catch(error => {
+                    if (process.env.DEBUG) {
+                        console.warn('Disk cache sync error:', error);
+                    }
+                });
+            }, this.syncInterval);
+            // Don't keep the process alive
+            if (this.syncTimer.unref) {
+                this.syncTimer.unref();
+            }
+        }
+        this.initialized = true;
+    }
+    /**
+     * Get a cache entry from disk
+     */
+    async get(key) {
+        try {
+            const filePath = this.getFilePath(key);
+            const content = await fs.readFile(filePath, 'utf-8');
+            const entry = JSON.parse(content);
+            // Check if expired
+            if (Date.now() > entry.expiresAt) {
+                // Delete expired entry
+                await this.invalidate(key);
+                return null;
+            }
+            return entry;
+        }
+        catch (error) {
+            if (error.code === 'ENOENT') {
+                return null;
+            }
+            if (process.env.DEBUG) {
+                console.warn(`Failed to read cache entry ${key}:`, error.message);
+            }
+            return null;
+        }
+    }
+    /**
+     * Set a cache entry to disk
+     */
+    async set(key, data, ttl) {
+        const entry = {
+            key,
+            data,
+            expiresAt: Date.now() + ttl,
+            createdAt: Date.now(),
+            size: JSON.stringify(data).length,
+        };
+        const filePath = this.getFilePath(key);
+        const tmpPath = `${filePath}.tmp`;
+        try {
+            // Write to temporary file
+            await fs.writeFile(tmpPath, JSON.stringify(entry), 'utf-8');
+            // Atomic rename
+            await fs.rename(tmpPath, filePath);
+            this.dirtyKeys.delete(key);
+        }
+        catch (error) {
+            // Clean up temp file if it exists
+            try {
+                await fs.unlink(tmpPath);
+            }
+            catch {
+                // Ignore cleanup errors
+            }
+            if (process.env.DEBUG) {
+                console.warn(`Failed to write cache entry ${key}:`, error.message);
+            }
+        }
+        // Check if we need to enforce size limits
+        const stats = await this.getStats();
+        if (stats.totalSize > this.maxSize) {
+            await this.enforceMaxSize();
+        }
+    }
+    /**
+     * Invalidate (delete) a cache entry
+     */
+    async invalidate(key) {
+        try {
+            const filePath = this.getFilePath(key);
+            await fs.unlink(filePath);
+            this.dirtyKeys.delete(key);
+        }
+        catch (error) {
+            if (error.code !== 'ENOENT') {
+                if (process.env.DEBUG) {
+                    console.warn(`Failed to delete cache entry ${key}:`, error.message);
+                }
+            }
+        }
+    }
+    /**
+     * Clear all cache entries
+     */
+    async clear() {
+        try {
+            const files = await fs.readdir(this.cacheDir);
+            await Promise.all(files
+                .filter(file => !file.endsWith('.tmp'))
+                .map(file => fs.unlink(path.join(this.cacheDir, file)).catch(() => { })));
+            this.dirtyKeys.clear();
+        }
+        catch (error) {
+            if (error.code !== 'ENOENT') {
+                if (process.env.DEBUG) {
+                    console.warn('Failed to clear cache:', error.message);
+                }
+            }
+        }
+    }
+    /**
+     * Sync dirty entries to disk
+     */
+    async sync() {
+        // In our implementation, writes are immediate (no write buffering)
+        // This method is here for API compatibility
+        this.dirtyKeys.clear();
+    }
+    /**
+     * Shutdown (flush and cleanup)
+     */
+    async shutdown() {
+        if (this.syncTimer) {
+            clearInterval(this.syncTimer);
+            this.syncTimer = null;
+        }
+        await this.sync();
+        this.initialized = false;
+    }
+    /**
+     * Get cache statistics
+     */
+    async getStats() {
+        try {
+            const files = await fs.readdir(this.cacheDir);
+            const entries = [];
+            for (const file of files) {
+                if (file.endsWith('.tmp')) {
+                    continue;
+                }
+                try {
+                    const content = await fs.readFile(path.join(this.cacheDir, file), 'utf-8');
+                    const entry = JSON.parse(content);
+                    entries.push(entry);
+                }
+                catch {
+                    // Skip corrupted entries
+                }
+            }
+            const totalSize = entries.reduce((sum, entry) => sum + entry.size, 0);
+            const timestamps = entries.map(e => e.createdAt);
+            return {
+                totalEntries: entries.length,
+                totalSize,
+                oldestEntry: timestamps.length > 0 ? Math.min(...timestamps) : null,
+                newestEntry: timestamps.length > 0 ? Math.max(...timestamps) : null,
+            };
+        }
+        catch (error) {
+            return {
+                totalEntries: 0,
+                totalSize: 0,
+                oldestEntry: null,
+                newestEntry: null,
+            };
+        }
+    }
+    /**
+     * Enforce maximum cache size by removing oldest entries
+     */
+    async enforceMaxSize() {
+        try {
+            const files = await fs.readdir(this.cacheDir);
+            const entries = [];
+            // Load all entries
+            for (const file of files) {
+                if (file.endsWith('.tmp')) {
+                    continue;
+                }
+                try {
+                    const filePath = path.join(this.cacheDir, file);
+                    const content = await fs.readFile(filePath, 'utf-8');
+                    const entry = JSON.parse(content);
+                    // Remove expired entries
+                    if (Date.now() > entry.expiresAt) {
+                        await fs.unlink(filePath);
+                        continue;
+                    }
+                    entries.push({ file, entry });
+                }
+                catch {
+                    // Skip corrupted entries
+                }
+            }
+            // Calculate total size
+            const totalSize = entries.reduce((sum, { entry }) => sum + entry.size, 0);
+            // If under limit, we're done
+            if (totalSize <= this.maxSize) {
+                return;
+            }
+            // Sort by creation time (oldest first)
+            entries.sort((a, b) => a.entry.createdAt - b.entry.createdAt);
+            // Remove oldest entries until under limit
+            let currentSize = totalSize;
+            for (const { file, entry } of entries) {
+                if (currentSize <= this.maxSize) {
+                    break;
+                }
+                try {
+                    await fs.unlink(path.join(this.cacheDir, file));
+                    currentSize -= entry.size;
+                }
+                catch {
+                    // Skip deletion errors
+                }
+            }
+        }
+        catch (error) {
+            if (process.env.DEBUG) {
+                console.warn('Failed to enforce max size:', error.message);
+            }
+        }
+    }
+    /**
+     * Ensure cache directory exists
+     */
+    async ensureCacheDir() {
+        try {
+            await fs.mkdir(this.cacheDir, { recursive: true });
+        }
+        catch (error) {
+            if (error.code !== 'EEXIST') {
+                throw new Error(`Failed to create cache directory: ${error.message}`);
+            }
+        }
+    }
+    /**
+     * Get file path for a cache key
+     */
+    getFilePath(key) {
+        // Hash the key to create a safe filename
+        const hash = crypto.createHash('sha256').update(key).digest('hex');
+        return path.join(this.cacheDir, `${hash}.json`);
+    }
+}
+exports.DiskCacheManager = DiskCacheManager;
+/**
+ * Global singleton instance
+ */
+exports.diskCacheManager = new DiskCacheManager();
