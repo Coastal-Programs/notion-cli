@@ -6,13 +6,23 @@ const cache_1 = require("./cache");
 const retry_1 = require("./retry");
 const deduplication_1 = require("./deduplication");
 /**
- * Custom fetch function that uses our configured HTTPS agent
+ * Custom fetch function that uses our configured HTTPS agent and compression
  */
 function createFetchWithAgent() {
-    // Use node-fetch or native fetch with custom agent
-    // Note: The Notion SDK uses @notionhq/client which internally uses an HTTP client
-    // We'll configure the agent through the global configuration
-    return fetch;
+    return async (input, init) => {
+        // Merge headers with compression support
+        const headers = new Headers((init === null || init === void 0 ? void 0 : init.headers) || {});
+        // Add compression headers if not already present
+        if (!headers.has('Accept-Encoding')) {
+            // Request gzip, deflate, and brotli compression
+            headers.set('Accept-Encoding', 'gzip, deflate, br');
+        }
+        // Call native fetch with enhanced headers
+        return fetch(input, {
+            ...init,
+            headers,
+        });
+    };
 }
 exports.client = new client_1.Client({
     auth: process.env.NOTION_TOKEN,

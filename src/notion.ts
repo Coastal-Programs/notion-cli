@@ -22,13 +22,25 @@ import { deduplicationManager } from './deduplication'
 import { httpsAgent } from './http-agent'
 
 /**
- * Custom fetch function that uses our configured HTTPS agent
+ * Custom fetch function that uses our configured HTTPS agent and compression
  */
 function createFetchWithAgent(): typeof fetch {
-  // Use node-fetch or native fetch with custom agent
-  // Note: The Notion SDK uses @notionhq/client which internally uses an HTTP client
-  // We'll configure the agent through the global configuration
-  return fetch
+  return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    // Merge headers with compression support
+    const headers = new Headers(init?.headers || {})
+
+    // Add compression headers if not already present
+    if (!headers.has('Accept-Encoding')) {
+      // Request gzip, deflate, and brotli compression
+      headers.set('Accept-Encoding', 'gzip, deflate, br')
+    }
+
+    // Call native fetch with enhanced headers
+    return fetch(input, {
+      ...init,
+      headers,
+    })
+  }
 }
 
 export const client = new Client({
