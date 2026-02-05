@@ -26,19 +26,19 @@ describe('table-formatter', () => {
     mockPrintLine = (s: string) => outputLines.push(s)
   })
 
-  // Test fixtures
-  const simpleDatabases = [
+  // Test fixtures (reserved for future test expansion)
+  const _simpleDatabases = [
     { id: 'db-001', title: 'Projects', aliases: ['projects', 'proj'] },
     { id: 'db-002', title: 'Tasks', aliases: ['tasks'] },
     { id: 'db-003', title: 'Notes', aliases: [] },
   ]
 
-  const userList = [
+  const _userList = [
     { id: 'user-001', name: 'Alice', type: 'person' },
     { id: 'user-002', name: 'Bob', type: 'bot' },
   ]
 
-  const edgeCaseData = [
+  const _edgeCaseData = [
     { id: 'edge-001', name: 'Name, with comma', value: 'Has "quotes"' },
     { id: 'edge-002', name: null, value: undefined },
     { id: 'edge-003', name: '', value: 0 },

@@ -2,6 +2,7 @@ import { expect, test } from '@oclif/test'
 import * as nock from 'nock'
 import * as sinon from 'sinon'
 import { cacheManager } from '../../../dist/cache.js'
+import { diskCacheManager } from '../../../dist/utils/disk-cache.js'
 
 const DATABASE_ID = '11111111-2222-3333-4444-555555555555'
 const DATABASE_ID_NO_DASHES = DATABASE_ID.replace(/-/g, '')
@@ -32,6 +33,22 @@ const titleEmptyResponse = {
 
 describe('db:retrieve', () => {
   let processExitStub: sinon.SinonStub
+  let originalDiskCacheEnabled: string | undefined
+
+  before(() => {
+    // Disable disk cache for all tests in this suite
+    originalDiskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED
+    process.env.NOTION_CLI_DISK_CACHE_ENABLED = 'false'
+  })
+
+  after(() => {
+    // Restore disk cache setting
+    if (originalDiskCacheEnabled === undefined) {
+      delete process.env.NOTION_CLI_DISK_CACHE_ENABLED
+    } else {
+      process.env.NOTION_CLI_DISK_CACHE_ENABLED = originalDiskCacheEnabled
+    }
+  })
 
   beforeEach(async () => {
     // Clean all nock mocks and abort any pending requests
@@ -39,17 +56,20 @@ describe('db:retrieve', () => {
     nock.cleanAll()
     nock.restore()
     nock.activate()
-    // Clear cache to prevent test interference
+    // Clear both in-memory and disk cache
     cacheManager.clear()
-    // Disable cache by directly modifying the config (environment variables don't work after instantiation)
+    await diskCacheManager.clear()
+    // Disable cache by directly modifying the config
     ;(cacheManager as any).config.enabled = false
     // Stub process.exit to prevent tests from hanging
     processExitStub = sinon.stub(process, 'exit' as any)
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     nock.cleanAll()
     processExitStub.restore()
+    // Clear disk cache again
+    await diskCacheManager.clear()
     // Re-enable cache for other tests
     ;(cacheManager as any).config.enabled = true
   })

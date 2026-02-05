@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import * as fs from 'fs/promises'
 import * as path from 'path'
 import * as os from 'os'
-import { DiskCacheManager, DiskCacheEntry } from '../dist/utils/disk-cache.js'
+import { DiskCacheManager } from '../dist/utils/disk-cache.js'
 
 describe('DiskCacheManager', () => {
   let diskCache: DiskCacheManager
@@ -411,7 +411,6 @@ describe('DiskCacheManager', () => {
 
     it('should handle corrupted cache files gracefully', async () => {
       // Write corrupted file
-      const files = await fs.readdir(tmpDir)
       const corruptedPath = path.join(tmpDir, 'corrupted.json')
       await fs.writeFile(corruptedPath, '{invalid json', 'utf-8')
 
@@ -732,7 +731,6 @@ describe('DiskCacheManager', () => {
   describe('Error Handling', () => {
     it('should handle JSON parse errors gracefully', async () => {
       // Write invalid JSON to a cache file
-      const files = await fs.readdir(tmpDir)
       const testFile = path.join(tmpDir, 'invalid.json')
       await fs.writeFile(testFile, 'not valid json', 'utf-8')
 
@@ -787,7 +785,9 @@ describe('DiskCacheManager', () => {
         // If chmod doesn't work on this system, just skip
         try {
           await fs.chmod(tmpDir2, 0o755)
-        } catch {}
+        } catch {
+          // Intentionally ignore chmod errors on systems that don't support it
+        }
       }
 
       process.env.DEBUG = originalDebug
