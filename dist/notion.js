@@ -1,13 +1,46 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mapPageStructure = exports.retrievePageRecursive = exports.CircuitBreaker = exports.enhancedFetchWithRetry = exports.cacheManager = exports.search = exports.searchDb = exports.botUser = exports.listUser = exports.retrieveUser = exports.deleteBlock = exports.appendBlockChildren = exports.retrieveBlockChildren = exports.updateBlock = exports.retrieveBlock = exports.updatePage = exports.updatePageProps = exports.createPage = exports.retrievePageProperty = exports.retrievePage = exports.updateDataSource = exports.retrieveDataSource = exports.retrieveDb = exports.updateDb = exports.createDb = exports.fetchAllPagesInDS = exports.fetchWithRetry = exports.client = void 0;
+exports.mapPageStructure = exports.retrievePageRecursive = exports.CircuitBreaker = exports.enhancedFetchWithRetry = exports.cacheManager = exports.search = exports.searchDb = exports.botUser = exports.listUser = exports.retrieveUser = exports.deleteBlock = exports.appendBlockChildren = exports.retrieveBlockChildren = exports.updateBlock = exports.retrieveBlock = exports.updatePage = exports.updatePageProps = exports.createPage = exports.retrievePageProperty = exports.retrievePage = exports.updateDataSource = exports.retrieveDataSource = exports.retrieveDb = exports.updateDb = exports.createDb = exports.fetchAllPagesInDS = exports.fetchWithRetry = exports.BATCH_CONFIG = exports.client = void 0;
 const client_1 = require("@notionhq/client");
 const cache_1 = require("./cache");
 const retry_1 = require("./retry");
+const deduplication_1 = require("./deduplication");
+const http_agent_1 = require("./http-agent");
+/**
+ * Custom fetch function that uses our configured HTTPS agent and compression
+ */
+function createFetchWithAgent() {
+    return async (input, init) => {
+        // Merge headers with compression support
+        const headers = new Headers((init === null || init === void 0 ? void 0 : init.headers) || {});
+        // Add compression headers if not already present
+        if (!headers.has('Accept-Encoding')) {
+            // Request gzip, deflate, and brotli compression
+            headers.set('Accept-Encoding', 'gzip, deflate, br');
+        }
+        // Call native fetch with dispatcher (undici agent) and enhanced headers
+        return fetch(input, {
+            ...init,
+            headers,
+            // @ts-expect-error - dispatcher is supported but not in @types/node yet
+            dispatcher: http_agent_1.httpsAgent,
+        });
+    };
+}
 exports.client = new client_1.Client({
     auth: process.env.NOTION_TOKEN,
     logLevel: process.env.DEBUG ? client_1.LogLevel.DEBUG : null,
+    // Note: The @notionhq/client library uses its own HTTP client
+    // We configure the agent globally for Node.js HTTP(S) requests
+    fetch: createFetchWithAgent(),
 });
+/**
+ * Configuration for batch operations
+ */
+exports.BATCH_CONFIG = {
+    deleteConcurrency: parseInt(process.env.NOTION_CLI_DELETE_CONCURRENCY || '5', 10),
+    childrenConcurrency: parseInt(process.env.NOTION_CLI_CHILDREN_CONCURRENCY || '10', 10),
+};
 /**
  * Legacy fetchWithRetry for backward compatibility
  * @deprecated Use the enhanced retry logic from retry.ts
@@ -19,13 +52,13 @@ const fetchWithRetry = async (fn, retries = 3) => {
 };
 exports.fetchWithRetry = fetchWithRetry;
 /**
- * Cached wrapper for API calls with retry logic
+ * Cached wrapper for API calls with retry logic and deduplication
  */
 async function cachedFetch(cacheType, cacheKey, fetchFn, options = {}) {
-    const { cacheTtl, skipCache = false, retryConfig } = options;
+    const { cacheTtl, skipCache = false, skipDedup = false, retryConfig } = options;
     // Check cache first (unless skipped or cache disabled)
     if (!skipCache) {
-        const cached = cache_1.cacheManager.get(cacheType, cacheKey);
+        const cached = await cache_1.cacheManager.get(cacheType, cacheKey);
         if (cached !== null) {
             if (process.env.DEBUG) {
                 console.log(`Cache HIT: ${cacheType}:${cacheKey}`);
@@ -36,11 +69,26 @@ async function cachedFetch(cacheType, cacheKey, fetchFn, options = {}) {
             console.log(`Cache MISS: ${cacheType}:${cacheKey}`);
         }
     }
-    // Fetch with retry logic
-    const data = await (0, retry_1.fetchWithRetry)(fetchFn, {
-        config: retryConfig,
-        context: `${cacheType}:${cacheKey}`,
-    });
+    // Generate deduplication key
+    const dedupKey = `${cacheType}:${JSON.stringify(cacheKey)}`;
+    // Wrap fetch function with deduplication (unless disabled)
+    const dedupEnabled = process.env.NOTION_CLI_DEDUP_ENABLED !== 'false' && !skipDedup;
+    const fetchWithDedup = dedupEnabled
+        ? () => deduplication_1.deduplicationManager.execute(dedupKey, async () => {
+            if (process.env.DEBUG) {
+                console.log(`Dedup MISS: ${dedupKey}`);
+            }
+            return (0, retry_1.fetchWithRetry)(fetchFn, {
+                config: retryConfig,
+                context: `${cacheType}:${cacheKey}`,
+            });
+        })
+        : () => (0, retry_1.fetchWithRetry)(fetchFn, {
+            config: retryConfig,
+            context: `${cacheType}:${cacheKey}`,
+        });
+    // Execute fetch (with or without deduplication)
+    const data = await fetchWithDedup();
     // Store in cache
     if (!skipCache) {
         cache_1.cacheManager.set(cacheType, data, cacheTtl, cacheKey);
@@ -160,9 +208,17 @@ exports.updatePageProps = updatePageProps;
 const updatePage = async (pageId, blocks) => {
     // Get all blocks
     const blks = await (0, retry_1.fetchWithRetry)(() => exports.client.blocks.children.list({ block_id: pageId }), { context: `updatePage:list:${pageId}` });
-    // Delete all blocks
-    for (const blk of blks.results) {
-        await (0, retry_1.fetchWithRetry)(() => exports.client.blocks.delete({ block_id: blk.id }), { context: `updatePage:delete:${blk.id}` });
+    // Delete all blocks in parallel
+    if (blks.results.length > 0) {
+        const deleteResults = await (0, retry_1.batchWithRetry)(blks.results.map(blk => () => exports.client.blocks.delete({ block_id: blk.id })), {
+            concurrency: exports.BATCH_CONFIG.deleteConcurrency,
+            config: { maxRetries: 3 },
+        });
+        // Check for errors
+        const failures = deleteResults.filter(r => !r.success);
+        if (failures.length > 0) {
+            throw new Error(`Failed to delete ${failures.length} of ${blks.results.length} blocks`);
+        }
     }
     // Append new blocks
     const res = await (0, retry_1.fetchWithRetry)(() => exports.client.blocks.children.append({
@@ -304,14 +360,9 @@ const retrievePageRecursive = async (pageId, depth = 0, maxDepth = 3) => {
     const blocksResponse = await (0, exports.retrieveBlockChildren)(pageId);
     const blocks = blocksResponse.results || [];
     const warnings = [];
-    // Recursively fetch nested blocks
+    // Handle unsupported blocks (collect warnings)
     for (const block of blocks) {
-        // Skip partial blocks
-        if (!(0, client_1.isFullBlock)(block)) {
-            continue;
-        }
-        // Handle unsupported blocks
-        if (block.type === 'unsupported') {
+        if ((0, client_1.isFullBlock)(block) && block.type === 'unsupported') {
             warnings.push({
                 block_id: block.id,
                 type: 'unsupported',
@@ -319,29 +370,64 @@ const retrievePageRecursive = async (pageId, depth = 0, maxDepth = 3) => {
                 message: `Block type '${((_b = block.unsupported) === null || _b === void 0 ? void 0 : _b.type) || 'unknown'}' not supported by Notion API`,
                 has_children: block.has_children,
             });
-            continue;
         }
-        // Recursively fetch children for blocks that have them
-        if (block.has_children) {
+    }
+    // Collect blocks with children that need fetching
+    const blocksWithChildren = blocks.filter(block => (0, client_1.isFullBlock)(block) && block.has_children && block.type !== 'unsupported');
+    // Fetch children in parallel
+    if (blocksWithChildren.length > 0) {
+        const childFetchResults = await (0, retry_1.batchWithRetry)(blocksWithChildren.map(block => async () => {
+            // TypeScript guard - we already filtered for full blocks
+            if (!(0, client_1.isFullBlock)(block)) {
+                throw new Error('Block is not a full block');
+            }
             try {
                 const childrenResponse = await (0, exports.retrieveBlockChildren)(block.id);
-                block.children = childrenResponse.results || [];
+                const children = childrenResponse.results || [];
                 // If this is a child_page block, recursively fetch that page too
+                let childPageDetails = null;
                 if (block.type === 'child_page' && depth + 1 < maxDepth) {
-                    const childPageData = await (0, exports.retrievePageRecursive)(block.id, depth + 1, maxDepth);
-                    block.child_page_details = childPageData;
+                    childPageDetails = await (0, exports.retrievePageRecursive)(block.id, depth + 1, maxDepth);
+                }
+                return {
+                    success: true,
+                    block,
+                    children,
+                    childPageDetails,
+                };
+            }
+            catch (error) {
+                return {
+                    success: false,
+                    block,
+                    error,
+                };
+            }
+        }), {
+            concurrency: exports.BATCH_CONFIG.childrenConcurrency,
+        });
+        // Process results
+        for (const result of childFetchResults) {
+            if (result.success && result.data && result.data.success) {
+                // Attach children to the block
+                ;
+                result.data.block.children = result.data.children;
+                // Attach child page details if present
+                if (result.data.childPageDetails) {
+                    ;
+                    result.data.block.child_page_details = result.data.childPageDetails;
                     // Merge warnings from recursive calls
-                    if (childPageData.warnings) {
-                        warnings.push(...childPageData.warnings);
+                    if (result.data.childPageDetails.warnings) {
+                        warnings.push(...result.data.childPageDetails.warnings);
                     }
                 }
             }
-            catch (error) {
-                // If we can't fetch children, add a warning
+            else if (result.success && result.data && !result.data.success) {
+                // Add warning for inner operation failure (wrapped in successful batch result)
                 warnings.push({
-                    block_id: block.id,
+                    block_id: result.data.block.id,
                     type: 'fetch_error',
-                    message: `Failed to fetch children for block: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    message: `Failed to fetch children for block: ${result.data.error instanceof Error ? result.data.error.message : 'Unknown error'}`,
                     has_children: true,
                 });
             }

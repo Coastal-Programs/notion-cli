@@ -8,6 +8,8 @@
 import { Command, Flags, Interfaces } from '@oclif/core'
 import { EnvelopeFormatter, ExitCode, OutputFlags } from './envelope'
 import { wrapNotionError, NotionCLIError } from './errors/index'
+import { diskCacheManager } from './utils/disk-cache'
+import { destroyAgents } from './http-agent'
 
 /**
  * Base command configuration
@@ -34,6 +36,19 @@ export abstract class BaseCommand extends Command {
   async init(): Promise<void> {
     await super.init()
 
+    // Initialize disk cache (load from disk)
+    const diskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
+    if (diskCacheEnabled) {
+      try {
+        await diskCacheManager.initialize()
+      } catch (error) {
+        // Silently ignore disk cache initialization errors
+        if (process.env.DEBUG) {
+          console.error('Failed to initialize disk cache:', error)
+        }
+      }
+    }
+
     // Get command name from ID (e.g., "page:retrieve" -> "page retrieve")
     const commandName = this.id?.replace(/:/g, ' ') || 'unknown'
 
@@ -42,6 +57,36 @@ export abstract class BaseCommand extends Command {
 
     // Initialize envelope formatter
     this.envelope = new EnvelopeFormatter(commandName, version)
+  }
+
+  /**
+   * Cleanup hook - flushes disk cache and destroys HTTP agents before exit
+   */
+  async finally(error?: Error): Promise<void> {
+    // Destroy HTTP agents to close all connections
+    try {
+      destroyAgents()
+    } catch (agentError) {
+      // Silently ignore agent cleanup errors
+      if (process.env.DEBUG) {
+        console.error('Failed to destroy HTTP agents:', agentError)
+      }
+    }
+
+    // Flush disk cache before exit
+    const diskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
+    if (diskCacheEnabled) {
+      try {
+        await diskCacheManager.shutdown()
+      } catch (shutdownError) {
+        // Silently ignore shutdown errors
+        if (process.env.DEBUG) {
+          console.error('Failed to shutdown disk cache:', shutdownError)
+        }
+      }
+    }
+
+    await super.finally(error)
   }
 
   /**

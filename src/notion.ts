@@ -17,12 +17,49 @@ import {
   SearchParameters,
 } from '@notionhq/client/build/src/api-endpoints'
 import { cacheManager } from './cache'
-import { fetchWithRetry as enhancedFetchWithRetry, RetryConfig } from './retry'
+import { fetchWithRetry as enhancedFetchWithRetry, RetryConfig, batchWithRetry } from './retry'
+import { deduplicationManager } from './deduplication'
+import { httpsAgent } from './http-agent'
+
+/**
+ * Custom fetch function that uses our configured HTTPS agent and compression
+ */
+function createFetchWithAgent(): typeof fetch {
+  return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    // Merge headers with compression support
+    const headers = new Headers(init?.headers || {})
+
+    // Add compression headers if not already present
+    if (!headers.has('Accept-Encoding')) {
+      // Request gzip, deflate, and brotli compression
+      headers.set('Accept-Encoding', 'gzip, deflate, br')
+    }
+
+    // Call native fetch with dispatcher (undici agent) and enhanced headers
+    return fetch(input, {
+      ...init,
+      headers,
+      // @ts-expect-error - dispatcher is supported but not in @types/node yet
+      dispatcher: httpsAgent,
+    })
+  }
+}
 
 export const client = new Client({
   auth: process.env.NOTION_TOKEN,
   logLevel: process.env.DEBUG ? LogLevel.DEBUG : null,
+  // Note: The @notionhq/client library uses its own HTTP client
+  // We configure the agent globally for Node.js HTTP(S) requests
+  fetch: createFetchWithAgent(),
 })
+
+/**
+ * Configuration for batch operations
+ */
+export const BATCH_CONFIG = {
+  deleteConcurrency: parseInt(process.env.NOTION_CLI_DELETE_CONCURRENCY || '5', 10),
+  childrenConcurrency: parseInt(process.env.NOTION_CLI_CHILDREN_CONCURRENCY || '10', 10),
+}
 
 /**
  * Legacy fetchWithRetry for backward compatibility
@@ -38,7 +75,7 @@ export const fetchWithRetry = async (
 }
 
 /**
- * Cached wrapper for API calls with retry logic
+ * Cached wrapper for API calls with retry logic and deduplication
  */
 async function cachedFetch<T>(
   cacheType: string,
@@ -47,14 +84,15 @@ async function cachedFetch<T>(
   options: {
     cacheTtl?: number
     skipCache?: boolean
+    skipDedup?: boolean
     retryConfig?: Partial<RetryConfig>
   } = {}
 ): Promise<T> {
-  const { cacheTtl, skipCache = false, retryConfig } = options
+  const { cacheTtl, skipCache = false, skipDedup = false, retryConfig } = options
 
   // Check cache first (unless skipped or cache disabled)
   if (!skipCache) {
-    const cached = cacheManager.get<T>(cacheType, cacheKey)
+    const cached = await cacheManager.get<T>(cacheType, cacheKey)
     if (cached !== null) {
       if (process.env.DEBUG) {
         console.log(`Cache HIT: ${cacheType}:${cacheKey}`)
@@ -66,11 +104,28 @@ async function cachedFetch<T>(
     }
   }
 
-  // Fetch with retry logic
-  const data = await enhancedFetchWithRetry(fetchFn, {
-    config: retryConfig,
-    context: `${cacheType}:${cacheKey}`,
-  })
+  // Generate deduplication key
+  const dedupKey = `${cacheType}:${JSON.stringify(cacheKey)}`
+
+  // Wrap fetch function with deduplication (unless disabled)
+  const dedupEnabled = process.env.NOTION_CLI_DEDUP_ENABLED !== 'false' && !skipDedup
+  const fetchWithDedup = dedupEnabled
+    ? () => deduplicationManager.execute(dedupKey, async () => {
+        if (process.env.DEBUG) {
+          console.log(`Dedup MISS: ${dedupKey}`)
+        }
+        return enhancedFetchWithRetry(fetchFn, {
+          config: retryConfig,
+          context: `${cacheType}:${cacheKey}`,
+        })
+      })
+    : () => enhancedFetchWithRetry(fetchFn, {
+        config: retryConfig,
+        context: `${cacheType}:${cacheKey}`,
+      })
+
+  // Execute fetch (with or without deduplication)
+  const data = await fetchWithDedup()
 
   // Store in cache
   if (!skipCache) {
@@ -251,12 +306,25 @@ export const updatePage = async (pageId: string, blocks: BlockObjectRequest[]) =
     { context: `updatePage:list:${pageId}` }
   )
 
-  // Delete all blocks
-  for (const blk of blks.results) {
-    await enhancedFetchWithRetry(
-      () => client.blocks.delete({ block_id: blk.id }),
-      { context: `updatePage:delete:${blk.id}` }
+  // Delete all blocks in parallel
+  if (blks.results.length > 0) {
+    const deleteResults = await batchWithRetry(
+      blks.results.map(blk =>
+        () => client.blocks.delete({ block_id: blk.id })
+      ),
+      {
+        concurrency: BATCH_CONFIG.deleteConcurrency,
+        config: { maxRetries: 3 },
+      }
     )
+
+    // Check for errors
+    const failures = deleteResults.filter(r => !r.success)
+    if (failures.length > 0) {
+      throw new Error(
+        `Failed to delete ${failures.length} of ${blks.results.length} blocks`
+      )
+    }
   }
 
   // Append new blocks
@@ -463,15 +531,9 @@ export const retrievePageRecursive = async (
 
   const warnings: any[] = []
 
-  // Recursively fetch nested blocks
+  // Handle unsupported blocks (collect warnings)
   for (const block of blocks) {
-    // Skip partial blocks
-    if (!isFullBlock(block)) {
-      continue
-    }
-
-    // Handle unsupported blocks
-    if (block.type === 'unsupported') {
+    if (isFullBlock(block) && block.type === 'unsupported') {
       warnings.push({
         block_id: block.id,
         type: 'unsupported',
@@ -479,35 +541,77 @@ export const retrievePageRecursive = async (
         message: `Block type '${(block as any).unsupported?.type || 'unknown'}' not supported by Notion API`,
         has_children: block.has_children,
       })
-      continue
     }
+  }
 
-    // Recursively fetch children for blocks that have them
-    if (block.has_children) {
-      try {
-        const childrenResponse = await retrieveBlockChildren(block.id)
-        ;(block as any).children = childrenResponse.results || []
+  // Collect blocks with children that need fetching
+  const blocksWithChildren = blocks.filter(
+    block => isFullBlock(block) && block.has_children && block.type !== 'unsupported'
+  )
 
-        // If this is a child_page block, recursively fetch that page too
-        if (block.type === 'child_page' && depth + 1 < maxDepth) {
-          const childPageData = await retrievePageRecursive(
-            block.id,
-            depth + 1,
-            maxDepth
-          )
-          ;(block as any).child_page_details = childPageData
+  // Fetch children in parallel
+  if (blocksWithChildren.length > 0) {
+    const childFetchResults = await batchWithRetry(
+      blocksWithChildren.map(block => async () => {
+        // TypeScript guard - we already filtered for full blocks
+        if (!isFullBlock(block)) {
+          throw new Error('Block is not a full block')
+        }
 
-          // Merge warnings from recursive calls
-          if (childPageData.warnings) {
-            warnings.push(...childPageData.warnings)
+        try {
+          const childrenResponse = await retrieveBlockChildren(block.id)
+          const children = childrenResponse.results || []
+
+          // If this is a child_page block, recursively fetch that page too
+          let childPageDetails = null
+          if (block.type === 'child_page' && depth + 1 < maxDepth) {
+            childPageDetails = await retrievePageRecursive(
+              block.id,
+              depth + 1,
+              maxDepth
+            )
+          }
+
+          return {
+            success: true,
+            block,
+            children,
+            childPageDetails,
+          }
+        } catch (error) {
+          return {
+            success: false,
+            block,
+            error,
           }
         }
-      } catch (error) {
-        // If we can't fetch children, add a warning
+      }),
+      {
+        concurrency: BATCH_CONFIG.childrenConcurrency,
+      }
+    )
+
+    // Process results
+    for (const result of childFetchResults) {
+      if (result.success && result.data && result.data.success) {
+        // Attach children to the block
+        ;(result.data.block as any).children = result.data.children
+
+        // Attach child page details if present
+        if (result.data.childPageDetails) {
+          ;(result.data.block as any).child_page_details = result.data.childPageDetails
+
+          // Merge warnings from recursive calls
+          if (result.data.childPageDetails.warnings) {
+            warnings.push(...result.data.childPageDetails.warnings)
+          }
+        }
+      } else if (result.success && result.data && !result.data.success) {
+        // Add warning for inner operation failure (wrapped in successful batch result)
         warnings.push({
-          block_id: block.id,
+          block_id: result.data.block.id,
           type: 'fetch_error',
-          message: `Failed to fetch children for block: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Failed to fetch children for block: ${result.data.error instanceof Error ? result.data.error.message : 'Unknown error'}`,
           has_children: true,
         })
       }

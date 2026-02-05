@@ -2,6 +2,13 @@ import { Client } from '@notionhq/client';
 import { CreateDatabaseParameters, QueryDataSourceResponse, GetDatabaseResponse, GetDataSourceResponse, CreateDatabaseResponse, UpdateDatabaseParameters, UpdateDataSourceParameters, GetPageParameters, CreatePageParameters, BlockObjectRequest, UpdatePageParameters, AppendBlockChildrenParameters, UpdateBlockParameters, SearchParameters } from '@notionhq/client/build/src/api-endpoints';
 export declare const client: Client;
 /**
+ * Configuration for batch operations
+ */
+export declare const BATCH_CONFIG: {
+    deleteConcurrency: number;
+    childrenConcurrency: number;
+};
+/**
  * Legacy fetchWithRetry for backward compatibility
  * @deprecated Use the enhanced retry logic from retry.ts
  */

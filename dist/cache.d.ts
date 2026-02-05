@@ -1,6 +1,7 @@
 /**
  * Simple in-memory caching layer for Notion API responses
  * Supports TTL (time-to-live) and cache invalidation
+ * Integrated with disk cache for persistence across CLI invocations
  */
 export interface CacheEntry<T> {
     data: T;
@@ -48,11 +49,11 @@ export declare class CacheManager {
      */
     private evictOldest;
     /**
-     * Get a value from cache
+     * Get a value from cache (checks memory, then disk)
      */
-    get<T>(type: string, ...identifiers: Array<string | number | object>): T | null;
+    get<T>(type: string, ...identifiers: Array<string | number | object>): Promise<T | null>;
     /**
-     * Set a value in cache with optional custom TTL
+     * Set a value in cache with optional custom TTL (writes to memory and disk)
      */
     set<T>(type: string, data: T, customTtl?: number, ...identifiers: Array<string | number | object>): void;
     /**
@@ -60,7 +61,7 @@ export declare class CacheManager {
      */
     invalidate(type: string, ...identifiers: Array<string | number | object>): void;
     /**
-     * Clear all cache entries
+     * Clear all cache entries (memory and disk)
      */
     clear(): void;
     /**

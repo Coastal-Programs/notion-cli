@@ -10,6 +10,8 @@ exports.EnvelopeFlags = exports.BaseCommand = void 0;
 const core_1 = require("@oclif/core");
 const envelope_1 = require("./envelope");
 const index_1 = require("./errors/index");
+const disk_cache_1 = require("./utils/disk-cache");
+const http_agent_1 = require("./http-agent");
 /**
  * BaseCommand - Extends oclif Command with envelope support
  *
@@ -31,12 +33,54 @@ class BaseCommand extends core_1.Command {
     async init() {
         var _a;
         await super.init();
+        // Initialize disk cache (load from disk)
+        const diskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false';
+        if (diskCacheEnabled) {
+            try {
+                await disk_cache_1.diskCacheManager.initialize();
+            }
+            catch (error) {
+                // Silently ignore disk cache initialization errors
+                if (process.env.DEBUG) {
+                    console.error('Failed to initialize disk cache:', error);
+                }
+            }
+        }
         // Get command name from ID (e.g., "page:retrieve" -> "page retrieve")
         const commandName = ((_a = this.id) === null || _a === void 0 ? void 0 : _a.replace(/:/g, ' ')) || 'unknown';
         // Get version from config
         const version = this.config.version;
         // Initialize envelope formatter
         this.envelope = new envelope_1.EnvelopeFormatter(commandName, version);
+    }
+    /**
+     * Cleanup hook - flushes disk cache and destroys HTTP agents before exit
+     */
+    async finally(error) {
+        // Destroy HTTP agents to close all connections
+        try {
+            (0, http_agent_1.destroyAgents)();
+        }
+        catch (agentError) {
+            // Silently ignore agent cleanup errors
+            if (process.env.DEBUG) {
+                console.error('Failed to destroy HTTP agents:', agentError);
+            }
+        }
+        // Flush disk cache before exit
+        const diskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false';
+        if (diskCacheEnabled) {
+            try {
+                await disk_cache_1.diskCacheManager.shutdown();
+            }
+            catch (shutdownError) {
+                // Silently ignore shutdown errors
+                if (process.env.DEBUG) {
+                    console.error('Failed to shutdown disk cache:', shutdownError);
+                }
+            }
+        }
+        await super.finally(error);
     }
     /**
      * Determine if envelope should be used based on flags
