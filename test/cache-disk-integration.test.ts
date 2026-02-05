@@ -116,17 +116,14 @@ describe('CacheManager Integration with DiskCacheManager', () => {
 
       // Clear memory cache to ensure we're testing disk promotion
       cache.clear()
-      await new Promise(resolve => setTimeout(resolve, 50))
 
-      // First get returns null (disk check is async)
-      const result = cache.get('dataSource', 'abc')
-      expect(result).to.be.null
-
-      // Wait for disk promotion
-      await new Promise(resolve => setTimeout(resolve, 150))
+      // First get should now retrieve from disk (with await - bug fix applied)
+      const result = await cache.get('dataSource', 'abc')
+      expect(result).to.not.be.null
+      expect(result).to.deep.equal(cacheEntry.data)
 
       // Second get should hit memory after promotion
-      const result2 = cache.get('dataSource', 'abc')
+      const result2 = await cache.get('dataSource', 'abc')
       expect(result2).to.not.be.null
       expect(result2).to.deep.equal(cacheEntry.data)
     })
@@ -142,13 +139,9 @@ describe('CacheManager Integration with DiskCacheManager', () => {
 
       // Clear memory cache
       cache.clear()
-      await new Promise(resolve => setTimeout(resolve, 50))
 
-      // Should not promote expired entry
-      cache.get('dataSource', 'expired')
-      await new Promise(resolve => setTimeout(resolve, 150))
-
-      const result = cache.get('dataSource', 'expired')
+      // Should not promote expired entry (validates TTL before promoting)
+      const result = await cache.get('dataSource', 'expired')
       expect(result).to.be.null
     })
 
@@ -161,9 +154,11 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       }
       await diskCacheManager.set('dataSource:cleanup', expiredEntry, 1000)
 
-      // Trigger promotion attempt
-      cache.get('dataSource', 'cleanup')
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Trigger promotion attempt (will validate and delete expired entry)
+      await cache.get('dataSource', 'cleanup')
+
+      // Give invalidation a moment to complete (fire-and-forget)
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // Verify disk entry was deleted
       const diskEntry = await diskCacheManager.get('dataSource:cleanup')
@@ -173,16 +168,18 @@ describe('CacheManager Integration with DiskCacheManager', () => {
     it('should handle disk read failures gracefully', async () => {
       // Mock disk cache to fail
       const originalGet = diskCacheManager.get.bind(diskCacheManager)
-      diskCacheManager.get = async () => {
-        throw new Error('Disk read failed')
+      try {
+        diskCacheManager.get = async () => {
+          throw new Error('Disk read failed')
+        }
+
+        // Should not throw - errors are silently ignored
+        const result = await cache.get('dataSource', 'fail-read')
+        expect(result).to.be.null
+      } finally {
+        // Restore original
+        diskCacheManager.get = originalGet
       }
-
-      // Should not throw - errors are silently ignored
-      const result = cache.get('dataSource', 'fail-read')
-      expect(result).to.be.null
-
-      // Restore original
-      diskCacheManager.get = originalGet
     })
 
     it('should not check disk when NOTION_CLI_DISK_CACHE_ENABLED=false', async () => {
@@ -201,16 +198,17 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Should not check disk (returns null immediately)
-      const result = cache.get('dataSource', 'no-check')
+      const result = await cache.get('dataSource', 'no-check')
       expect(result).to.be.null
 
       // Wait and verify it's still not in memory
       await new Promise(resolve => setTimeout(resolve, 150))
-      const result2 = cache.get('dataSource', 'no-check')
+      const result2 = await cache.get('dataSource', 'no-check')
       expect(result2).to.be.null
     })
 
     it('should log disk cache hit in DEBUG mode', async () => {
+      const originalDebugValue = process.env.DEBUG
       process.env.DEBUG = 'true'
 
       // Capture console.error calls
@@ -220,35 +218,47 @@ describe('CacheManager Integration with DiskCacheManager', () => {
         errorLogs.push(msg)
       }
 
-      // Write to disk
-      const cacheEntry = {
-        data: { id: 'debug-test', name: 'test' },
-        timestamp: Date.now(),
-        ttl: 60000,
-      }
-      await diskCacheManager.set('dataSource:debug-test', cacheEntry, 60000)
-
-      // Clear memory
-      cache.clear()
-      await new Promise(resolve => setTimeout(resolve, 50))
-
-      // Trigger disk promotion
-      cache.get('dataSource', 'debug-test')
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      // Verify debug log
-      const diskHitLog = errorLogs.find(log => {
-        try {
-          const parsed = JSON.parse(log)
-          return parsed.event === 'disk_cache_hit' && parsed.namespace === 'dataSource'
-        } catch {
-          return false
+      try {
+        // Write to disk
+        const cacheEntry = {
+          data: { id: 'debug-test', name: 'test' },
+          timestamp: Date.now(),
+          ttl: 60000,
         }
-      })
-      expect(diskHitLog).to.not.be.undefined
+        await diskCacheManager.set('dataSource:debug-test', cacheEntry, 60000)
 
-      // Restore console.error
-      console.error = originalError
+        // Clear memory to force disk lookup
+        cache.clear()
+
+        // Wait longer for disk operations to settle
+        await new Promise(resolve => setTimeout(resolve, 150))
+
+        // Trigger disk promotion
+        await cache.get('dataSource', 'debug-test')
+
+        // Wait for async disk promotion logging to complete
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Verify debug log (disk cache hit happens asynchronously)
+        const diskHitLog = errorLogs.find(log => {
+          try {
+            const parsed = JSON.parse(log)
+            return parsed.event === 'disk_cache_hit' && parsed.namespace === 'dataSource'
+          } catch {
+            return false
+          }
+        })
+        expect(diskHitLog).to.not.be.undefined
+      } finally {
+        // Restore console.error
+        console.error = originalError
+        // Restore DEBUG env var
+        if (originalDebugValue !== undefined) {
+          process.env.DEBUG = originalDebugValue
+        } else {
+          delete process.env.DEBUG
+        }
+      }
     })
   })
 
@@ -370,8 +380,8 @@ describe('CacheManager Integration with DiskCacheManager', () => {
 
       // Perform cache operations
       cache.set('dataSource', { id: '1' }, undefined, 'verbose1')
-      cache.get('dataSource', 'verbose1')
-      cache.get('dataSource', 'nonexistent')
+      await cache.get('dataSource', 'verbose1')
+      await cache.get('dataSource', 'nonexistent')
       cache.invalidate('dataSource', 'verbose1')
 
       // Verify logs were generated
@@ -406,7 +416,7 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       }
 
       cache.set('dataSource', { id: '2' }, undefined, 'debug2')
-      cache.get('dataSource', 'debug2')
+      await cache.get('dataSource', 'debug2')
 
       expect(errorLogs.length).to.be.greaterThan(0)
 
@@ -427,8 +437,8 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       cache.set('dataSource', { id: 'exp' }, 10, 'expire')
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // Trigger eviction by setting new entry
-      cache.set('dataSource', { id: 'new' }, undefined, 'new')
+      // Trigger eviction by accessing expired entry
+      await cache.get('dataSource', 'expire')
 
       // Check for eviction log
       const parsedLogs = errorLogs.map(log => {
@@ -515,34 +525,34 @@ describe('CacheManager Integration with DiskCacheManager', () => {
   })
 
   describe('Edge Cases and Additional Coverage', () => {
-    it('should handle object identifiers in key generation', () => {
+    it('should handle object identifiers in key generation', async () => {
       const objId = { type: 'database', id: '123' }
       cache.set('query', { results: [] }, undefined, objId)
 
-      const result = cache.get('query', objId)
+      const result = await cache.get('query', objId)
       expect(result).to.not.be.null
       expect(result).to.deep.equal({ results: [] })
     })
 
-    it('should handle numeric identifiers', () => {
+    it('should handle numeric identifiers', async () => {
       cache.set('dataSource', { id: 'numeric' }, undefined, 123)
 
-      const result = cache.get('dataSource', 123)
+      const result = await cache.get('dataSource', 123)
       expect(result).to.not.be.null
     })
 
-    it('should invalidate all entries of a type even when some already evicted', () => {
+    it('should invalidate all entries of a type even when some already evicted', async () => {
       cache.set('dataSource', { id: '1' }, 10, '1') // Will expire quickly
       cache.set('dataSource', { id: '2' }, 60000, '2')
 
       // Invalidate all - should work even with mixed valid/invalid entries
       cache.invalidate('dataSource')
 
-      expect(cache.get('dataSource', '1')).to.be.null
-      expect(cache.get('dataSource', '2')).to.be.null
+      expect(await cache.get('dataSource', '1')).to.be.null
+      expect(await cache.get('dataSource', '2')).to.be.null
     })
 
-    it('should handle custom TTL from ttlByType config', () => {
+    it('should handle custom TTL from ttlByType config', async () => {
       const customCache = new CacheManager({
         enabled: true,
         defaultTtl: 5000,
@@ -559,27 +569,27 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       customCache.set('dataSource', { id: 'test' }, undefined, 'ds1')
 
       // Check that it exists initially
-      let result = customCache.get('dataSource', 'ds1')
+      let result = await customCache.get('dataSource', 'ds1')
       expect(result).to.not.be.null
 
       // Wait for expiration
       return new Promise<void>((resolve) => {
-        setTimeout(() => {
-          const expired = customCache.get('dataSource', 'ds1')
+        setTimeout(async () => {
+          const expired = await customCache.get('dataSource', 'ds1')
           expect(expired).to.be.null
           resolve()
         }, 150)
       })
     })
 
-    it('should properly handle getStats', () => {
+    it('should properly handle getStats', async () => {
       cache.clear()
 
       cache.set('dataSource', { id: '1' }, undefined, '1')
       cache.set('dataSource', { id: '2' }, undefined, '2')
 
-      cache.get('dataSource', '1') // Hit
-      cache.get('dataSource', 'nonexistent') // Miss
+      await cache.get('dataSource', '1') // Hit
+      await cache.get('dataSource', 'nonexistent') // Miss
 
       const stats = cache.getStats()
       expect(stats.size).to.equal(2)
@@ -588,14 +598,15 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       expect(stats.misses).to.be.greaterThan(0)
     })
 
-    it('should calculate hit rate', () => {
+    it('should calculate hit rate', async () => {
       cache.clear()
+      await new Promise(resolve => setTimeout(resolve, 50))
 
       cache.set('dataSource', { id: '1' }, undefined, '1')
 
-      cache.get('dataSource', '1') // Hit
-      cache.get('dataSource', '1') // Hit
-      cache.get('dataSource', '2') // Miss
+      await cache.get('dataSource', '1') // Hit
+      await cache.get('dataSource', '1') // Hit
+      await cache.get('dataSource', '2') // Miss
 
       const hitRate = cache.getHitRate()
       expect(hitRate).to.be.closeTo(0.667, 0.01) // 2 hits / 3 total
@@ -629,7 +640,7 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       await new Promise(resolve => setTimeout(resolve, 50))
 
       // Get should remove the invalid entry
-      const result = cache.get('dataSource', 'short')
+      const result = await cache.get('dataSource', 'short')
       expect(result).to.be.null
 
       // Stats should show an eviction
