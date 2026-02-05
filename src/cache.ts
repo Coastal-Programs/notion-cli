@@ -4,7 +4,7 @@
  * Integrated with disk cache for persistence across CLI invocations
  */
 
-import { diskCacheManager, DiskCacheEntry } from './utils/disk-cache'
+import { diskCacheManager } from './utils/disk-cache'
 
 export interface CacheEntry<T> {
   data: T
