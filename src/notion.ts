@@ -35,10 +35,12 @@ function createFetchWithAgent(): typeof fetch {
       headers.set('Accept-Encoding', 'gzip, deflate, br')
     }
 
-    // Call native fetch with enhanced headers
+    // Call native fetch with dispatcher (undici agent) and enhanced headers
     return fetch(input, {
       ...init,
       headers,
+      // @ts-expect-error - dispatcher is supported but not in @types/node yet
+      dispatcher: httpsAgent,
     })
   }
 }
@@ -90,7 +92,7 @@ async function cachedFetch<T>(
 
   // Check cache first (unless skipped or cache disabled)
   if (!skipCache) {
-    const cached = cacheManager.get<T>(cacheType, cacheKey)
+    const cached = await cacheManager.get<T>(cacheType, cacheKey)
     if (cached !== null) {
       if (process.env.DEBUG) {
         console.log(`Cache HIT: ${cacheType}:${cacheKey}`)
@@ -591,7 +593,7 @@ export const retrievePageRecursive = async (
 
     // Process results
     for (const result of childFetchResults) {
-      if (result.success && result.data) {
+      if (result.success && result.data && result.data.success) {
         // Attach children to the block
         ;(result.data.block as any).children = result.data.children
 
@@ -604,8 +606,8 @@ export const retrievePageRecursive = async (
             warnings.push(...result.data.childPageDetails.warnings)
           }
         }
-      } else if (!result.success && result.data) {
-        // Add warning for failed fetch
+      } else if (result.success && result.data && !result.data.success) {
+        // Add warning for inner operation failure (wrapped in successful batch result)
         warnings.push({
           block_id: result.data.block.id,
           type: 'fetch_error',

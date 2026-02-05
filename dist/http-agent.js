@@ -10,19 +10,19 @@ exports.REQUEST_TIMEOUT = exports.httpsAgent = void 0;
 exports.getAgentStats = getAgentStats;
 exports.destroyAgents = destroyAgents;
 exports.getAgentConfig = getAgentConfig;
-const https = require("https");
+const undici_1 = require("undici");
 /**
- * HTTPS Agent with keep-alive enabled
+ * Undici Agent with keep-alive and connection pooling enabled
+ * Undici is used instead of native https.Agent because Node.js fetch uses undici under the hood
  */
-exports.httpsAgent = new https.Agent({
-    // Enable keep-alive connections
-    keepAlive: process.env.NOTION_CLI_HTTP_KEEP_ALIVE !== 'false',
-    // Keep-alive timeout (how long to keep idle connections open)
-    keepAliveMsecs: parseInt(process.env.NOTION_CLI_HTTP_KEEP_ALIVE_MS || '60000', 10),
-    // Maximum number of sockets to allow (concurrent connections)
-    maxSockets: parseInt(process.env.NOTION_CLI_HTTP_MAX_SOCKETS || '50', 10),
-    // Maximum number of sockets to leave open in a free state (connection pool size)
-    maxFreeSockets: parseInt(process.env.NOTION_CLI_HTTP_MAX_FREE_SOCKETS || '10', 10),
+exports.httpsAgent = new undici_1.Agent({
+    // Connection pooling
+    connections: parseInt(process.env.NOTION_CLI_HTTP_MAX_SOCKETS || '50', 10),
+    // Keep-alive settings
+    keepAliveTimeout: parseInt(process.env.NOTION_CLI_HTTP_KEEP_ALIVE_MS || '60000', 10),
+    keepAliveMaxTimeout: parseInt(process.env.NOTION_CLI_HTTP_KEEP_ALIVE_MS || '60000', 10),
+    // Pipelining (HTTP/1.1 request pipelining, 0 = disabled)
+    pipelining: 0,
 });
 /**
  * Default request timeout in milliseconds
@@ -31,28 +31,15 @@ exports.httpsAgent = new https.Agent({
 exports.REQUEST_TIMEOUT = parseInt(process.env.NOTION_CLI_HTTP_TIMEOUT || '30000', 10);
 /**
  * Get current agent statistics
+ * Note: undici Agent doesn't expose socket statistics like https.Agent
  */
 function getAgentStats() {
-    const agent = exports.httpsAgent;
-    // Count active sockets
-    const socketsCount = Object.keys(agent.sockets || {}).reduce((count, key) => {
-        var _a;
-        return count + (((_a = agent.sockets[key]) === null || _a === void 0 ? void 0 : _a.length) || 0);
-    }, 0);
-    // Count free sockets
-    const freeSocketsCount = Object.keys(agent.freeSockets || {}).reduce((count, key) => {
-        var _a;
-        return count + (((_a = agent.freeSockets[key]) === null || _a === void 0 ? void 0 : _a.length) || 0);
-    }, 0);
-    // Count pending requests
-    const requestsCount = Object.keys(agent.requests || {}).reduce((count, key) => {
-        var _a;
-        return count + (((_a = agent.requests[key]) === null || _a === void 0 ? void 0 : _a.length) || 0);
-    }, 0);
+    // undici's Agent doesn't expose internal socket statistics
+    // Return placeholder values for now
     return {
-        sockets: socketsCount,
-        freeSockets: freeSocketsCount,
-        requests: requestsCount,
+        sockets: 0,
+        freeSockets: 0,
+        requests: 0,
     };
 }
 /**
@@ -65,13 +52,9 @@ function destroyAgents() {
  * Get agent configuration
  */
 function getAgentConfig() {
-    var _a, _b, _c, _d;
-    const agent = exports.httpsAgent;
     return {
-        keepAlive: (_a = agent.keepAlive) !== null && _a !== void 0 ? _a : false,
-        keepAliveMsecs: (_b = agent.keepAliveMsecs) !== null && _b !== void 0 ? _b : 1000,
-        maxSockets: (_c = agent.maxSockets) !== null && _c !== void 0 ? _c : Infinity,
-        maxFreeSockets: (_d = agent.maxFreeSockets) !== null && _d !== void 0 ? _d : 256,
+        connections: parseInt(process.env.NOTION_CLI_HTTP_MAX_SOCKETS || '50', 10),
+        keepAliveTimeout: parseInt(process.env.NOTION_CLI_HTTP_KEEP_ALIVE_MS || '60000', 10),
         requestTimeout: exports.REQUEST_TIMEOUT,
     };
 }

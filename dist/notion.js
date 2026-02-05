@@ -5,6 +5,7 @@ const client_1 = require("@notionhq/client");
 const cache_1 = require("./cache");
 const retry_1 = require("./retry");
 const deduplication_1 = require("./deduplication");
+const http_agent_1 = require("./http-agent");
 /**
  * Custom fetch function that uses our configured HTTPS agent and compression
  */
@@ -17,10 +18,12 @@ function createFetchWithAgent() {
             // Request gzip, deflate, and brotli compression
             headers.set('Accept-Encoding', 'gzip, deflate, br');
         }
-        // Call native fetch with enhanced headers
+        // Call native fetch with dispatcher (undici agent) and enhanced headers
         return fetch(input, {
             ...init,
             headers,
+            // @ts-expect-error - dispatcher is supported but not in @types/node yet
+            dispatcher: http_agent_1.httpsAgent,
         });
     };
 }
@@ -55,7 +58,7 @@ async function cachedFetch(cacheType, cacheKey, fetchFn, options = {}) {
     const { cacheTtl, skipCache = false, skipDedup = false, retryConfig } = options;
     // Check cache first (unless skipped or cache disabled)
     if (!skipCache) {
-        const cached = cache_1.cacheManager.get(cacheType, cacheKey);
+        const cached = await cache_1.cacheManager.get(cacheType, cacheKey);
         if (cached !== null) {
             if (process.env.DEBUG) {
                 console.log(`Cache HIT: ${cacheType}:${cacheKey}`);
@@ -405,7 +408,7 @@ const retrievePageRecursive = async (pageId, depth = 0, maxDepth = 3) => {
         });
         // Process results
         for (const result of childFetchResults) {
-            if (result.success && result.data) {
+            if (result.success && result.data && result.data.success) {
                 // Attach children to the block
                 ;
                 result.data.block.children = result.data.children;
@@ -419,8 +422,8 @@ const retrievePageRecursive = async (pageId, depth = 0, maxDepth = 3) => {
                     }
                 }
             }
-            else if (!result.success && result.data) {
-                // Add warning for failed fetch
+            else if (result.success && result.data && !result.data.success) {
+                // Add warning for inner operation failure (wrapped in successful batch result)
                 warnings.push({
                     block_id: result.data.block.id,
                     type: 'fetch_error',

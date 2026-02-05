@@ -51,12 +51,7 @@ export declare class CacheManager {
     /**
      * Get a value from cache (checks memory, then disk)
      */
-    get<T>(type: string, ...identifiers: Array<string | number | object>): T | null;
-    /**
-     * Check disk cache and promote to memory if found (synchronous wrapper)
-     * @private
-     */
-    private checkDiskCache;
+    get<T>(type: string, ...identifiers: Array<string | number | object>): Promise<T | null>;
     /**
      * Set a value in cache with optional custom TTL (writes to memory and disk)
      */

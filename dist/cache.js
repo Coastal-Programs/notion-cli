@@ -121,7 +121,7 @@ class CacheManager {
     /**
      * Get a value from cache (checks memory, then disk)
      */
-    get(type, ...identifiers) {
+    async get(type, ...identifiers) {
         if (!this.config.enabled) {
             return null;
         }
@@ -147,74 +147,46 @@ class CacheManager {
             this.cache.delete(key);
             this.stats.evictions++;
         }
-        // Check disk cache (synchronously, but non-blocking for performance)
-        // Note: This is a synchronous wrapper for the async disk cache
-        // We use a sync approach here to maintain the current API signature
-        this.checkDiskCache(key, type, identifiers);
-        // If we still have no entry after disk check, it's a miss
-        const finalEntry = this.cache.get(key);
-        if (!finalEntry || !this.isValid(finalEntry)) {
-            this.stats.misses++;
-            // Log cache miss
-            logCacheEvent({
-                level: 'debug',
-                event: 'cache_miss',
-                namespace: type,
-                key: identifiers.join(':'),
-                timestamp: new Date().toISOString(),
-            });
-            return null;
-        }
-        this.stats.hits++;
-        // Log cache hit (from disk)
-        logCacheEvent({
-            level: 'debug',
-            event: 'cache_hit',
-            namespace: type,
-            key: identifiers.join(':'),
-            age_ms: Date.now() - finalEntry.timestamp,
-            ttl_ms: finalEntry.ttl,
-            timestamp: new Date().toISOString(),
-        });
-        return finalEntry.data;
-    }
-    /**
-     * Check disk cache and promote to memory if found (synchronous wrapper)
-     * @private
-     */
-    checkDiskCache(key, type, identifiers) {
-        // Only check disk cache if enabled
+        // Check disk cache (only if enabled)
         const diskEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false';
-        if (!diskEnabled) {
-            return;
-        }
-        // Fire-and-forget disk cache check
-        // We don't await here to keep the API synchronous
-        disk_cache_1.diskCacheManager.get(key).then(diskEntry => {
+        if (diskEnabled) {
+            const diskEntry = await disk_cache_1.diskCacheManager.get(key);
             if (diskEntry && diskEntry.data) {
                 const entry = diskEntry.data;
                 // Validate disk entry
                 if (this.isValid(entry)) {
                     // Promote to memory cache
                     this.cache.set(key, entry);
-                    if (process.env.DEBUG) {
-                        console.error(JSON.stringify({
-                            level: 'debug',
-                            event: 'disk_cache_hit',
-                            namespace: type,
-                            key: identifiers.join(':'),
-                            timestamp: new Date().toISOString(),
-                        }));
-                    }
+                    this.stats.hits++;
+                    // Log cache hit (from disk)
+                    logCacheEvent({
+                        level: 'debug',
+                        event: 'cache_hit',
+                        namespace: type,
+                        key: identifiers.join(':'),
+                        age_ms: Date.now() - entry.timestamp,
+                        ttl_ms: entry.ttl,
+                        timestamp: new Date().toISOString(),
+                    });
+                    return entry.data;
                 }
                 else {
                     // Remove expired disk entry
                     disk_cache_1.diskCacheManager.invalidate(key).catch(() => { });
                 }
             }
-        }).catch(() => {
-            // Silently ignore disk cache errors
+        }
+        // Cache miss
+        this.stats.misses++;
+        // Log cache miss
+        logCacheEvent({
+            level: 'debug',
+            event: 'cache_miss',
+            namespace: type,
+            key: identifiers.join(':'),
+            timestamp: new Date().toISOString(),
         });
+        return null;
     }
     /**
      * Set a value in cache with optional custom TTL (writes to memory and disk)
