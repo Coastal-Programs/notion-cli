@@ -112,13 +112,16 @@ jobs:
       env:
         CI: true
 
+    # Upload coverage to Codecov for tracking and PR comments
+    # Free for public repositories: https://about.codecov.io/
+    # View reports: https://codecov.io/gh/Coastal-Programs/notion-cli
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
       with:
         files: ./coverage/lcov.info
         flags: unittests
         name: codecov-umbrella
-        fail_ci_if_error: false
+        fail_ci_if_error: false  # Non-blocking - CI passes even if upload fails
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
