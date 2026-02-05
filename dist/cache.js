@@ -146,34 +146,48 @@ class CacheManager {
         if (entry) {
             this.cache.delete(key);
             this.stats.evictions++;
+            // Log eviction event
+            logCacheEvent({
+                level: 'debug',
+                event: 'cache_evict',
+                namespace: type,
+                key: identifiers.join(':'),
+                cache_size: this.cache.size,
+                timestamp: new Date().toISOString(),
+            });
         }
         // Check disk cache (only if enabled)
         const diskEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false';
         if (diskEnabled) {
-            const diskEntry = await disk_cache_1.diskCacheManager.get(key);
-            if (diskEntry && diskEntry.data) {
-                const entry = diskEntry.data;
-                // Validate disk entry
-                if (this.isValid(entry)) {
-                    // Promote to memory cache
-                    this.cache.set(key, entry);
-                    this.stats.hits++;
-                    // Log cache hit (from disk)
-                    logCacheEvent({
-                        level: 'debug',
-                        event: 'cache_hit',
-                        namespace: type,
-                        key: identifiers.join(':'),
-                        age_ms: Date.now() - entry.timestamp,
-                        ttl_ms: entry.ttl,
-                        timestamp: new Date().toISOString(),
-                    });
-                    return entry.data;
+            try {
+                const diskEntry = await disk_cache_1.diskCacheManager.get(key);
+                if (diskEntry && diskEntry.data) {
+                    const entry = diskEntry.data;
+                    // Validate disk entry
+                    if (this.isValid(entry)) {
+                        // Promote to memory cache
+                        this.cache.set(key, entry);
+                        this.stats.hits++;
+                        // Log cache hit (from disk)
+                        logCacheEvent({
+                            level: 'debug',
+                            event: 'cache_hit',
+                            namespace: type,
+                            key: identifiers.join(':'),
+                            age_ms: Date.now() - entry.timestamp,
+                            ttl_ms: entry.ttl,
+                            timestamp: new Date().toISOString(),
+                        });
+                        return entry.data;
+                    }
+                    else {
+                        // Remove expired disk entry
+                        disk_cache_1.diskCacheManager.invalidate(key).catch(() => { });
+                    }
                 }
-                else {
-                    // Remove expired disk entry
-                    disk_cache_1.diskCacheManager.invalidate(key).catch(() => { });
-                }
+            }
+            catch (error) {
+                // Silently ignore disk cache errors
             }
         }
         // Cache miss

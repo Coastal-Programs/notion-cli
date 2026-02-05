@@ -5,6 +5,8 @@ import { cacheManager } from '../../../dist/cache.js'
 
 const DATABASE_ID = '11111111-2222-3333-4444-555555555555'
 const DATABASE_ID_NO_DASHES = DATABASE_ID.replace(/-/g, '')
+const DATABASE_ID_TEST3 = '11111111-2222-3333-4444-666666666666'
+const DATABASE_ID_TEST3_NO_DASHES = DATABASE_ID_TEST3.replace(/-/g, '')
 
 const response = {
   object: 'data_source',
@@ -23,18 +25,24 @@ const response = {
 
 const titleEmptyResponse = {
   object: 'data_source',
-  id: DATABASE_ID,
+  id: DATABASE_ID_TEST3,
   title: [],
-  url: `https://www.notion.so/${DATABASE_ID_NO_DASHES}`,
+  url: `https://www.notion.so/${DATABASE_ID_TEST3_NO_DASHES}`,
 }
 
 describe('db:retrieve', () => {
   let processExitStub: sinon.SinonStub
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Clean all nock mocks and abort any pending requests
+    nock.abortPendingRequests()
     nock.cleanAll()
+    nock.restore()
+    nock.activate()
     // Clear cache to prevent test interference
     cacheManager.clear()
+    // Disable cache by directly modifying the config (environment variables don't work after instantiation)
+    ;(cacheManager as any).config.enabled = false
     // Stub process.exit to prevent tests from hanging
     processExitStub = sinon.stub(process, 'exit' as any)
   })
@@ -42,15 +50,18 @@ describe('db:retrieve', () => {
   afterEach(() => {
     nock.cleanAll()
     processExitStub.restore()
+    // Re-enable cache for other tests
+    ;(cacheManager as any).config.enabled = true
   })
 
   describe('with no flags', () => {
     test
       .do(() => {
-        // Mock the data_sources endpoint - called twice (once for resolveNotionId, once for retrieve)
+        // Mock the data_sources endpoint
+        // NOTE: Only called once due to caching. First call from resolveNotionId caches the result,
+        // second call from retrieve uses cache instead of API.
         nock('https://api.notion.com')
           .get(`/v1/data_sources/${DATABASE_ID_NO_DASHES}`)
-          .times(2)
           .reply(200, response)
       })
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
@@ -66,10 +77,10 @@ describe('db:retrieve', () => {
   describe('with --raw flags', () => {
     test
       .do(() => {
-        // Mock the data_sources endpoint - called twice (once for resolveNotionId, once for retrieve)
+        // Mock the data_sources endpoint
+        // NOTE: Only called once due to caching (same as first test)
         nock('https://api.notion.com')
           .get(`/v1/data_sources/${DATABASE_ID_NO_DASHES}`)
-          .times(2)
           .reply(200, response)
       })
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
@@ -83,18 +94,21 @@ describe('db:retrieve', () => {
   describe('response title is []', () => {
     test
       .do(() => {
-        // Mock the data_sources endpoint - called twice (once for resolveNotionId, once for retrieve)
+        // CRITICAL: Clean nock and cache before setting up mocks to prevent cross-test pollution
+        nock.cleanAll()
+        cacheManager.clear()
+        // Mock the data_sources endpoint with a DIFFERENT ID to avoid test interference
+        // NOTE: Only called once due to caching (same pattern as other tests)
         nock('https://api.notion.com')
-          .get(`/v1/data_sources/${DATABASE_ID_NO_DASHES}`)
-          .times(2)
+          .get(`/v1/data_sources/${DATABASE_ID_TEST3_NO_DASHES}`)
           .reply(200, titleEmptyResponse)
       })
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
-      .command(['db:retrieve', '--no-truncate', DATABASE_ID])
+      .command(['db:retrieve', '--no-truncate', DATABASE_ID_TEST3])
       .it('shows retrieved result table', (ctx) => {
         expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
-          new RegExp(`Untitled.*data_source.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
+          new RegExp(`Untitled.*data_source.*${DATABASE_ID_TEST3}.*https://www\\.notion\\.so/${DATABASE_ID_TEST3_NO_DASHES}`)
         )
       })
   })

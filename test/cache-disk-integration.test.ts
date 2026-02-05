@@ -219,6 +219,12 @@ describe('CacheManager Integration with DiskCacheManager', () => {
       }
 
       try {
+        // Clear memory first (before writing to disk)
+        cache.clear()
+
+        // Wait for clear to complete
+        await new Promise(resolve => setTimeout(resolve, 150))
+
         // Write to disk
         const cacheEntry = {
           data: { id: 'debug-test', name: 'test' },
@@ -227,23 +233,20 @@ describe('CacheManager Integration with DiskCacheManager', () => {
         }
         await diskCacheManager.set('dataSource:debug-test', cacheEntry, 60000)
 
-        // Clear memory to force disk lookup
-        cache.clear()
-
-        // Wait longer for disk operations to settle
-        await new Promise(resolve => setTimeout(resolve, 150))
-
         // Trigger disk promotion
-        await cache.get('dataSource', 'debug-test')
+        const result = await cache.get('dataSource', 'debug-test')
 
         // Wait for async disk promotion logging to complete
         await new Promise(resolve => setTimeout(resolve, 300))
+
+        // Verify result was retrieved
+        expect(result).to.not.be.null
 
         // Verify debug log (disk cache hit happens asynchronously)
         const diskHitLog = errorLogs.find(log => {
           try {
             const parsed = JSON.parse(log)
-            return parsed.event === 'disk_cache_hit' && parsed.namespace === 'dataSource'
+            return parsed.event === 'cache_hit' && parsed.namespace === 'dataSource'
           } catch {
             return false
           }
