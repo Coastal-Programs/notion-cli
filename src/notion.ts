@@ -17,13 +17,21 @@ import {
   SearchParameters,
 } from '@notionhq/client/build/src/api-endpoints'
 import { cacheManager } from './cache'
-import { fetchWithRetry as enhancedFetchWithRetry, RetryConfig } from './retry'
+import { fetchWithRetry as enhancedFetchWithRetry, RetryConfig, batchWithRetry } from './retry'
 import { deduplicationManager } from './deduplication'
 
 export const client = new Client({
   auth: process.env.NOTION_TOKEN,
   logLevel: process.env.DEBUG ? LogLevel.DEBUG : null,
 })
+
+/**
+ * Configuration for batch operations
+ */
+export const BATCH_CONFIG = {
+  deleteConcurrency: parseInt(process.env.NOTION_CLI_DELETE_CONCURRENCY || '5', 10),
+  childrenConcurrency: parseInt(process.env.NOTION_CLI_CHILDREN_CONCURRENCY || '10', 10),
+}
 
 /**
  * Legacy fetchWithRetry for backward compatibility
@@ -270,12 +278,25 @@ export const updatePage = async (pageId: string, blocks: BlockObjectRequest[]) =
     { context: `updatePage:list:${pageId}` }
   )
 
-  // Delete all blocks
-  for (const blk of blks.results) {
-    await enhancedFetchWithRetry(
-      () => client.blocks.delete({ block_id: blk.id }),
-      { context: `updatePage:delete:${blk.id}` }
+  // Delete all blocks in parallel
+  if (blks.results.length > 0) {
+    const deleteResults = await batchWithRetry(
+      blks.results.map(blk =>
+        () => client.blocks.delete({ block_id: blk.id })
+      ),
+      {
+        concurrency: BATCH_CONFIG.deleteConcurrency,
+        config: { maxRetries: 3 },
+      }
     )
+
+    // Check for errors
+    const failures = deleteResults.filter(r => !r.success)
+    if (failures.length > 0) {
+      throw new Error(
+        `Failed to delete ${failures.length} of ${blks.results.length} blocks`
+      )
+    }
   }
 
   // Append new blocks
@@ -482,15 +503,9 @@ export const retrievePageRecursive = async (
 
   const warnings: any[] = []
 
-  // Recursively fetch nested blocks
+  // Handle unsupported blocks (collect warnings)
   for (const block of blocks) {
-    // Skip partial blocks
-    if (!isFullBlock(block)) {
-      continue
-    }
-
-    // Handle unsupported blocks
-    if (block.type === 'unsupported') {
+    if (isFullBlock(block) && block.type === 'unsupported') {
       warnings.push({
         block_id: block.id,
         type: 'unsupported',
@@ -498,35 +513,77 @@ export const retrievePageRecursive = async (
         message: `Block type '${(block as any).unsupported?.type || 'unknown'}' not supported by Notion API`,
         has_children: block.has_children,
       })
-      continue
     }
+  }
 
-    // Recursively fetch children for blocks that have them
-    if (block.has_children) {
-      try {
-        const childrenResponse = await retrieveBlockChildren(block.id)
-        ;(block as any).children = childrenResponse.results || []
+  // Collect blocks with children that need fetching
+  const blocksWithChildren = blocks.filter(
+    block => isFullBlock(block) && block.has_children && block.type !== 'unsupported'
+  )
 
-        // If this is a child_page block, recursively fetch that page too
-        if (block.type === 'child_page' && depth + 1 < maxDepth) {
-          const childPageData = await retrievePageRecursive(
-            block.id,
-            depth + 1,
-            maxDepth
-          )
-          ;(block as any).child_page_details = childPageData
+  // Fetch children in parallel
+  if (blocksWithChildren.length > 0) {
+    const childFetchResults = await batchWithRetry(
+      blocksWithChildren.map(block => async () => {
+        // TypeScript guard - we already filtered for full blocks
+        if (!isFullBlock(block)) {
+          throw new Error('Block is not a full block')
+        }
 
-          // Merge warnings from recursive calls
-          if (childPageData.warnings) {
-            warnings.push(...childPageData.warnings)
+        try {
+          const childrenResponse = await retrieveBlockChildren(block.id)
+          const children = childrenResponse.results || []
+
+          // If this is a child_page block, recursively fetch that page too
+          let childPageDetails = null
+          if (block.type === 'child_page' && depth + 1 < maxDepth) {
+            childPageDetails = await retrievePageRecursive(
+              block.id,
+              depth + 1,
+              maxDepth
+            )
+          }
+
+          return {
+            success: true,
+            block,
+            children,
+            childPageDetails,
+          }
+        } catch (error) {
+          return {
+            success: false,
+            block,
+            error,
           }
         }
-      } catch (error) {
-        // If we can't fetch children, add a warning
+      }),
+      {
+        concurrency: BATCH_CONFIG.childrenConcurrency,
+      }
+    )
+
+    // Process results
+    for (const result of childFetchResults) {
+      if (result.success && result.data) {
+        // Attach children to the block
+        ;(result.data.block as any).children = result.data.children
+
+        // Attach child page details if present
+        if (result.data.childPageDetails) {
+          ;(result.data.block as any).child_page_details = result.data.childPageDetails
+
+          // Merge warnings from recursive calls
+          if (result.data.childPageDetails.warnings) {
+            warnings.push(...result.data.childPageDetails.warnings)
+          }
+        }
+      } else if (!result.success && result.data) {
+        // Add warning for failed fetch
         warnings.push({
-          block_id: block.id,
+          block_id: result.data.block.id,
           type: 'fetch_error',
-          message: `Failed to fetch children for block: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          message: `Failed to fetch children for block: ${result.data.error instanceof Error ? result.data.error.message : 'Unknown error'}`,
           has_children: true,
         })
       }
