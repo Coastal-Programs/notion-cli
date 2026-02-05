@@ -9,6 +9,7 @@ import { Command, Flags, Interfaces } from '@oclif/core'
 import { EnvelopeFormatter, ExitCode, OutputFlags } from './envelope'
 import { wrapNotionError, NotionCLIError } from './errors/index'
 import { diskCacheManager } from './utils/disk-cache'
+import { destroyAgents } from './http-agent'
 
 /**
  * Base command configuration
@@ -59,9 +60,19 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Cleanup hook - flushes disk cache before exit
+   * Cleanup hook - flushes disk cache and destroys HTTP agents before exit
    */
   async finally(error?: Error): Promise<void> {
+    // Destroy HTTP agents to close all connections
+    try {
+      destroyAgents()
+    } catch (agentError) {
+      // Silently ignore agent cleanup errors
+      if (process.env.DEBUG) {
+        console.error('Failed to destroy HTTP agents:', agentError)
+      }
+    }
+
     // Flush disk cache before exit
     const diskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false'
     if (diskCacheEnabled) {

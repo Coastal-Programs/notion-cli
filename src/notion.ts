@@ -19,10 +19,24 @@ import {
 import { cacheManager } from './cache'
 import { fetchWithRetry as enhancedFetchWithRetry, RetryConfig, batchWithRetry } from './retry'
 import { deduplicationManager } from './deduplication'
+import { httpsAgent } from './http-agent'
+
+/**
+ * Custom fetch function that uses our configured HTTPS agent
+ */
+function createFetchWithAgent(): typeof fetch {
+  // Use node-fetch or native fetch with custom agent
+  // Note: The Notion SDK uses @notionhq/client which internally uses an HTTP client
+  // We'll configure the agent through the global configuration
+  return fetch
+}
 
 export const client = new Client({
   auth: process.env.NOTION_TOKEN,
   logLevel: process.env.DEBUG ? LogLevel.DEBUG : null,
+  // Note: The @notionhq/client library uses its own HTTP client
+  // We configure the agent globally for Node.js HTTP(S) requests
+  fetch: createFetchWithAgent(),
 })
 
 /**

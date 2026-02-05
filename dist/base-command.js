@@ -11,6 +11,7 @@ const core_1 = require("@oclif/core");
 const envelope_1 = require("./envelope");
 const index_1 = require("./errors/index");
 const disk_cache_1 = require("./utils/disk-cache");
+const http_agent_1 = require("./http-agent");
 /**
  * BaseCommand - Extends oclif Command with envelope support
  *
@@ -53,9 +54,19 @@ class BaseCommand extends core_1.Command {
         this.envelope = new envelope_1.EnvelopeFormatter(commandName, version);
     }
     /**
-     * Cleanup hook - flushes disk cache before exit
+     * Cleanup hook - flushes disk cache and destroys HTTP agents before exit
      */
     async finally(error) {
+        // Destroy HTTP agents to close all connections
+        try {
+            (0, http_agent_1.destroyAgents)();
+        }
+        catch (agentError) {
+            // Silently ignore agent cleanup errors
+            if (process.env.DEBUG) {
+                console.error('Failed to destroy HTTP agents:', agentError);
+            }
+        }
         // Flush disk cache before exit
         const diskCacheEnabled = process.env.NOTION_CLI_DISK_CACHE_ENABLED !== 'false';
         if (diskCacheEnabled) {

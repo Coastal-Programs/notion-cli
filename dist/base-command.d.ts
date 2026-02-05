@@ -29,7 +29,7 @@ export declare abstract class BaseCommand extends Command {
      */
     init(): Promise<void>;
     /**
-     * Cleanup hook - flushes disk cache before exit
+     * Cleanup hook - flushes disk cache and destroys HTTP agents before exit
      */
     finally(error?: Error): Promise<void>;
     /**

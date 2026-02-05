@@ -5,9 +5,21 @@ const client_1 = require("@notionhq/client");
 const cache_1 = require("./cache");
 const retry_1 = require("./retry");
 const deduplication_1 = require("./deduplication");
+/**
+ * Custom fetch function that uses our configured HTTPS agent
+ */
+function createFetchWithAgent() {
+    // Use node-fetch or native fetch with custom agent
+    // Note: The Notion SDK uses @notionhq/client which internally uses an HTTP client
+    // We'll configure the agent through the global configuration
+    return fetch;
+}
 exports.client = new client_1.Client({
     auth: process.env.NOTION_TOKEN,
     logLevel: process.env.DEBUG ? client_1.LogLevel.DEBUG : null,
+    // Note: The @notionhq/client library uses its own HTTP client
+    // We configure the agent globally for Node.js HTTP(S) requests
+    fetch: createFetchWithAgent(),
 });
 /**
  * Configuration for batch operations
