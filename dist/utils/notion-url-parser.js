@@ -9,7 +9,9 @@
  * - Raw IDs without dashes: 1fb79d4c71bb8032b722c82305b63a00
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isValidNotionId = exports.isNotionUrl = exports.extractNotionId = void 0;
+exports.extractNotionId = extractNotionId;
+exports.isNotionUrl = isNotionUrl;
+exports.isValidNotionId = isValidNotionId;
 /**
  * Extract Notion ID from URL or raw ID
  *
@@ -44,7 +46,6 @@ function extractNotionId(input) {
     // Not a URL, treat as raw ID
     return cleanRawId(trimmed);
 }
-exports.extractNotionId = extractNotionId;
 /**
  * Extract ID from Notion URL
  */
@@ -90,7 +91,6 @@ function isNotionUrl(input) {
     }
     return input.includes('notion.so');
 }
-exports.isNotionUrl = isNotionUrl;
 /**
  * Check if a string looks like a valid Notion ID
  *
@@ -109,4 +109,3 @@ function isValidNotionId(input) {
         return false;
     }
 }
-exports.isValidNotionId = isValidNotionId;

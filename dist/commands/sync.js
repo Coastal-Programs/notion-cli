@@ -156,7 +156,6 @@ class Sync extends core_1.Command {
         return databases;
     }
 }
-exports.default = Sync;
 Sync.description = 'Sync workspace databases to local cache for fast lookups';
 Sync.aliases = ['db:sync'];
 Sync.examples = [
@@ -181,3 +180,4 @@ Sync.flags = {
     }),
     ...base_flags_1.AutomationFlags,
 };
+exports.default = Sync;

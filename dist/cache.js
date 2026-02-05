@@ -38,13 +38,13 @@ class CacheManager {
         // Default configuration
         this.config = {
             enabled: process.env.NOTION_CLI_CACHE_ENABLED !== 'false',
-            defaultTtl: parseInt(process.env.NOTION_CLI_CACHE_TTL || '300000', 10),
+            defaultTtl: parseInt(process.env.NOTION_CLI_CACHE_TTL || '300000', 10), // 5 minutes default
             maxSize: parseInt(process.env.NOTION_CLI_CACHE_MAX_SIZE || '1000', 10),
             ttlByType: {
-                dataSource: parseInt(process.env.NOTION_CLI_CACHE_DS_TTL || '600000', 10),
-                database: parseInt(process.env.NOTION_CLI_CACHE_DB_TTL || '600000', 10),
-                user: parseInt(process.env.NOTION_CLI_CACHE_USER_TTL || '3600000', 10),
-                page: parseInt(process.env.NOTION_CLI_CACHE_PAGE_TTL || '60000', 10),
+                dataSource: parseInt(process.env.NOTION_CLI_CACHE_DS_TTL || '600000', 10), // 10 min
+                database: parseInt(process.env.NOTION_CLI_CACHE_DB_TTL || '600000', 10), // 10 min
+                user: parseInt(process.env.NOTION_CLI_CACHE_USER_TTL || '3600000', 10), // 1 hour
+                page: parseInt(process.env.NOTION_CLI_CACHE_PAGE_TTL || '60000', 10), // 1 min
                 block: parseInt(process.env.NOTION_CLI_CACHE_BLOCK_TTL || '30000', 10), // 30 sec
             },
             ...config,

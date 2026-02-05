@@ -38,7 +38,7 @@ export declare const getFilterFields: (type: string) => Promise<{
 }[]>;
 export declare const buildDatabaseQueryFilter: (name: string, type: string, field: string, value: string | string[] | boolean) => Promise<object | null>;
 export declare const buildPagePropUpdateData: (name: string, type: string, value: string) => Promise<object | null>;
-export declare const buildOneDepthJson: (pages: QueryDataSourceResponse['results']) => Promise<{
+export declare const buildOneDepthJson: (pages: QueryDataSourceResponse["results"]) => Promise<{
     oneDepthJson: any[];
     relationJson: any[];
 }>;

@@ -226,7 +226,6 @@ class DbSchema extends core_1.Command {
         return lines.join('\n');
     }
 }
-exports.default = DbSchema;
 DbSchema.description = 'Extract clean, AI-parseable schema from a Notion data source (table). ' +
     'This command is optimized for AI agents and automation - it returns property names, ' +
     'types, options (for select/multi-select), and configuration in an easy-to-parse format.';
@@ -306,3 +305,4 @@ DbSchema.flags = {
         default: false,
     }),
 };
+exports.default = DbSchema;

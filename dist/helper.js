@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.buildBlockUpdateFromTextFlags = exports.getChildDatabasesWithIds = exports.enrichChildDatabaseBlock = exports.buildBlocksFromTextFlags = exports.getBlockPlainText = exports.getPageTitle = exports.getDataSourceTitle = exports.getDbTitle = exports.buildOneDepthJson = exports.buildPagePropUpdateData = exports.buildDatabaseQueryFilter = exports.getFilterFields = exports.showRawFlagHint = exports.outputPrettyTable = exports.outputMarkdownTable = exports.stripMetadata = exports.outputCompactJson = exports.outputRawJson = void 0;
+exports.buildBlockUpdateFromTextFlags = exports.getChildDatabasesWithIds = exports.enrichChildDatabaseBlock = exports.buildBlocksFromTextFlags = exports.getBlockPlainText = exports.getPageTitle = exports.getDataSourceTitle = exports.getDbTitle = exports.buildOneDepthJson = exports.buildPagePropUpdateData = exports.buildDatabaseQueryFilter = exports.getFilterFields = exports.outputPrettyTable = exports.outputMarkdownTable = exports.stripMetadata = exports.outputCompactJson = exports.outputRawJson = void 0;
+exports.showRawFlagHint = showRawFlagHint;
 const notion = require("./notion");
 const client_1 = require("@notionhq/client");
 const outputRawJson = async (res) => {
@@ -194,7 +195,6 @@ function showRawFlagHint(itemCount, item, visibleFields = 4) {
         console.log(`Use -r flag for full JSON output with all properties (recommended for AI assistants and automation).`);
     }
 }
-exports.showRawFlagHint = showRawFlagHint;
 const getFilterFields = async (type) => {
     switch (type) {
         case 'checkbox':

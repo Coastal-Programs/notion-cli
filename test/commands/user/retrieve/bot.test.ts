@@ -48,7 +48,7 @@ describe('user:retrieve:bot', () => {
       apiMockUser
         .command(['user:retrieve:bot', '--no-truncate'])
         .it('shows retrieved bot table', (ctx) => {
-          expect(ctx.stdout).to.match(/Id.*Name.*Object.*Type.*person\/bot.*Avatar url/)
+          expect(ctx.stdout).to.match(/id.*name.*object.*type.*person\/bot.*avatar_url/)
           expect(ctx.stdout).to.match(
             /dummy-bot-id.*dummy-bot-name.*user.*bot.*dummy-bot-avatar-url/
           )
@@ -74,7 +74,7 @@ describe('user:retrieve:bot', () => {
       apiMockWs
         .command(['user:retrieve:bot', '--no-truncate'])
         .it('shows retrieved bot table', (ctx) => {
-          expect(ctx.stdout).to.match(/Id.*Name.*Object.*Type.*person\/bot.*Avatar url/)
+          expect(ctx.stdout).to.match(/id.*name.*object.*type.*person\/bot.*avatar_url/)
           expect(ctx.stdout).to.match(/dummy-bot-id.*dummy-bot-name.*user.*bot.*/)
         })
     })

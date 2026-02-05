@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
+const table_formatter_1 = require("../../utils/table-formatter");
 const notion = require("../../notion");
 const fs = require("fs");
 const path = require("path");
@@ -135,7 +136,7 @@ class PageCreate extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table([res], columns, options);
+            (0, table_formatter_1.formatTable)([res], columns, options);
             process.exit(0);
         }
         catch (error) {
@@ -155,7 +156,6 @@ class PageCreate extends core_1.Command {
         }
     }
 }
-exports.default = PageCreate;
 PageCreate.description = 'Create a page';
 PageCreate.aliases = ['page:c'];
 PageCreate.examples = [
@@ -234,6 +234,7 @@ PageCreate.flags = {
         char: 'r',
         description: 'output raw json',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = PageCreate;

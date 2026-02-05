@@ -168,7 +168,6 @@ class ConfigSetToken extends core_1.Command {
         }
     }
 }
-exports.default = ConfigSetToken;
 ConfigSetToken.description = 'Set NOTION_TOKEN in your shell configuration file';
 ConfigSetToken.aliases = ['config:token'];
 ConfigSetToken.examples = [
@@ -194,3 +193,4 @@ ConfigSetToken.args = {
 ConfigSetToken.flags = {
     ...base_flags_1.AutomationFlags,
 };
+exports.default = ConfigSetToken;

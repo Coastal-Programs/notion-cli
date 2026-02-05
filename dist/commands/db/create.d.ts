@@ -7,25 +7,24 @@ export default class DbCreate extends Command {
         command: string;
     }[];
     static args: {
-        page_id: import("@oclif/core/lib/interfaces/parser").Arg<string, Record<string, unknown>>;
+        page_id: import("@oclif/core/lib/interfaces").Arg<string, Record<string, unknown>>;
     };
     static flags: {
         json: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
-        'page-size': import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        'page-size': import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces").CustomOptions>;
         retry: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
-        timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        timeout: import("@oclif/core/lib/interfaces").OptionFlag<number, import("@oclif/core/lib/interfaces").CustomOptions>;
         'no-cache': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         verbose: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         minimal: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
-        columns: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
-        sort: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
-        filter: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
-        csv: import("@oclif/core/lib/interfaces").Flag<boolean>;
-        output: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
-        extended: import("@oclif/core/lib/interfaces").Flag<boolean>;
-        'no-truncate': import("@oclif/core/lib/interfaces").Flag<boolean>;
-        'no-header': import("@oclif/core/lib/interfaces").Flag<boolean>;
-        title: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces/parser").CustomOptions>;
+        columns: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces").CustomOptions>;
+        sort: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces").CustomOptions>;
+        filter: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces").CustomOptions>;
+        csv: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        extended: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        'no-truncate': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        'no-header': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        title: import("@oclif/core/lib/interfaces").OptionFlag<string, import("@oclif/core/lib/interfaces").CustomOptions>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
     run(): Promise<void>;

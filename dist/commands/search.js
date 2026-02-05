@@ -7,6 +7,7 @@ const helper_1 = require("../helper");
 const base_flags_1 = require("../base-flags");
 const errors_1 = require("../errors");
 const dayjs = require("dayjs");
+const table_formatter_1 = require("../utils/table-formatter");
 class Search extends core_1.Command {
     async run() {
         const { flags } = await this.parse(Search);
@@ -193,7 +194,7 @@ class Search extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table(res.results, columns, options);
+            (0, table_formatter_1.formatTable)(res.results, columns, options);
             // Show hint after table output to make -r flag discoverable
             // Use first result as sample to count fields
             if (res.results.length > 0) {
@@ -217,7 +218,6 @@ class Search extends core_1.Command {
         }
     }
 }
-exports.default = Search;
 Search.description = 'Search by title';
 Search.examples = [
     {
@@ -341,7 +341,8 @@ Search.flags = {
         char: 'r',
         description: 'output raw json (recommended for AI assistants - returns all search results)',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.OutputFormatFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = Search;

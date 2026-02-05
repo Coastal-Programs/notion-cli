@@ -42,7 +42,6 @@ class PageRetrievePropertyItem extends core_1.Command {
         }
     }
 }
-exports.default = PageRetrievePropertyItem;
 PageRetrievePropertyItem.description = 'Retrieve a page property item';
 PageRetrievePropertyItem.aliases = ['page:r:pi'];
 PageRetrievePropertyItem.examples = [
@@ -70,3 +69,4 @@ PageRetrievePropertyItem.flags = {
     }),
     ...base_flags_1.AutomationFlags,
 };
+exports.default = PageRetrievePropertyItem;

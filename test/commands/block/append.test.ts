@@ -69,7 +69,7 @@ describe('block:append', () => {
         '[{"type": "heading_2", "heading_2": {"rich_text": [{"type": "text", "text": {"content": "dummy-heading-2-content"}}]}}]',
       ])
       .it('shows appended block object when success', (ctx) => {
-        expect(ctx.stdout).to.match(/Object.*Id.*Type.*Parent.*Content/)
+        expect(ctx.stdout).to.match(/object.*id.*type.*parent.*content/)
         expect(ctx.stdout).to.match(new RegExp(`block.*${BLOCK_ID}.*heading_2.*dummy-heading-2-content`))
       })
   })

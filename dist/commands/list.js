@@ -5,6 +5,7 @@ const workspace_cache_1 = require("../utils/workspace-cache");
 const helper_1 = require("../helper");
 const base_flags_1 = require("../base-flags");
 const errors_1 = require("../errors");
+const table_formatter_1 = require("../utils/table-formatter");
 class List extends core_1.Command {
     async run() {
         const { flags } = await this.parse(List);
@@ -135,7 +136,7 @@ class List extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table(databases, columns, options);
+            (0, table_formatter_1.formatTable)(databases, columns, options);
             this.log(`\nTip: Run "notion-cli sync" to refresh the cache.`);
             process.exit(0);
         }
@@ -155,7 +156,6 @@ class List extends core_1.Command {
         }
     }
 }
-exports.default = List;
 List.description = 'List all cached databases from your workspace';
 List.aliases = ['db:list', 'ls'];
 List.examples = [
@@ -177,7 +177,8 @@ List.examples = [
     },
 ];
 List.flags = {
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
     ...base_flags_1.OutputFormatFlags,
 };
+exports.default = List;

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
+const table_formatter_1 = require("../../utils/table-formatter");
 const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
@@ -57,7 +58,7 @@ class DbUpdate extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table([res], columns, options);
+            (0, table_formatter_1.formatTable)([res], columns, options);
             process.exit(0);
         }
         catch (error) {
@@ -78,7 +79,6 @@ class DbUpdate extends core_1.Command {
         }
     }
 }
-exports.default = DbUpdate;
 DbUpdate.description = 'Update a data source (table) title and properties';
 DbUpdate.aliases = ['db:u', 'ds:update', 'ds:u'];
 DbUpdate.examples = [
@@ -111,6 +111,7 @@ DbUpdate.flags = {
         char: 'r',
         description: 'output raw json',
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = DbUpdate;

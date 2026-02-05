@@ -44,7 +44,7 @@ describe('block:retrieve', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['block:retrieve', BLOCK_ID])
       .it('shows retrieved block object when success', (ctx) => {
-        expect(ctx.stdout).to.match(/Object.*Id.*Type.*Parent.*Content/)
+        expect(ctx.stdout).to.match(/object.*id.*type.*parent.*content/)
         expect(ctx.stdout).to.match(new RegExp(`block.*${BLOCK_ID}.*child_page.*dummy child page title`))
       })
   })

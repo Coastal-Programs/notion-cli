@@ -84,7 +84,7 @@ describe('search', () => {
       // Need --no-truncate flag to match expected stdout
       .command(['search', '--no-truncate'])
       .it('shows search result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           /dummy page title.*page.*dummy-page-id.*https:\/\/www\.notion\.so\/dummy-page-id/
         )
@@ -109,7 +109,7 @@ describe('search', () => {
     apiMock(titleEmptyResponse)
       .command(['search', '--no-truncate'])
       .it('shows search result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           /Untitled.*page.*dummy-page-id.*https:\/\/www\.notion\.so\/dummy-page-id/
         )

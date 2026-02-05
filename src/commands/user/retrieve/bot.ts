@@ -1,4 +1,4 @@
-import { Command, Flags, ux } from '@oclif/core'
+import { Command, Flags } from '@oclif/core'
 import { UserObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import * as notion from '../../../notion'
 import { outputRawJson } from '../../../helper'
@@ -7,6 +7,7 @@ import {
   NotionCLIError,
   wrapNotionError
 } from '../../../errors'
+import { tableFlags, formatTable } from '../../../utils/table-formatter'
 
 export default class UserRetrieveBot extends Command {
   static description = 'Retrieve a bot user'
@@ -35,7 +36,7 @@ export default class UserRetrieveBot extends Command {
       char: 'r',
       description: 'output raw json',
     }),
-    ...ux.table.flags(),
+    ...tableFlags,
     ...AutomationFlags,
   }
 
@@ -84,7 +85,7 @@ export default class UserRetrieveBot extends Command {
         printLine: this.log.bind(this),
         ...flags,
       }
-      ux.table([res], columns, options)
+      formatTable([res], columns, options)
       process.exit(0)
     } catch (error) {
       const cliError = error instanceof NotionCLIError

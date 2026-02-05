@@ -80,7 +80,7 @@ describe('db:query', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:query', DATABASE_ID, '-a', '{"and": []}'])
       .it('shows query result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`dummy page title.*page.*${PAGE_ID}.*https://www\\.notion\\.so/${PAGE_ID_NO_DASHES}`)
         )
@@ -122,7 +122,7 @@ describe('db:query', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:query', DATABASE_ID, '-a', '{"and": []}'])
       .it('shows query result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`Untitled.*page.*${PAGE_ID}.*https://www\\.notion\\.so/${PAGE_ID_NO_DASHES}`)
         )

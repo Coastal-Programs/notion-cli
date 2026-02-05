@@ -6,7 +6,9 @@
  * Helps AI agents understand the correct format for create/update operations.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.groupExamplesByWritability = exports.formatExamplesForConsole = exports.generatePropertyExamples = void 0;
+exports.generatePropertyExamples = generatePropertyExamples;
+exports.formatExamplesForConsole = formatExamplesForConsole;
+exports.groupExamplesByWritability = groupExamplesByWritability;
 /**
  * Generate property examples for all properties in a data source schema
  *
@@ -23,7 +25,6 @@ function generatePropertyExamples(properties) {
     }
     return examples;
 }
-exports.generatePropertyExamples = generatePropertyExamples;
 /**
  * Generate example for a single property based on its type
  *
@@ -337,7 +338,6 @@ function formatExamplesForConsole(examples) {
     }
     return lines.join('\n');
 }
-exports.formatExamplesForConsole = formatExamplesForConsole;
 /**
  * Group examples by writability (writable vs read-only)
  *
@@ -357,4 +357,3 @@ function groupExamplesByWritability(examples) {
     }
     return { writable, readOnly };
 }
-exports.groupExamplesByWritability = groupExamplesByWritability;

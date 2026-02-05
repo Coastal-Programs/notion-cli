@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@oclif/core");
+const table_formatter_1 = require("../../utils/table-formatter");
 const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const notion_to_md_1 = require("notion-to-md");
@@ -130,7 +131,7 @@ class PageRetrieve extends core_1.Command {
                 printLine: this.log.bind(this),
                 ...flags,
             };
-            core_1.ux.table([res], columns, options);
+            (0, table_formatter_1.formatTable)([res], columns, options);
             // Show hint after table output to make -r flag discoverable
             (0, helper_1.showRawFlagHint)(1, res);
         }
@@ -152,7 +153,6 @@ class PageRetrieve extends core_1.Command {
         }
     }
 }
-exports.default = PageRetrieve;
 PageRetrieve.description = 'Retrieve a page';
 PageRetrieve.aliases = ['page:r'];
 PageRetrieve.examples = [
@@ -237,7 +237,8 @@ PageRetrieve.flags = {
         max: 10,
         dependsOn: ['recursive'],
     }),
-    ...core_1.ux.table.flags(),
+    ...table_formatter_1.tableFlags,
     ...base_flags_1.OutputFormatFlags,
     ...base_flags_1.AutomationFlags,
 };
+exports.default = PageRetrieve;

@@ -398,7 +398,6 @@ class Doctor extends core_1.Command {
         this.log('');
     }
 }
-exports.default = Doctor;
 Doctor.description = 'Run health checks and diagnostics for Notion CLI';
 Doctor.aliases = ['diagnose', 'healthcheck'];
 Doctor.examples = [
@@ -418,3 +417,4 @@ Doctor.flags = {
         default: false,
     }),
 };
+exports.default = Doctor;

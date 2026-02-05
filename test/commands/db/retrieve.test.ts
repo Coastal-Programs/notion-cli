@@ -1,7 +1,7 @@
 import { expect, test } from '@oclif/test'
 import * as nock from 'nock'
 import * as sinon from 'sinon'
-import { cacheManager } from '../../../src/cache'
+import { cacheManager } from '../../../dist/cache.js'
 
 const DATABASE_ID = '11111111-2222-3333-4444-555555555555'
 const DATABASE_ID_NO_DASHES = DATABASE_ID.replace(/-/g, '')
@@ -56,7 +56,7 @@ describe('db:retrieve', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:retrieve', '--no-truncate', DATABASE_ID])
       .it('shows retrieved result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`dummy database title.*data_source.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
         )
@@ -92,7 +92,7 @@ describe('db:retrieve', () => {
       .stdout({ print: process.env.TEST_DEBUG ? true : false })
       .command(['db:retrieve', '--no-truncate', DATABASE_ID])
       .it('shows retrieved result table', (ctx) => {
-        expect(ctx.stdout).to.match(/Title.*Object.*Id.*Url/)
+        expect(ctx.stdout).to.match(/title.*object.*id.*url/)
         expect(ctx.stdout).to.match(
           new RegExp(`Untitled.*data_source.*${DATABASE_ID}.*https://www\\.notion\\.so/${DATABASE_ID_NO_DASHES}`)
         )

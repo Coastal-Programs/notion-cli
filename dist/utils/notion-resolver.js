@@ -16,7 +16,7 @@
  * 5. Smart database_id → data_source_id resolution (for databases)
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveNotionId = void 0;
+exports.resolveNotionId = resolveNotionId;
 const notion_url_parser_1 = require("./notion-url-parser");
 const errors_1 = require("../errors");
 const workspace_cache_1 = require("./workspace-cache");
@@ -95,7 +95,6 @@ async function resolveNotionId(input, type = 'database') {
     }
     throw errors_1.NotionCLIErrorFactory.resourceNotFound(type, trimmed);
 }
-exports.resolveNotionId = resolveNotionId;
 /**
  * Smart database resolution: handles database_id → data_source_id conversion
  *

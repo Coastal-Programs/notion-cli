@@ -432,7 +432,6 @@ class Init extends core_1.Command {
         }
     }
 }
-exports.default = Init;
 Init.description = 'Interactive first-time setup wizard for Notion CLI';
 Init.examples = [
     {
@@ -447,3 +446,4 @@ Init.examples = [
 Init.flags = {
     ...base_flags_1.AutomationFlags,
 };
+exports.default = Init;
