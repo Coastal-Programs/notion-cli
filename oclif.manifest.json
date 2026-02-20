@@ -1915,90 +1915,6 @@
         "update.js"
       ]
     },
-    "cache:info": {
-      "aliases": [
-        "cache:stats",
-        "cache:status"
-      ],
-      "args": {},
-      "description": "Show cache statistics and configuration",
-      "examples": [
-        {
-          "description": "Show cache info in JSON format",
-          "command": "notion-cli cache:info --json"
-        },
-        {
-          "description": "Show cache statistics",
-          "command": "notion-cli cache:info"
-        }
-      ],
-      "flags": {
-        "json": {
-          "char": "j",
-          "description": "Output as JSON (recommended for automation)",
-          "name": "json",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "page-size": {
-          "description": "Items per page (1-100, default: 100 for automation)",
-          "name": "page-size",
-          "default": 100,
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "retry": {
-          "description": "Auto-retry on rate limit (respects Retry-After header)",
-          "name": "retry",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "timeout": {
-          "description": "Request timeout in milliseconds",
-          "name": "timeout",
-          "default": 30000,
-          "hasDynamicHelp": false,
-          "multiple": false,
-          "type": "option"
-        },
-        "no-cache": {
-          "description": "Bypass cache and force fresh API calls",
-          "name": "no-cache",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "verbose": {
-          "char": "v",
-          "description": "Enable verbose logging to stderr (retry events, cache stats) - never pollutes stdout",
-          "env": "NOTION_CLI_VERBOSE",
-          "name": "verbose",
-          "allowNo": false,
-          "type": "boolean"
-        },
-        "minimal": {
-          "description": "Strip unnecessary metadata (created_by, last_edited_by, object fields, request_id, etc.) - reduces response size by ~40%",
-          "name": "minimal",
-          "allowNo": false,
-          "type": "boolean"
-        }
-      },
-      "hasDynamicHelp": false,
-      "hiddenAliases": [],
-      "id": "cache:info",
-      "pluginAlias": "@coastal-programs/notion-cli",
-      "pluginName": "@coastal-programs/notion-cli",
-      "pluginType": "core",
-      "strict": true,
-      "enableJsonFlag": false,
-      "isESM": false,
-      "relativePath": [
-        "dist",
-        "commands",
-        "cache",
-        "info.js"
-      ]
-    },
     "config:set-token": {
       "aliases": [
         "config:token"
@@ -2090,6 +2006,90 @@
         "commands",
         "config",
         "set-token.js"
+      ]
+    },
+    "cache:info": {
+      "aliases": [
+        "cache:stats",
+        "cache:status"
+      ],
+      "args": {},
+      "description": "Show cache statistics and configuration",
+      "examples": [
+        {
+          "description": "Show cache info in JSON format",
+          "command": "notion-cli cache:info --json"
+        },
+        {
+          "description": "Show cache statistics",
+          "command": "notion-cli cache:info"
+        }
+      ],
+      "flags": {
+        "json": {
+          "char": "j",
+          "description": "Output as JSON (recommended for automation)",
+          "name": "json",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "page-size": {
+          "description": "Items per page (1-100, default: 100 for automation)",
+          "name": "page-size",
+          "default": 100,
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "retry": {
+          "description": "Auto-retry on rate limit (respects Retry-After header)",
+          "name": "retry",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "timeout": {
+          "description": "Request timeout in milliseconds",
+          "name": "timeout",
+          "default": 30000,
+          "hasDynamicHelp": false,
+          "multiple": false,
+          "type": "option"
+        },
+        "no-cache": {
+          "description": "Bypass cache and force fresh API calls",
+          "name": "no-cache",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "verbose": {
+          "char": "v",
+          "description": "Enable verbose logging to stderr (retry events, cache stats) - never pollutes stdout",
+          "env": "NOTION_CLI_VERBOSE",
+          "name": "verbose",
+          "allowNo": false,
+          "type": "boolean"
+        },
+        "minimal": {
+          "description": "Strip unnecessary metadata (created_by, last_edited_by, object fields, request_id, etc.) - reduces response size by ~40%",
+          "name": "minimal",
+          "allowNo": false,
+          "type": "boolean"
+        }
+      },
+      "hasDynamicHelp": false,
+      "hiddenAliases": [],
+      "id": "cache:info",
+      "pluginAlias": "@coastal-programs/notion-cli",
+      "pluginName": "@coastal-programs/notion-cli",
+      "pluginType": "core",
+      "strict": true,
+      "enableJsonFlag": false,
+      "isESM": false,
+      "relativePath": [
+        "dist",
+        "commands",
+        "cache",
+        "info.js"
       ]
     },
     "db:create": {
