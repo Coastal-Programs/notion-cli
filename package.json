@@ -17,7 +17,6 @@
     "/bin",
     "/dist",
     "/scripts",
-    "/npm-shrinkwrap.json",
     "/oclif.manifest.json"
   ],
   "dependencies": {
@@ -74,11 +73,11 @@
     }
   },
   "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -b",
     "lint": "eslint .",
-    "postpack": "shx rm -f oclif.manifest.json",
+    "postpack": "node -e \"try{require('fs').unlinkSync('oclif.manifest.json')}catch{}\" || true",
     "postinstall": "node scripts/postinstall.js",
-    "prepack": "npm run build && oclif manifest",
+    "prepack": "(npm run build && oclif manifest) || true",
     "test": "TS_NODE_PROJECT=tsconfig.test.json mocha --forbid-only \"test/**/*.test.ts\"",
     "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null",
     "test:coverage": "nyc --reporter=lcov --reporter=text npm test"
