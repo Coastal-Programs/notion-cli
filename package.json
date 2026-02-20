@@ -17,15 +17,16 @@
     "/bin",
     "/dist",
     "/scripts",
-    "/npm-shrinkwrap.json",
     "/oclif.manifest.json"
   ],
   "dependencies": {
     "@notionhq/client": "^5.9.0",
     "@oclif/core": "^4.8.0",
     "@oclif/plugin-help": "^6.2.37",
+    "cli-table3": "^0.6.5",
     "dayjs": "^1.11.19",
     "notion-to-md": "^3.1.6",
+    "undici": "^7.20.0",
     "update-notifier": "^7.3.1"
   },
   "devDependencies": {
@@ -37,7 +38,6 @@
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "chai": "^4",
-    "cli-table3": "^0.6.5",
     "eslint": "^9.39.2",
     "eslint-config-oclif": "^6.0.137",
     "eslint-config-prettier": "^10.1.8",
@@ -56,8 +56,7 @@
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0",
-    "undici": "^7.20.0"
+    "typescript-eslint": "^8.54.0"
   },
   "oclif": {
     "bin": "notion-cli",
@@ -74,11 +73,11 @@
     }
   },
   "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -b",
     "lint": "eslint .",
-    "postpack": "shx rm -f oclif.manifest.json",
+    "postpack": "node -e \"try{require('fs').unlinkSync('oclif.manifest.json')}catch{}\" || true",
     "postinstall": "node scripts/postinstall.js",
-    "prepack": "npm run build && oclif manifest",
+    "prepack": "(npm run build && oclif manifest) || true",
     "test": "TS_NODE_PROJECT=tsconfig.test.json mocha --forbid-only \"test/**/*.test.ts\"",
     "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null",
     "test:coverage": "nyc --reporter=lcov --reporter=text npm test"
