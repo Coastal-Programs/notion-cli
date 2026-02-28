@@ -5,17 +5,19 @@ const notion = require("../../../notion");
 const helper_1 = require("../../../helper");
 const base_flags_1 = require("../../../base-flags");
 const errors_1 = require("../../../errors");
+const notion_resolver_1 = require("../../../utils/notion-resolver");
 class PageRetrievePropertyItem extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(PageRetrievePropertyItem);
         try {
-            const res = await notion.retrievePageProperty(args.page_id, args.property_id);
+            const pageId = await (0, notion_resolver_1.resolveNotionId)(args.page_id, "page");
+            const res = await notion.retrievePageProperty(pageId, args.property_id);
             // Handle JSON output for automation
             if (flags.json) {
                 this.log(JSON.stringify({
                     success: true,
                     data: res,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 }, null, 2));
                 process.exit(0);
                 return;
@@ -28,9 +30,9 @@ class PageRetrievePropertyItem extends core_1.Command {
             const cliError = error instanceof errors_1.NotionCLIError
                 ? error
                 : (0, errors_1.wrapNotionError)(error, {
-                    resourceType: 'page',
+                    resourceType: "page",
                     attemptedId: args.page_id,
-                    endpoint: 'pages.properties.retrieve'
+                    endpoint: "pages.properties.retrieve",
                 });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
@@ -42,30 +44,30 @@ class PageRetrievePropertyItem extends core_1.Command {
         }
     }
 }
-PageRetrievePropertyItem.description = 'Retrieve a page property item';
-PageRetrievePropertyItem.aliases = ['page:r:pi'];
+PageRetrievePropertyItem.description = "Retrieve a page property item";
+PageRetrievePropertyItem.aliases = ["page:r:pi"];
 PageRetrievePropertyItem.examples = [
     {
-        description: 'Retrieve a page property item',
+        description: "Retrieve a page property item",
         command: `$ notion-cli page retrieve:property_item PAGE_ID PROPERTY_ID`,
     },
     {
-        description: 'Retrieve a page property item and output raw json',
+        description: "Retrieve a page property item and output raw json",
         command: `$ notion-cli page retrieve:property_item PAGE_ID PROPERTY_ID -r`,
     },
     {
-        description: 'Retrieve a page property item and output JSON for automation',
+        description: "Retrieve a page property item and output JSON for automation",
         command: `$ notion-cli page retrieve:property_item PAGE_ID PROPERTY_ID --json`,
     },
 ];
 PageRetrievePropertyItem.args = {
-    page_id: core_1.Args.string({ required: true }),
+    page_id: core_1.Args.string({ required: true, description: "Page ID or URL" }),
     property_id: core_1.Args.string({ required: true }),
 };
 PageRetrievePropertyItem.flags = {
     raw: core_1.Flags.boolean({
-        char: 'r',
-        description: 'output raw json',
+        char: "r",
+        description: "output raw json",
     }),
     ...base_flags_1.AutomationFlags,
 };

@@ -6,17 +6,19 @@ const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class BlockDelete extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(BlockDelete);
         try {
-            const res = await notion.deleteBlock(args.block_id);
+            const blockId = await (0, notion_resolver_1.resolveNotionId)(args.block_id, "page");
+            const res = await notion.deleteBlock(blockId);
             // Handle JSON output for automation
             if (flags.json) {
                 this.log(JSON.stringify({
                     success: true,
                     data: res,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 }, null, 2));
                 process.exit(0);
                 return;
@@ -50,9 +52,9 @@ class BlockDelete extends core_1.Command {
             const cliError = error instanceof errors_1.NotionCLIError
                 ? error
                 : (0, errors_1.wrapNotionError)(error, {
-                    resourceType: 'block',
+                    resourceType: "block",
                     attemptedId: args.block_id,
-                    endpoint: 'blocks.delete'
+                    endpoint: "blocks.delete",
                 });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
@@ -64,29 +66,29 @@ class BlockDelete extends core_1.Command {
         }
     }
 }
-BlockDelete.description = 'Delete a block';
-BlockDelete.aliases = ['block:d'];
+BlockDelete.description = "Delete a block";
+BlockDelete.aliases = ["block:d"];
 BlockDelete.examples = [
     {
-        description: 'Delete a block',
+        description: "Delete a block",
         command: `$ notion-cli block delete BLOCK_ID`,
     },
     {
-        description: 'Delete a block and output raw json',
+        description: "Delete a block and output raw json",
         command: `$ notion-cli block delete BLOCK_ID -r`,
     },
     {
-        description: 'Delete a block and output JSON for automation',
+        description: "Delete a block and output JSON for automation",
         command: `$ notion-cli block delete BLOCK_ID --json`,
     },
 ];
 BlockDelete.args = {
-    block_id: core_1.Args.string({ required: true }),
+    block_id: core_1.Args.string({ required: true, description: "Block ID or URL" }),
 };
 BlockDelete.flags = {
     raw: core_1.Flags.boolean({
-        char: 'r',
-        description: 'output raw json',
+        char: "r",
+        description: "output raw json",
     }),
     ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,

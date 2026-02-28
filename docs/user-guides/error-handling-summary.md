@@ -18,17 +18,20 @@ This document provides a complete overview of the AI-friendly error handling sys
 ### Current Issues
 
 **AI Testing Revealed:**
+
 - Generic error messages ("Resource not found") provide no debugging context
 - No distinction between common failure scenarios
 - No suggested fixes or next steps
 - Difficult for AI assistants to help users troubleshoot
 
 **Example of Current Error:**
+
 ```
 Error: object_not_found
 ```
 
 **What Users Need:**
+
 ```
 ❌ Database not found: 1fb79d4c71bb8032b722c82305b63a00
    Error Code: DATABASE_NOT_FOUND
@@ -93,7 +96,9 @@ Enhanced Error System
 ### 1. Implementation Files
 
 #### ✅ Core Error System
+
 **File**: `src/errors/enhanced-errors.ts` (542 lines)
+
 - NotionCLIError class
 - NotionCLIErrorCode enum (30+ codes)
 - NotionCLIErrorFactory class (10+ factory methods)
@@ -101,7 +106,9 @@ Enhanced Error System
 - handleCliError() function
 
 #### ✅ Clean Exports
+
 **File**: `src/errors/index.ts` (28 lines)
+
 - Centralized import point
 - Backward compatibility layer
 - Type exports
@@ -109,7 +116,9 @@ Enhanced Error System
 ### 2. Documentation
 
 #### ✅ Architecture Document
+
 **File**: `docs/ERROR-HANDLING-ARCHITECTURE.md` (1,800+ lines)
+
 - Complete technical specification
 - Error code taxonomy
 - Integration patterns
@@ -117,28 +126,36 @@ Enhanced Error System
 - Migration roadmap
 
 #### ✅ Quick Reference
+
 **File**: `docs/ERROR-HANDLING-QUICK-REF.md` (600+ lines)
+
 - Common patterns
 - Factory function reference
 - Decision tree
 - Testing checklist
 
 #### ✅ Examples Document
+
 **File**: `docs/ERROR-HANDLING-EXAMPLES.md` (800+ lines)
+
 - Real command integrations
 - Validation utilities
 - Retry logic examples
 - Test templates
 
 #### ✅ Migration Guide
+
 **File**: `docs/ERROR-HANDLING-MIGRATION.md` (650+ lines)
+
 - Step-by-step migration
 - Command-by-command checklist
 - Testing strategy
 - Rollback plan
 
 #### ✅ This Summary
+
 **File**: `docs/ERROR-HANDLING-SUMMARY.md`
+
 - Executive overview
 - Quick navigation
 - Success metrics
@@ -149,67 +166,68 @@ Enhanced Error System
 
 ### Authentication & Authorization (6 Codes)
 
-| Code | Scenario | User Action | Retry? |
-|------|----------|-------------|--------|
-| `TOKEN_MISSING` | NOTION_TOKEN not set | Set token via config | No |
-| `TOKEN_INVALID` | Token expired/invalid | Generate new token | No |
-| `TOKEN_EXPIRED` | Token no longer valid | Refresh token | No |
-| `INTEGRATION_NOT_SHARED` | Resource not shared | Share with integration | No |
-| `PERMISSION_DENIED` | Insufficient permissions | Check workspace role | No |
-| `UNAUTHORIZED` | Generic auth failure | Verify credentials | No |
+| Code                     | Scenario                 | User Action            | Retry? |
+| ------------------------ | ------------------------ | ---------------------- | ------ |
+| `TOKEN_MISSING`          | NOTION_TOKEN not set     | Set token via config   | No     |
+| `TOKEN_INVALID`          | Token expired/invalid    | Generate new token     | No     |
+| `TOKEN_EXPIRED`          | Token no longer valid    | Refresh token          | No     |
+| `INTEGRATION_NOT_SHARED` | Resource not shared      | Share with integration | No     |
+| `PERMISSION_DENIED`      | Insufficient permissions | Check workspace role   | No     |
+| `UNAUTHORIZED`           | Generic auth failure     | Verify credentials     | No     |
 
 ### Resource Errors (5 Codes)
 
-| Code | Scenario | User Action | Retry? |
-|------|----------|-------------|--------|
-| `OBJECT_NOT_FOUND` | Generic 404 | Verify ID/permissions | Maybe |
-| `DATABASE_NOT_FOUND` | Database 404 | Run sync, check ID | Maybe |
-| `PAGE_NOT_FOUND` | Page 404 | Verify ID/permissions | Maybe |
-| `BLOCK_NOT_FOUND` | Block 404 | Verify ID/permissions | Maybe |
-| `NOT_FOUND` | Catch-all 404 | General troubleshooting | Maybe |
+| Code                 | Scenario      | User Action             | Retry? |
+| -------------------- | ------------- | ----------------------- | ------ |
+| `OBJECT_NOT_FOUND`   | Generic 404   | Verify ID/permissions   | Maybe  |
+| `DATABASE_NOT_FOUND` | Database 404  | Run sync, check ID      | Maybe  |
+| `PAGE_NOT_FOUND`     | Page 404      | Verify ID/permissions   | Maybe  |
+| `BLOCK_NOT_FOUND`    | Block 404     | Verify ID/permissions   | Maybe  |
+| `NOT_FOUND`          | Catch-all 404 | General troubleshooting | Maybe  |
 
 ### Validation Errors (8 Codes)
 
-| Code | Scenario | User Action | Retry? |
-|------|----------|-------------|--------|
-| `INVALID_ID_FORMAT` | Malformed Notion ID | Use correct format | No |
-| `INVALID_DATABASE_ID` | Bad database ID | Validate format | No |
-| `INVALID_PAGE_ID` | Bad page ID | Validate format | No |
-| `INVALID_BLOCK_ID` | Bad block ID | Validate format | No |
-| `INVALID_URL` | Malformed URL | Use correct URL | No |
-| `INVALID_JSON` | JSON parse failed | Check JSON syntax | No |
-| `INVALID_PROPERTY` | Property doesn't exist | Check schema | No |
-| `INVALID_FILTER` | Bad filter syntax | Validate filter | No |
+| Code                  | Scenario               | User Action        | Retry? |
+| --------------------- | ---------------------- | ------------------ | ------ |
+| `INVALID_ID_FORMAT`   | Malformed Notion ID    | Use correct format | No     |
+| `INVALID_DATABASE_ID` | Bad database ID        | Validate format    | No     |
+| `INVALID_PAGE_ID`     | Bad page ID            | Validate format    | No     |
+| `INVALID_BLOCK_ID`    | Bad block ID           | Validate format    | No     |
+| `INVALID_URL`         | Malformed URL          | Use correct URL    | No     |
+| `INVALID_JSON`        | JSON parse failed      | Check JSON syntax  | No     |
+| `INVALID_PROPERTY`    | Property doesn't exist | Check schema       | No     |
+| `INVALID_FILTER`      | Bad filter syntax      | Validate filter    | No     |
 
 ### Network & API Errors (5 Codes)
 
-| Code | Scenario | User Action | Retry? |
-|------|----------|-------------|--------|
-| `RATE_LIMITED` | 429 Too Many Requests | Wait and retry | Yes |
-| `NETWORK_ERROR` | Connection failed | Check network | Yes |
-| `SERVICE_UNAVAILABLE` | 503/504 from API | Wait for Notion | Yes |
-| `TIMEOUT` | Request timed out | Retry | Yes |
-| `API_ERROR` | Generic API error | Check docs | Maybe |
+| Code                  | Scenario              | User Action     | Retry? |
+| --------------------- | --------------------- | --------------- | ------ |
+| `RATE_LIMITED`        | 429 Too Many Requests | Wait and retry  | Yes    |
+| `NETWORK_ERROR`       | Connection failed     | Check network   | Yes    |
+| `SERVICE_UNAVAILABLE` | 503/504 from API      | Wait for Notion | Yes    |
+| `TIMEOUT`             | Request timed out     | Retry           | Yes    |
+| `API_ERROR`           | Generic API error     | Check docs      | Maybe  |
 
 ### Cache & State (2 Codes)
 
-| Code | Scenario | User Action | Retry? |
-|------|----------|-------------|--------|
-| `WORKSPACE_NOT_SYNCED` | Name lookup failed | Run sync command | No |
-| `CACHE_ERROR` | Cache read/write fail | Clear cache | No |
+| Code                   | Scenario              | User Action      | Retry? |
+| ---------------------- | --------------------- | ---------------- | ------ |
+| `WORKSPACE_NOT_SYNCED` | Name lookup failed    | Run sync command | No     |
+| `CACHE_ERROR`          | Cache read/write fail | Clear cache      | No     |
 
 ### Special Cases (2 Codes)
 
-| Code | Scenario | Purpose | Retry? |
-|------|----------|---------|--------|
-| `DATABASE_ID_CONFUSION` | API v5 terminology | Educational hint | No |
-| `WORKSPACE_VS_DATABASE` | Wrong ID type used | Clarification | No |
+| Code                    | Scenario           | Purpose          | Retry? |
+| ----------------------- | ------------------ | ---------------- | ------ |
+| `DATABASE_ID_CONFUSION` | API v5 terminology | Educational hint | No     |
+| `WORKSPACE_VS_DATABASE` | Wrong ID type used | Clarification    | No     |
 
 ---
 
 ## Common Error Scenarios
 
 ### 1. Integration Not Shared
+
 **Frequency**: Very High
 **Impact**: High - Blocks all operations
 
@@ -226,6 +244,7 @@ Enhanced Error System
 ```
 
 ### 2. Invalid ID Format
+
 **Frequency**: High
 **Impact**: Medium - Easy to fix
 
@@ -241,6 +260,7 @@ Enhanced Error System
 ```
 
 ### 3. Workspace Not Synced
+
 **Frequency**: Medium
 **Impact**: Medium - Prevents name resolution
 
@@ -257,6 +277,7 @@ Enhanced Error System
 ```
 
 ### 4. Rate Limited
+
 **Frequency**: Low-Medium
 **Impact**: Low - Automatic retry
 
@@ -272,6 +293,7 @@ Enhanced Error System
 ```
 
 ### 5. Token Missing
+
 **Frequency**: Medium (new users)
 **Impact**: High - Blocks all operations
 
@@ -295,6 +317,7 @@ Enhanced Error System
 ### Human-Readable (Default)
 
 **Format:**
+
 ```
 ❌ [Error message]
    Error Code: [CODE]
@@ -307,6 +330,7 @@ Enhanced Error System
 ```
 
 **Visual Features:**
+
 - ❌ Error indicator
 - 💡 Suggestions indicator
 - 🔗 Link indicator
@@ -342,7 +366,16 @@ Enhanced Error System
 ### Compact JSON (Logging)
 
 ```json
-{"success":false,"error":{"code":"NOT_FOUND","message":"Database not found","suggestions":[],"context":{},"timestamp":"2025-10-22T10:30:00.000Z"}}
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Database not found",
+    "suggestions": [],
+    "context": {},
+    "timestamp": "2025-10-22T10:30:00.000Z"
+  }
+}
 ```
 
 ---
@@ -353,34 +386,29 @@ Enhanced Error System
 
 ```typescript
 // 1. Import error system
-import {
-  handleCliError,
-  NotionCLIErrorFactory,
-  ErrorContext
-} from '../errors'
+import { handleCliError, NotionCLIErrorFactory, ErrorContext } from "../errors";
 
 // 2. Add try-catch with context
 export default class MyCommand extends Command {
   async run() {
     try {
       // Your command logic
-      const result = await someOperation()
+      const result = await someOperation();
 
       // Success output
       if (flags.json) {
-        this.log(JSON.stringify({ success: true, data: result }))
+        this.log(JSON.stringify({ success: true, data: result }));
       }
-
     } catch (error) {
       // Provide context for better error messages
       const context: ErrorContext = {
-        resourceType: 'database',
+        resourceType: "database",
         attemptedId: args.database_id,
-        userInput: args.database_id
-      }
+        userInput: args.database_id,
+      };
 
       // handleCliError formats and exits
-      handleCliError(error, flags.json, context)
+      handleCliError(error, flags.json, context);
     }
   }
 }
@@ -389,33 +417,36 @@ export default class MyCommand extends Command {
 ### Best Practices
 
 1. **Always Provide Context**
+
    ```typescript
    const context: ErrorContext = {
-     resourceType: 'database',
+     resourceType: "database",
      attemptedId: databaseId,
      userInput: userInput,
-     endpoint: 'dataSources.query'
-   }
+     endpoint: "dataSources.query",
+   };
    ```
 
 2. **Validate Before API Calls**
+
    ```typescript
    // Check ID format before making API call
    if (!/^[a-f0-9]{32}$/i.test(cleanId)) {
-     throw NotionCLIErrorFactory.invalidIdFormat(input, 'database')
+     throw NotionCLIErrorFactory.invalidIdFormat(input, "database");
    }
    ```
 
 3. **Use Factory Functions**
+
    ```typescript
    // Use specialized factory instead of generic error
-   throw NotionCLIErrorFactory.integrationNotShared('database', dbId)
+   throw NotionCLIErrorFactory.integrationNotShared("database", dbId);
    ```
 
 4. **Handle JSON Output**
    ```typescript
    // Support both human and automation modes
-   handleCliError(error, flags.json, context)
+   handleCliError(error, flags.json, context);
    ```
 
 ---
@@ -425,23 +456,23 @@ export default class MyCommand extends Command {
 ### Unit Tests (Per Error Type)
 
 ```typescript
-describe('NotionCLIErrorFactory', () => {
-  it('creates token missing error with correct code')
-  it('includes setup command in suggestions')
-  it('includes link to integration docs')
-  it('formats JSON output correctly')
-})
+describe("NotionCLIErrorFactory", () => {
+  it("creates token missing error with correct code");
+  it("includes setup command in suggestions");
+  it("includes link to integration docs");
+  it("formats JSON output correctly");
+});
 ```
 
 ### Integration Tests (Per Command)
 
 ```typescript
-describe('db query command', () => {
-  it('returns TOKEN_MISSING when token not set')
-  it('returns INVALID_ID_FORMAT for bad ID')
-  it('returns INTEGRATION_NOT_SHARED for 403')
-  it('supports JSON output mode')
-})
+describe("db query command", () => {
+  it("returns TOKEN_MISSING when token not set");
+  it("returns INVALID_ID_FORMAT for bad ID");
+  it("returns INTEGRATION_NOT_SHARED for 403");
+  it("supports JSON output mode");
+});
 ```
 
 ### Manual Testing
@@ -457,12 +488,14 @@ describe('db query command', () => {
 ## Migration Roadmap
 
 ### Week 1: High Priority Commands
+
 - db query
 - db retrieve
 - page retrieve
 - list
 
 ### Week 2: Write Commands
+
 - db create
 - db update
 - page create
@@ -471,12 +504,14 @@ describe('db query command', () => {
 - block update
 
 ### Week 3: Utility Commands
+
 - sync
 - config set-token
 - db schema
 - Other minor commands
 
 ### Week 4: Polish & Release
+
 - Full test coverage
 - Documentation updates
 - User acceptance testing
@@ -487,12 +522,14 @@ describe('db query command', () => {
 ## Success Metrics
 
 ### Quantitative Goals
+
 - ✅ 30+ specialized error codes
 - ✅ 100% of commands use enhanced errors
 - ✅ <20ms overhead per error
 - ✅ >90% test coverage
 
 ### Qualitative Goals
+
 - ✅ AI assistants can debug independently
 - ✅ Users report clearer error messages
 - ✅ Reduced support requests
@@ -510,6 +547,7 @@ describe('db query command', () => {
 **Total Overhead**: <20ms per error (negligible for CLI)
 
 **Memory Usage**:
+
 - Base error: ~2KB
 - With context: ~5KB
 - JSON output: ~3KB
@@ -521,10 +559,12 @@ describe('db query command', () => {
 ## File Locations
 
 ### Implementation
+
 - `src/errors/enhanced-errors.ts` - Main error system
 - `src/errors/index.ts` - Clean exports
 
 ### Documentation
+
 - `docs/ERROR-HANDLING-ARCHITECTURE.md` - Complete technical spec
 - `docs/ERROR-HANDLING-QUICK-REF.md` - Quick reference guide
 - `docs/ERROR-HANDLING-EXAMPLES.md` - Real-world examples
@@ -532,6 +572,7 @@ describe('db query command', () => {
 - `docs/ERROR-HANDLING-SUMMARY.md` - This document
 
 ### Tests (To Be Created)
+
 - `test/errors/enhanced-errors.test.ts` - Unit tests
 - `test/integration/error-handling.test.ts` - Integration tests
 
@@ -540,21 +581,25 @@ describe('db query command', () => {
 ## Navigation Guide
 
 **For Developers:**
+
 1. Start with [Quick Reference](./ERROR-HANDLING-QUICK-REF.md)
 2. Review [Examples](./ERROR-HANDLING-EXAMPLES.md)
 3. Follow [Migration Guide](./ERROR-HANDLING-MIGRATION.md)
 
 **For Architects:**
+
 1. Read [Architecture Document](./ERROR-HANDLING-ARCHITECTURE.md)
 2. Review code in `src/errors/enhanced-errors.ts`
 3. Check integration examples
 
 **For Testers:**
+
 1. Check [Migration Guide Testing Strategy](./ERROR-HANDLING-MIGRATION.md#testing-strategy)
 2. Follow manual testing checklist
 3. Review integration test examples
 
 **For AI Assistants:**
+
 1. Error codes in [Quick Reference](./ERROR-HANDLING-QUICK-REF.md#error-code-reference)
 2. Common scenarios in [Architecture](./ERROR-HANDLING-ARCHITECTURE.md#common-error-scenarios)
 3. JSON output format examples throughout
@@ -564,21 +609,24 @@ describe('db query command', () => {
 ## Next Steps
 
 ### Immediate Actions
+
 1. ✅ Review this summary
 2. ✅ Read architecture document
 3. ⏳ Approve design
 4. ⏳ Begin Phase 1 implementation
 
 ### Implementation Order
+
 1. **Week 1**: Core commands (db query, db retrieve, page retrieve, list)
 2. **Week 2**: Write commands (create, update operations)
 3. **Week 3**: Utility commands (sync, config, schema)
 4. **Week 4**: Testing, polish, documentation, release
 
 ### Success Criteria
+
 - [ ] All 25+ commands migrated
 - [ ] 100% backward compatibility
-- [ ] >90% test coverage
+- [ ] > 90% test coverage
 - [ ] Positive user feedback
 - [ ] AI assistants report improved debuggability
 
@@ -587,17 +635,20 @@ describe('db query command', () => {
 ## Support & Feedback
 
 ### Documentation
+
 - [Architecture](./ERROR-HANDLING-ARCHITECTURE.md)
 - [Quick Reference](./ERROR-HANDLING-QUICK-REF.md)
 - [Examples](./ERROR-HANDLING-EXAMPLES.md)
 - [Migration Guide](./ERROR-HANDLING-MIGRATION.md)
 
 ### Code
+
 - Implementation: `src/errors/enhanced-errors.ts`
 - Exports: `src/errors/index.ts`
 
 ### Issues
-- GitHub: [Coastal-Programs/notion-cli/issues](https://github.com/Coastal-Programs/notion-cli/issues)
+
+- GitHub: [infograb/notion-cli/issues](https://github.com/infograb/notion-cli/issues)
 - Tag: `error-handling`
 
 ---
@@ -607,6 +658,7 @@ describe('db query command', () => {
 This enhanced error handling system represents a significant improvement in the Notion CLI's usability, especially for AI assistants and automation systems. By providing context-rich errors with actionable suggestions, we empower users to resolve issues quickly without external support.
 
 **Key Achievements:**
+
 - ✅ 30+ specialized error types
 - ✅ Contextual suggestions with commands
 - ✅ Multiple output formats
@@ -616,6 +668,7 @@ This enhanced error handling system represents a significant improvement in the 
 - ✅ Zero breaking changes
 
 **Impact:**
+
 - **For Users**: Clear, actionable error messages
 - **For AI Assistants**: Structured errors for automated debugging
 - **For Developers**: Easy-to-use, testable error system

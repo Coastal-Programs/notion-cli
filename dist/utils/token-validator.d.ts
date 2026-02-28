@@ -39,4 +39,17 @@ export declare function maskToken(token: string): string;
  * }
  * ```
  */
+/**
+ * Valid Notion token prefixes.
+ * - "secret_": Internal integration tokens (legacy format, still valid)
+ * - "ntn_": New token format introduced September 2024
+ */
+export declare const VALID_TOKEN_PREFIXES: readonly ["secret_", "ntn_"];
+/**
+ * Checks whether a token string has a recognized Notion token prefix.
+ *
+ * @param token - The token to check
+ * @returns true if the token starts with a known Notion prefix
+ */
+export declare function hasValidTokenPrefix(token: string): boolean;
 export declare function validateNotionToken(): void;

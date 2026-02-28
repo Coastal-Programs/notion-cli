@@ -63,7 +63,7 @@ export interface ErrorSuggestion {
  */
 export interface ErrorContext {
     /** The resource type being accessed */
-    resourceType?: 'database' | 'page' | 'block' | 'user' | 'workspace';
+    resourceType?: "database" | "page" | "block" | "user" | "workspace";
     /** The ID that was attempted */
     attemptedId?: string;
     /** The input that led to the error */
@@ -124,15 +124,15 @@ export declare class NotionCLIErrorFactory {
     /**
      * Integration not shared with resource
      */
-    static integrationNotShared(resourceType: 'database' | 'page', resourceId?: string): NotionCLIError;
+    static integrationNotShared(resourceType: "database" | "page", resourceId?: string): NotionCLIError;
     /**
      * Database/Page/Block not found
      */
-    static resourceNotFound(resourceType: 'database' | 'page' | 'block', identifier: string): NotionCLIError;
+    static resourceNotFound(resourceType: "database" | "page" | "block", identifier: string): NotionCLIError;
     /**
      * Invalid ID format
      */
-    static invalidIdFormat(input: string, resourceType?: 'database' | 'page' | 'block'): NotionCLIError;
+    static invalidIdFormat(input: string, resourceType?: "database" | "page" | "block"): NotionCLIError;
     /**
      * Common confusion: using database_id when data_source_id is needed
      */

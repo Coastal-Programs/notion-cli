@@ -1,4 +1,4 @@
-import { Command } from '@oclif/core';
+import { Command } from "@oclif/core";
 export default class BlockRetrieve extends Command {
     static description: string;
     static aliases: string[];

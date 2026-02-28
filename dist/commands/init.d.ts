@@ -1,4 +1,4 @@
-import { Command } from '@oclif/core';
+import { Command } from "@oclif/core";
 /**
  * Interactive first-time setup wizard for Notion CLI
  *

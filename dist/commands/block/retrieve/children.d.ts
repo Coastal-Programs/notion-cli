@@ -1,4 +1,4 @@
-import { Command } from '@oclif/core';
+import { Command } from "@oclif/core";
 export default class BlockRetrieveChildren extends Command {
     static description: string;
     static aliases: string[];
@@ -25,7 +25,7 @@ export default class BlockRetrieveChildren extends Command {
         'no-truncate': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         'no-header': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
         raw: import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
-        'show-databases': import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
+        "show-databases": import("@oclif/core/lib/interfaces").BooleanFlag<boolean>;
     };
     run(): Promise<void>;
 }

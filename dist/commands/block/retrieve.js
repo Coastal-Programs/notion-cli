@@ -6,11 +6,13 @@ const notion = require("../../notion");
 const helper_1 = require("../../helper");
 const base_flags_1 = require("../../base-flags");
 const errors_1 = require("../../errors");
+const notion_resolver_1 = require("../../utils/notion-resolver");
 class BlockRetrieve extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(BlockRetrieve);
         try {
-            let res = await notion.retrieveBlock(args.block_id);
+            const blockId = await (0, notion_resolver_1.resolveNotionId)(args.block_id, "page");
+            let res = await notion.retrieveBlock(blockId);
             // Apply minimal flag to strip metadata
             if (flags.minimal) {
                 res = (0, helper_1.stripMetadata)(res);
@@ -20,7 +22,7 @@ class BlockRetrieve extends core_1.Command {
                 this.log(JSON.stringify({
                     success: true,
                     data: res,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 }, null, 2));
                 process.exit(0);
                 return;
@@ -54,9 +56,9 @@ class BlockRetrieve extends core_1.Command {
             const cliError = error instanceof errors_1.NotionCLIError
                 ? error
                 : (0, errors_1.wrapNotionError)(error, {
-                    resourceType: 'block',
+                    resourceType: "block",
                     attemptedId: args.block_id,
-                    endpoint: 'blocks.retrieve'
+                    endpoint: "blocks.retrieve",
                 });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
@@ -68,29 +70,29 @@ class BlockRetrieve extends core_1.Command {
         }
     }
 }
-BlockRetrieve.description = 'Retrieve a block';
-BlockRetrieve.aliases = ['block:r'];
+BlockRetrieve.description = "Retrieve a block";
+BlockRetrieve.aliases = ["block:r"];
 BlockRetrieve.examples = [
     {
-        description: 'Retrieve a block',
+        description: "Retrieve a block",
         command: `$ notion-cli block retrieve BLOCK_ID`,
     },
     {
-        description: 'Retrieve a block and output raw json',
+        description: "Retrieve a block and output raw json",
         command: `$ notion-cli block retrieve BLOCK_ID -r`,
     },
     {
-        description: 'Retrieve a block and output JSON for automation',
+        description: "Retrieve a block and output JSON for automation",
         command: `$ notion-cli block retrieve BLOCK_ID --json`,
     },
 ];
 BlockRetrieve.args = {
-    block_id: core_1.Args.string({ required: true }),
+    block_id: core_1.Args.string({ required: true, description: "Block ID or URL" }),
 };
 BlockRetrieve.flags = {
     raw: core_1.Flags.boolean({
-        char: 'r',
-        description: 'output raw json',
+        char: "r",
+        description: "output raw json",
     }),
     ...table_formatter_1.tableFlags,
     ...base_flags_1.AutomationFlags,

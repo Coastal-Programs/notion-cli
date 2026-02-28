@@ -28,7 +28,7 @@ This project follows a simple code of conduct: be respectful, constructive, and 
    ```
 3. **Add upstream remote**:
    ```bash
-   git remote add upstream https://github.com/Coastal-Programs/notion-cli.git
+   git remote add upstream https://github.com/infograb/notion-cli.git
    ```
 4. **Create a branch** for your changes:
    ```bash
@@ -131,7 +131,7 @@ We use **Prettier** for consistent formatting:
 
 All public APIs must have JSDoc comments:
 
-```typescript
+````typescript
 /**
  * Retrieve a database by ID
  *
@@ -148,11 +148,11 @@ All public APIs must have JSDoc comments:
  */
 async function retrieveDatabase(
   databaseId: string,
-  options?: RetrievalOptions
+  options?: RetrievalOptions,
 ): Promise<Database> {
   // Implementation
 }
-```
+````
 
 ## Testing Requirements
 
@@ -181,25 +181,25 @@ npm test -- --reporter spec
 We use **Mocha** and **Chai** for testing:
 
 ```typescript
-import { expect } from 'chai'
-import { describe, it } from 'mocha'
+import { expect } from "chai";
+import { describe, it } from "mocha";
 
-describe('db query command', () => {
-  it('should query database successfully', async () => {
+describe("db query command", () => {
+  it("should query database successfully", async () => {
     // Arrange
-    const databaseId = 'test-id'
+    const databaseId = "test-id";
 
     // Act
-    const result = await queryDatabase(databaseId)
+    const result = await queryDatabase(databaseId);
 
     // Assert
-    expect(result).to.have.property('results')
-  })
+    expect(result).to.have.property("results");
+  });
 
-  it('should handle errors gracefully', async () => {
+  it("should handle errors gracefully", async () => {
     // Test error case
-  })
-})
+  });
+});
 ```
 
 ### Test Guidelines
@@ -215,12 +215,14 @@ describe('db query command', () => {
 ### Before Submitting
 
 1. **Update from upstream**:
+
    ```bash
    git fetch upstream
    git rebase upstream/main
    ```
 
 2. **Run all checks**:
+
    ```bash
    npm run build
    npm test
@@ -235,6 +237,7 @@ describe('db query command', () => {
 ### Submitting
 
 1. **Push to your fork**:
+
    ```bash
    git push origin feature/your-feature-name
    ```
@@ -357,6 +360,7 @@ notion-cli/
 ### Bug Reports
 
 Include:
+
 - Clear description of the issue
 - Steps to reproduce
 - Expected vs actual behavior
@@ -367,6 +371,7 @@ Include:
 ### Feature Requests
 
 Include:
+
 - Clear description of the feature
 - Use case and motivation
 - Example usage
@@ -400,7 +405,7 @@ notion-cli --version
 notion-cli db query <id>
 
 # Unlink when done
-npm unlink -g @coastal-programs/notion-cli
+npm unlink -g @infograb/notion-cli
 ```
 
 ### Working with oclif

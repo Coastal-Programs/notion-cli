@@ -1,17 +1,17 @@
 {
-  "name": "@coastal-programs/notion-cli",
-  "version": "5.9.0",
+  "name": "@infograb/notion-cli",
+  "version": "5.10.0",
   "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, structured error handling, and comprehensive testing.",
-  "author": "Jake Schepis <jake@coastalprograms.com>",
+  "author": "InfoGrab <oss@infograb.net>",
   "bin": {
     "notion-cli": "./bin/run"
   },
-  "homepage": "https://github.com/Coastal-Programs/notion-cli#readme",
+  "homepage": "https://github.com/infograb/notion-cli#readme",
   "license": "MIT",
   "main": "dist/index.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Coastal-Programs/notion-cli.git"
+    "url": "https://github.com/infograb/notion-cli.git"
   },
   "files": [
     "/bin",
@@ -21,11 +21,13 @@
     "/oclif.manifest.json"
   ],
   "dependencies": {
-    "@notionhq/client": "^5.9.0",
-    "@oclif/core": "^4.8.0",
+    "@notionhq/client": "^5.11.0",
+    "@oclif/core": "^4.8.2",
     "@oclif/plugin-help": "^6.2.37",
+    "cli-table3": "^0.6.5",
     "dayjs": "^1.11.19",
     "notion-to-md": "^3.1.6",
+    "undici": "^7.20.0",
     "update-notifier": "^7.3.1"
   },
   "devDependencies": {
@@ -37,7 +39,6 @@
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "chai": "^4",
-    "cli-table3": "^0.6.5",
     "eslint": "^9.39.2",
     "eslint-config-oclif": "^6.0.137",
     "eslint-config-prettier": "^10.1.8",
@@ -56,8 +57,7 @@
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0",
-    "undici": "^7.20.0"
+    "typescript-eslint": "^8.54.0"
   },
   "oclif": {
     "bin": "notion-cli",
@@ -87,8 +87,8 @@
     "node": ">=22.0.0"
   },
   "bugs": {
-    "url": "https://github.com/Coastal-Programs/notion-cli/issues",
-    "email": "jake@coastalprograms.com"
+    "url": "https://github.com/infograb/notion-cli/issues",
+    "email": "oss@infograb.net"
   },
   "keywords": [
     "notion",

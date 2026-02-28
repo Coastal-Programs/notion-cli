@@ -25,10 +25,10 @@ This guide provides comprehensive instructions for AI agents to effectively use 
 
 ```bash
 # Mac/Linux: Install from GitHub
-npm install -g Coastal-Programs/notion-cli
+npm install -g infograb/notion-cli
 
 # Windows: Use local install (GitHub has symlink issues)
-git clone https://github.com/Coastal-Programs/notion-cli
+git clone https://github.com/infograb/notion-cli
 cd notion-cli
 npm install -g .
 ```
@@ -67,6 +67,7 @@ notion-cli init
 ```
 
 **Automation Mode:**
+
 ```bash
 # For CI/CD and automated environments
 notion-cli init --json
@@ -115,10 +116,12 @@ notion-cli doctor --json
 ```
 
 **Aliases:**
+
 - `notion-cli diagnose`
 - `notion-cli healthcheck`
 
 **Use cases:**
+
 - First-time setup verification
 - Troubleshooting errors
 - Pre-flight checks before automation
@@ -139,6 +142,7 @@ notion-cli whoami
 ```
 
 **Aliases:**
+
 - `notion-cli test`
 - `notion-cli health`
 
@@ -149,6 +153,7 @@ notion-cli whoami
 ### Recommended AI Agent Workflow
 
 **1. Verify Setup (First Run)**
+
 ```bash
 # Run health check
 notion-cli doctor
@@ -158,6 +163,7 @@ notion-cli init
 ```
 
 **2. Sync Workspace (One-Time Setup)**
+
 ```bash
 # Cache all databases for faster lookups
 notion-cli sync
@@ -167,6 +173,7 @@ notion-cli list --json
 ```
 
 **3. Discover Database Schema**
+
 ```bash
 # Get schema before creating/updating pages
 notion-cli db schema <DATA_SOURCE_ID> --with-examples --json
@@ -176,6 +183,7 @@ notion-cli db schema <ID> --properties Name,Status,Priority --json
 ```
 
 **4. Create/Update Pages**
+
 ```bash
 # Use simple properties mode for easier syntax
 notion-cli page create -d <DB_ID> -S --properties '{
@@ -193,6 +201,7 @@ notion-cli page update <PAGE_ID> -S --properties '{
 ```
 
 **5. Query Databases**
+
 ```bash
 # Query with filters
 notion-cli db query <ID> --filter '{
@@ -216,22 +225,22 @@ The `-S` or `--simple-properties` flag enables flat JSON syntax instead of compl
 
 ### Property Type Reference
 
-| Type | Simple Format | Example |
-|------|---------------|---------|
-| **title** | String | `"Name": "Task"` |
-| **rich_text** | String | `"Description": "Details"` |
-| **number** | Number | `"Priority": 5` |
-| **checkbox** | Boolean | `"Done": true` |
-| **select** | String | `"Status": "In Progress"` |
-| **multi_select** | Array | `"Tags": ["urgent", "bug"]` |
-| **status** | String | `"Status": "Active"` |
-| **date** | String/Object | `"Due": "2025-12-31"` |
-| **url** | String | `"Link": "https://..."` |
-| **email** | String | `"Email": "user@example.com"` |
-| **phone_number** | String | `"Phone": "+1-555-..."` |
-| **people** | Array | `"Assignee": ["user-id"]` |
-| **relation** | Array | `"Related": ["page-id"]` |
-| **files** | Array | `"Attachments": ["https://..."]` |
+| Type             | Simple Format | Example                          |
+| ---------------- | ------------- | -------------------------------- |
+| **title**        | String        | `"Name": "Task"`                 |
+| **rich_text**    | String        | `"Description": "Details"`       |
+| **number**       | Number        | `"Priority": 5`                  |
+| **checkbox**     | Boolean       | `"Done": true`                   |
+| **select**       | String        | `"Status": "In Progress"`        |
+| **multi_select** | Array         | `"Tags": ["urgent", "bug"]`      |
+| **status**       | String        | `"Status": "Active"`             |
+| **date**         | String/Object | `"Due": "2025-12-31"`            |
+| **url**          | String        | `"Link": "https://..."`          |
+| **email**        | String        | `"Email": "user@example.com"`    |
+| **phone_number** | String        | `"Phone": "+1-555-..."`          |
+| **people**       | Array         | `"Assignee": ["user-id"]`        |
+| **relation**     | Array         | `"Related": ["page-id"]`         |
+| **files**        | Array         | `"Attachments": ["https://..."]` |
 
 ### Relative Dates
 
@@ -246,6 +255,7 @@ The `-S` or `--simple-properties` flag enables flat JSON syntax instead of compl
 ```
 
 **Supported formats:**
+
 - `"today"`, `"tomorrow"`, `"yesterday"`
 - `"+N days"`, `"-N days"`
 - `"+N weeks"`, `"-N weeks"`
@@ -258,17 +268,18 @@ Property names and select values are case-insensitive:
 
 ```json
 {
-  "name": "Task",          // Works!
-  "Name": "Task",          // Works!
-  "NAME": "Task",          // Works!
+  "name": "Task", // Works!
+  "Name": "Task", // Works!
+  "NAME": "Task", // Works!
   "status": "in progress", // Works!
-  "Status": "In Progress"  // Works!
+  "Status": "In Progress" // Works!
 }
 ```
 
 ### Examples
 
 **Create Task:**
+
 ```bash
 notion-cli page create -d <DB_ID> -S --properties '{
   "Name": "Bug Fix: Login Error",
@@ -282,6 +293,7 @@ notion-cli page create -d <DB_ID> -S --properties '{
 ```
 
 **Update Task:**
+
 ```bash
 notion-cli page update <PAGE_ID> -S --properties '{
   "Status": "Done",
@@ -291,6 +303,7 @@ notion-cli page update <PAGE_ID> -S --properties '{
 ```
 
 **Clear Property:**
+
 ```json
 {
   "Description": null
@@ -375,6 +388,7 @@ notion-cli sync --json
 ### Workflow for Resolving Issues
 
 **1. Run Health Check**
+
 ```bash
 notion-cli doctor
 ```
@@ -384,6 +398,7 @@ This will identify the specific issue (token, connectivity, permissions, etc.)
 **2. Common Issues and Solutions**
 
 **Issue: Token Not Configured**
+
 ```bash
 # Solution: Run init wizard
 notion-cli init
@@ -393,6 +408,7 @@ export NOTION_TOKEN="secret_your_token_here"
 ```
 
 **Issue: API Connection Failed**
+
 ```bash
 # Check token validity
 notion-cli whoami
@@ -402,6 +418,7 @@ notion-cli init
 ```
 
 **Issue: Database Not Found**
+
 ```bash
 # Sync workspace to update cache
 notion-cli sync
@@ -411,6 +428,7 @@ notion-cli sync
 ```
 
 **Issue: Invalid Properties**
+
 ```bash
 # Get schema to see valid properties
 notion-cli db schema <ID> --with-examples --json
@@ -420,6 +438,7 @@ notion-cli page create -d <ID> -S --properties '{...}'
 ```
 
 **Issue: Permission Denied**
+
 ```bash
 # Check workspace access with doctor
 notion-cli doctor
@@ -433,6 +452,7 @@ notion-cli doctor
 The CLI provides **platform-specific error messages**:
 
 **Windows (Command Prompt):**
+
 ```
 Error: NOTION_TOKEN not found
 
@@ -443,6 +463,7 @@ Or run: notion-cli init
 ```
 
 **Windows (PowerShell):**
+
 ```
 Error: NOTION_TOKEN not found
 
@@ -453,6 +474,7 @@ Or run: notion-cli init
 ```
 
 **Unix/Mac:**
+
 ```
 Error: NOTION_TOKEN not found
 
@@ -469,42 +491,49 @@ Or run: notion-cli init
 ### For AI Agents
 
 **1. Always Run Health Check First**
+
 ```bash
 # Verify setup before operations
 notion-cli doctor
 ```
 
 **2. Cache Schema Before Creating Pages**
+
 ```bash
 # Get schema to understand structure
 notion-cli db schema <ID> --with-examples --json
 ```
 
 **3. Use Simple Properties Mode**
+
 ```bash
 # Reduces errors by 70%
 notion-cli page create -d <ID> -S --properties '{...}'
 ```
 
 **4. Use JSON Output for Parsing**
+
 ```bash
 # All commands support --json
 notion-cli db query <ID> --json | jq '.data.results'
 ```
 
 **5. Check Cache Freshness**
+
 ```bash
 # Before bulk operations
 notion-cli cache:info --json
 ```
 
 **6. Sync Workspace Periodically**
+
 ```bash
 # Recommended: every 24 hours
 notion-cli sync
 ```
 
 **7. Use Verbose Mode for Debugging**
+
 ```bash
 # Shows cache hits, retries, latency
 notion-cli db query <ID> --verbose --json
@@ -513,6 +542,7 @@ notion-cli db query <ID> --verbose --json
 ### Performance Optimization
 
 **1. Leverage Caching**
+
 ```bash
 # One-time sync for faster lookups
 notion-cli sync
@@ -522,12 +552,14 @@ notion-cli db query "Tasks Database" --json
 ```
 
 **2. Filter Early**
+
 ```bash
 # Reduce data transfer with filters
 notion-cli db query <ID> --filter '{...}' --json
 ```
 
 **3. Use Compact JSON**
+
 ```bash
 # Faster parsing for large responses
 notion-cli db query <ID> --compact-json
@@ -536,6 +568,7 @@ notion-cli db query <ID> --compact-json
 ### Error Handling
 
 **1. Check Exit Codes**
+
 ```bash
 notion-cli db retrieve <ID> --json
 if [ $? -eq 0 ]; then
@@ -546,11 +579,13 @@ fi
 ```
 
 **Exit codes:**
+
 - `0` = Success
 - `1` = Notion API error
 - `2` = CLI error (invalid flags, etc.)
 
 **2. Parse Error Responses**
+
 ```json
 {
   "success": false,
@@ -565,18 +600,21 @@ fi
 ### Security Best Practices
 
 **1. Use Environment Variables**
+
 ```bash
 # Never hardcode tokens
 export NOTION_TOKEN="secret_token"
 ```
 
 **2. Use Config Commands**
+
 ```bash
 # Secure token storage
 notion-cli config set-token
 ```
 
 **3. Verify Permissions**
+
 ```bash
 # Check integration access
 notion-cli doctor
@@ -623,6 +661,7 @@ notion-cli cache:info --json
 ```
 
 **Recommended Workflow:**
+
 1. `notion-cli init` - First-time setup
 2. `notion-cli doctor` - Verify health
 3. `notion-cli sync` - Cache workspace

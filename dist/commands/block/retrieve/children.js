@@ -6,21 +6,24 @@ const helper_1 = require("../../../helper");
 const base_flags_1 = require("../../../base-flags");
 const errors_1 = require("../../../errors");
 const table_formatter_1 = require("../../../utils/table-formatter");
+const notion_resolver_1 = require("../../../utils/notion-resolver");
 class BlockRetrieveChildren extends core_1.Command {
     async run() {
         const { args, flags } = await this.parse(BlockRetrieveChildren);
         try {
+            // Resolve ID from URL, direct ID, or name
+            const blockId = await (0, notion_resolver_1.resolveNotionId)(args.block_id, "page");
             // TODO: Add support start_cursor, page_size
-            let res = await notion.retrieveBlockChildren(args.block_id);
+            let res = await notion.retrieveBlockChildren(blockId);
             // Handle --show-databases flag: filter and enrich child_database blocks
-            if (flags['show-databases']) {
+            if (flags["show-databases"]) {
                 const databases = await (0, helper_1.getChildDatabasesWithIds)(res.results);
                 // Handle JSON output for automation
                 if (flags.json) {
                     this.log(JSON.stringify({
                         success: true,
                         data: databases,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
                     }, null, 2));
                     process.exit(0);
                     return;
@@ -34,16 +37,16 @@ class BlockRetrieveChildren extends core_1.Command {
                 // Display databases in table format
                 const columns = {
                     block_id: {
-                        header: 'Block ID',
+                        header: "Block ID",
                     },
                     title: {
-                        header: 'Title',
+                        header: "Title",
                     },
                     data_source_id: {
-                        header: 'Data Source ID',
+                        header: "Data Source ID",
                     },
                     database_id: {
-                        header: 'Database ID',
+                        header: "Database ID",
                     },
                 };
                 const options = {
@@ -53,11 +56,11 @@ class BlockRetrieveChildren extends core_1.Command {
                 (0, table_formatter_1.formatTable)(databases, columns, options);
                 // Show helpful tip
                 if (databases.length > 0) {
-                    this.log('\nTip: Use the data_source_id to query databases:');
+                    this.log("\nTip: Use the data_source_id to query databases:");
                     this.log(`  notion-cli db query <data_source_id>`);
                 }
                 else {
-                    this.log('\nNo child databases found on this page.');
+                    this.log("\nNo child databases found on this page.");
                 }
                 process.exit(0);
                 return;
@@ -65,7 +68,7 @@ class BlockRetrieveChildren extends core_1.Command {
             // Auto-enrich child_database blocks for JSON/raw output
             if (flags.json || flags.raw) {
                 const enrichedResults = await Promise.all(res.results.map(async (block) => {
-                    if (block.type === 'child_database') {
+                    if (block.type === "child_database") {
                         return await (0, helper_1.enrichChildDatabaseBlock)(block);
                     }
                     return block;
@@ -81,7 +84,7 @@ class BlockRetrieveChildren extends core_1.Command {
                 this.log(JSON.stringify({
                     success: true,
                     data: res,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
                 }, null, 2));
                 process.exit(0);
                 return;
@@ -114,9 +117,9 @@ class BlockRetrieveChildren extends core_1.Command {
             const cliError = error instanceof errors_1.NotionCLIError
                 ? error
                 : (0, errors_1.wrapNotionError)(error, {
-                    resourceType: 'block',
+                    resourceType: "block",
                     attemptedId: args.block_id,
-                    endpoint: 'blocks.children.list'
+                    endpoint: "blocks.children.list",
                 });
             if (flags.json) {
                 this.log(JSON.stringify(cliError.toJSON(), null, 2));
@@ -128,44 +131,44 @@ class BlockRetrieveChildren extends core_1.Command {
         }
     }
 }
-BlockRetrieveChildren.description = 'Retrieve block children (supports database discovery via --show-databases)';
-BlockRetrieveChildren.aliases = ['block:r:c'];
+BlockRetrieveChildren.description = "Retrieve block children (supports database discovery via --show-databases)";
+BlockRetrieveChildren.aliases = ["block:r:c"];
 BlockRetrieveChildren.examples = [
     {
-        description: 'Retrieve block children',
+        description: "Retrieve block children",
         command: `$ notion-cli block retrieve:children BLOCK_ID`,
     },
     {
-        description: 'Retrieve block children and output raw json',
+        description: "Retrieve block children and output raw json",
         command: `$ notion-cli block retrieve:children BLOCK_ID -r`,
     },
     {
-        description: 'Retrieve block children and output JSON for automation',
+        description: "Retrieve block children and output JSON for automation",
         command: `$ notion-cli block retrieve:children BLOCK_ID --json`,
     },
     {
-        description: 'Discover databases on a page with queryable IDs',
+        description: "Discover databases on a page with queryable IDs",
         command: `$ notion-cli block retrieve:children PAGE_ID --show-databases`,
     },
     {
-        description: 'Get databases as JSON for automation',
+        description: "Get databases as JSON for automation",
         command: `$ notion-cli block retrieve:children PAGE_ID --show-databases --json`,
     },
 ];
 BlockRetrieveChildren.args = {
     block_id: core_1.Args.string({
-        description: 'block_id or page_id',
+        description: "Block ID, page ID, or URL",
         required: true,
     }),
 };
 BlockRetrieveChildren.flags = {
     raw: core_1.Flags.boolean({
-        char: 'r',
-        description: 'output raw json',
+        char: "r",
+        description: "output raw json",
     }),
-    'show-databases': core_1.Flags.boolean({
-        char: 'd',
-        description: 'show only child databases with their queryable IDs (data_source_id)',
+    "show-databases": core_1.Flags.boolean({
+        char: "d",
+        description: "show only child databases with their queryable IDs (data_source_id)",
         default: false,
     }),
     ...table_formatter_1.tableFlags,

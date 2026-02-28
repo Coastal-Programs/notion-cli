@@ -4,12 +4,12 @@
 
 We actively support the following versions with security updates:
 
-| Version | Supported          | Notes                          |
-| ------- | ------------------ | ------------------------------ |
-| 5.6.x   | :white_check_mark: | Current release, fully supported |
+| Version | Supported          | Notes                                 |
+| ------- | ------------------ | ------------------------------------- |
+| 5.6.x   | :white_check_mark: | Current release, fully supported      |
 | 5.5.x   | :white_check_mark: | Previous release, critical fixes only |
-| 5.4.x   | :x:                | Upgrade to 5.6.x recommended |
-| < 5.4   | :x:                | No longer supported |
+| 5.4.x   | :x:                | Upgrade to 5.6.x recommended          |
+| < 5.4   | :x:                | No longer supported                   |
 
 ## Security Status
 
@@ -24,18 +24,21 @@ We actively support the following versions with security updates:
 The following vulnerabilities were resolved in recent releases:
 
 **v5.5.0 (2025-10-24):**
+
 - CVE-2023-48618: katex XSS vulnerability (removed @tryfabric/martian)
 - CVE-2024-28245: katex XSS vulnerability (removed @tryfabric/martian)
 - CVE-2021-23906: yargs-parser prototype pollution
 - CVE-2020-28469: glob-parent ReDoS vulnerability
 
 **v5.6.0 (2025-10-25):**
+
 - 14 development dependency vulnerabilities
 - Zero critical or high-severity issues remaining in production
 
 ### Known Issues
 
 **Development Dependencies (Non-Critical):**
+
 - 2 moderate severity vulnerabilities in oclif v2 dependencies
 - 9 low severity vulnerabilities in test infrastructure
 - **Impact:** Development environment only, no production runtime impact
@@ -47,7 +50,7 @@ The following vulnerabilities were resolved in recent releases:
 
 ### Reporting Process
 
-1. **Email:** Send details to `jake@coastalprograms.com`
+1. **Email:** Send details to `oss@infograb.net`
 
 2. **Include:**
    - Type of vulnerability
@@ -120,27 +123,30 @@ Don't share your entire workspace if you only need a few databases
 ### Secure Usage
 
 1. **Verify package integrity** before installation:
+
    ```bash
-   npm install @coastal-programs/notion-cli --dry-run
+   npm install @infograb/notion-cli --dry-run
    ```
 
 2. **Use specific versions** in production:
+
    ```json
    {
      "dependencies": {
-       "@coastal-programs/notion-cli": "5.6.0"
+       "@infograb/notion-cli": "5.6.0"
      }
    }
    ```
 
 3. **Review audit reports** regularly:
+
    ```bash
    npm audit
    ```
 
 4. **Keep updated** to latest version:
    ```bash
-   npm update @coastal-programs/notion-cli
+   npm update @infograb/notion-cli
    ```
 
 ### CI/CD Security
@@ -168,11 +174,11 @@ env:
 
 ### Recent Audits
 
-| Date       | Tool      | Critical | High | Moderate | Low | Notes |
-|------------|-----------|----------|------|----------|-----|-------|
-| 2025-10-25 | npm audit | 0        | 0    | 2        | 9   | DevDeps only |
+| Date       | Tool      | Critical | High | Moderate | Low | Notes                      |
+| ---------- | --------- | -------- | ---- | -------- | --- | -------------------------- |
+| 2025-10-25 | npm audit | 0        | 0    | 2        | 9   | DevDeps only               |
 | 2025-10-24 | npm audit | 0        | 0    | 0        | 0   | All production vulns fixed |
-| 2025-10-23 | npm audit | 1        | 3    | 18       | 4   | Pre-v5.5.0 baseline |
+| 2025-10-23 | npm audit | 1        | 3    | 18       | 4   | Pre-v5.5.0 baseline        |
 
 ### Continuous Monitoring
 
@@ -230,11 +236,11 @@ Security considerations for code reviewers:
 
 ## Contact
 
-**Security Issues:** jake@coastalprograms.com
+**Security Issues:** oss@infograb.net
 
-**General Issues:** https://github.com/Coastal-Programs/notion-cli/issues
+**General Issues:** https://github.com/infograb/notion-cli/issues
 
-**Discussions:** https://github.com/Coastal-Programs/notion-cli/discussions
+**Discussions:** https://github.com/infograb/notion-cli/discussions
 
 ## Additional Resources
 

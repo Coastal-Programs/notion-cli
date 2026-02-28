@@ -5,7 +5,7 @@
  * This ensures users get helpful, actionable error messages before attempting API calls.
  */
 
-import { NotionCLIErrorFactory } from '../errors'
+import { NotionCLIErrorFactory } from "../errors";
 
 /**
  * Masks a Notion token for safe display in logs and console output
@@ -24,22 +24,24 @@ import { NotionCLIErrorFactory } from '../errors'
  * ```
  */
 export function maskToken(token: string): string {
-  if (!token) return ''
+  if (!token) return "";
 
   if (token.length <= 10) {
     // Token too short to safely mask, obscure completely
     // Threshold: 10 chars ensures at least 3 chars are masked after prefix+suffix
-    return '***'
+    return "***";
   }
 
   // Show prefix (secret_ or ntn_) and last 3 chars
   // For unknown prefixes: use max 4 chars to ensure at least 4 chars are masked
-  const prefix = token.startsWith('secret_') ? 'secret_' :
-                 token.startsWith('ntn_') ? 'ntn_' :
-                 token.slice(0, Math.min(4, token.length - 7))
-  const suffix = token.slice(-3)
+  const prefix = token.startsWith("secret_")
+    ? "secret_"
+    : token.startsWith("ntn_")
+      ? "ntn_"
+      : token.slice(0, Math.min(4, token.length - 7));
+  const suffix = token.slice(-3);
 
-  return `${prefix}***...***${suffix}`
+  return `${prefix}***...***${suffix}`;
 }
 
 /**
@@ -60,8 +62,25 @@ export function maskToken(token: string): string {
  * }
  * ```
  */
+/**
+ * Valid Notion token prefixes.
+ * - "secret_": Internal integration tokens (legacy format, still valid)
+ * - "ntn_": New token format introduced September 2024
+ */
+export const VALID_TOKEN_PREFIXES = ["secret_", "ntn_"] as const;
+
+/**
+ * Checks whether a token string has a recognized Notion token prefix.
+ *
+ * @param token - The token to check
+ * @returns true if the token starts with a known Notion prefix
+ */
+export function hasValidTokenPrefix(token: string): boolean {
+  return VALID_TOKEN_PREFIXES.some((prefix) => token.startsWith(prefix));
+}
+
 export function validateNotionToken(): void {
   if (!process.env.NOTION_TOKEN) {
-    throw NotionCLIErrorFactory.tokenMissing()
+    throw NotionCLIErrorFactory.tokenMissing();
   }
 }

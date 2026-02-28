@@ -7,9 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.10.0] - 2026-02-28
+
+### Added
+
+- **Universal ID Resolution** — 모든 17개 명령어에서 UUID, Notion URL, alias/이름 입력을 지원
+  - `block:retrieve`, `block:delete`, `block:retrieve:children` — `resolveNotionId` 추가
+  - `page:retrieve:property_item` — `resolveNotionId` 추가
+  - `batch:retrieve` — `retrieveResource()` 내 `resolveNotionId` 추가
+- **Token Validation 개선** — `ntn_` (OAuth) 토큰 접두사 지원 추가 (`secret_` 외)
+
+### Fixed
+
+- **런타임 의존성 누락 수정** — `undici`, `cli-table3`를 `devDependencies`에서 `dependencies`로 이동
+  - `npm install -g` 설치 시 런타임 모듈 누락 방지
+- **패키지 이름 변경** — `@coastal-programs/notion-cli` → `@infograb/notion-cli`
+- **테스트 안정성** — `resolveNotionId`의 UUID 대시 제거 동작에 맞춰 nock mock URL 수정
+
+### Changed
+
+- **README.md** — 한국어 컴팩트 버전으로 전면 재작성 (1,386줄 → 299줄)
+- **의존성 업데이트** — `@notionhq/client` 5.9 → 5.11
+
 ## [5.9.0] - 2026-02-05
 
 ### Added
+
 - **Request deduplication** - Prevents duplicate concurrent API calls for the same resource
   - Automatic deduplication of in-flight requests using promise memoization
   - Statistics tracking for hits/misses/pending requests
@@ -42,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Expected 60-70% bandwidth reduction for JSON payloads
 
 ### Performance
+
 - Request deduplication reduces unnecessary API calls when multiple concurrent requests target the same resource
 - Parallel execution of bulk operations significantly reduces total operation time
   - Page updates with many blocks complete 60-80% faster
@@ -81,18 +105,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 All optimizations are configurable via environment variables. See `.env.example` for complete configuration guide.
 
 **Request Deduplication:**
+
 - `NOTION_CLI_DEDUP_ENABLED` (default: true)
 
 **Parallel Operations:**
+
 - `NOTION_CLI_DELETE_CONCURRENCY` (default: 5)
 - `NOTION_CLI_CHILDREN_CONCURRENCY` (default: 10)
 
 **Persistent Disk Cache:**
+
 - `NOTION_CLI_DISK_CACHE_ENABLED` (default: true)
 - `NOTION_CLI_DISK_CACHE_MAX_SIZE` (default: 104857600 / 100MB)
 - `NOTION_CLI_DISK_CACHE_SYNC_INTERVAL` (default: 5000ms)
 
 **HTTP Keep-Alive:**
+
 - `NOTION_CLI_HTTP_KEEP_ALIVE` (default: true)
 - `NOTION_CLI_HTTP_KEEP_ALIVE_MS` (default: 60000ms)
 - `NOTION_CLI_HTTP_MAX_SOCKETS` (default: 50)
@@ -100,6 +128,7 @@ All optimizations are configurable via environment variables. See `.env.example`
 - `NOTION_CLI_HTTP_TIMEOUT` (default: 30000ms)
 
 **Response Compression:**
+
 - Always enabled (no configuration needed)
 
 ### Migration Guide
@@ -114,6 +143,7 @@ All optimizations are configurable via environment variables. See `.env.example`
 6. **For memory-constrained environments**, reduce cache sizes
 
 Example `.env` for high-throughput batch processing:
+
 ```bash
 NOTION_CLI_DELETE_CONCURRENCY=10
 NOTION_CLI_CHILDREN_CONCURRENCY=20
@@ -126,6 +156,7 @@ NOTION_CLI_DISK_CACHE_MAX_SIZE=104857600
 **Overall improvement: 1.5-2x for batch operations and repeated data access**
 
 Individual phase improvements:
+
 - Request deduplication: 5-15% typical (30-50% best case with concurrent duplicates)
 - Parallel operations: 60-70% typical (80% best case for large batches)
 - Disk cache: 20-30% improvement across sessions (60% best case with heavy reuse)
@@ -137,6 +168,7 @@ See [README.md Performance Optimizations](./README.md#-performance-optimizations
 ## [5.8.0] - 2026-02-04
 
 ### Changed
+
 - **Major dependency updates** - Updated 24 packages with comprehensive testing
   - **oclif framework v4**: Core CLI framework updated from v2 to v4
     - Migrated from deprecated `ux.table` to new `cli-table3`-based table formatter
@@ -150,11 +182,13 @@ See [README.md Performance Optimizations](./README.md#-performance-optimizations
   - **Other updates**: dayjs 1.11.19, prettier 3.8.1, undici 7.20.0
 
 ### Security
+
 - **Eliminated all production vulnerabilities** - 0 vulnerabilities in production dependencies (down from 2)
 - **Reduced total vulnerabilities by 87%** - From 31 to 4 (all low-priority devDependencies)
 - **Resolved 27 security issues** in oclif v2/v3 tooling by upgrading to v4
 
 ### Technical
+
 - All 471 tests passing with >95% code coverage maintained
 - Backward compatible - no breaking changes for CLI users
 - Deferred ESM-only packages (chai v5+, node-fetch v3+, globby v14+) to v6.0.0
@@ -162,6 +196,7 @@ See [README.md Performance Optimizations](./README.md#-performance-optimizations
 ## [5.7.0] - 2026-01-28
 
 ### Added
+
 - **ASCII art banner** displayed during installation and `notion-cli init` command for enhanced branding and professional appearance
 - **PUBLISHING.md guide** with comprehensive npm release workflow and best practices
 - **Shared banner utilities** (`scripts/banner.js` and `src/utils/terminal-banner.ts`) following DRY principle
@@ -173,11 +208,12 @@ See [README.md Performance Optimizations](./README.md#-performance-optimizations
   - Users remain in full control - updates are never applied automatically
 
 ### Changed
+
 - **README Quick Start section** simplified with clearer installation flow and removed MCP server comparisons
 - **Enhanced postinstall message** to prominently highlight `notion-cli init` as the recommended first step
 - **Banner styling** now uses terminal's default color for better consistency with README
-- **Token input UX improved** - `notion-cli init` now accepts tokens with or without "secret_" prefix
-  - Automatically prepends "secret_" if user pastes just the token value
+- **Token input UX improved** - `notion-cli init` now accepts tokens with or without "secret\_" prefix
+  - Automatically prepends "secret\_" if user pastes just the token value
   - Shows friendly note when prefix is added
   - Eliminates confusing validation errors
 - **Token length validation** - Minimum 20 character requirement catches incomplete token copies early
@@ -185,16 +221,19 @@ See [README.md Performance Optimizations](./README.md#-performance-optimizations
 - **Update notification timing** - Changed to `defer: true` for non-intrusive display after command execution
 
 ### Fixed
+
 - **PUBLISHING.md chicken-and-egg problem** resolved by recommending README update before first npm publish
 - **Version consistency** - All documentation now correctly references v5.6.0
 
 ### Security
+
 - **Token masking** - Console output now masks tokens to prevent leakage in screen recordings, terminal sharing, or logs
   - Format: `secret_***...***abc` (shows prefix and last 3 chars only)
   - Applies to all token display scenarios (setup wizard, error messages, help text)
   - Protects against accidental token exposure during demos or support sessions
 
 ### Developer Experience
+
 - **DEBUG mode** - Set `DEBUG=1` environment variable to see verbose update check errors for troubleshooting
   - Helps diagnose npm registry connectivity issues
   - Shows detailed error messages when update checks fail
@@ -253,12 +292,14 @@ This release focuses on code quality, testing, and documentation improvements fo
 No breaking changes! This is a quality-focused release. All existing commands and functionality work exactly as before.
 
 **For developers:**
+
 - Review the new [CONTRIBUTING.md](CONTRIBUTING.md) before submitting pull requests
 - Run `npm run lint` to ensure code follows project standards
 - All tests must pass before commits
 
 **For users:**
-- Update normally: `npm update -g @coastal-programs/notion-cli`
+
+- Update normally: `npm update -g @infograb/notion-cli`
 - No configuration changes needed
 - All commands remain backward compatible
 
@@ -330,12 +371,14 @@ No breaking changes! This is a quality-focused release. All existing commands an
 **No breaking changes!** All existing commands work exactly as before.
 
 **New recommended workflow for new users:**
-1. Install: `npm install -g @coastal-programs/notion-cli`
+
+1. Install: `npm install -g @infograb/notion-cli`
 2. Run setup wizard: `notion-cli init`
 3. Verify health: `notion-cli doctor`
 4. Start using: `notion-cli list`, `notion-cli db query`, etc.
 
 **For existing users:**
+
 - Run `notion-cli doctor` to verify your setup is healthy
 - Your existing token configuration continues to work
 - No action required unless you want to use the new commands
@@ -349,6 +392,7 @@ No breaking changes! This is a quality-focused release. All existing commands an
 **Complete implementation of 7 major AI agent usability improvements:**
 
 **1. JSON Envelope Standardization**
+
 - Consistent `{success, data, metadata}` response format across ALL commands
 - Standardized exit codes: 0 = success, 1 = API error, 2 = CLI error
 - New `envelope.ts` module for centralized response handling
@@ -363,12 +407,14 @@ No breaking changes! This is a quality-focused release. All existing commands an
   - Index
 
 **2. Health Check Command**
+
 - NEW `whoami` command (aliases: `test`, `health`, `connectivity`)
 - Reports bot info, workspace access, cache status, and API latency
 - Comprehensive error handling with actionable suggestions
 - Perfect for AI agents to verify connectivity before operations
 
 **3. Simple Properties Mode** 🎉
+
 - NEW `--simple-properties` (`-S`) flag for `page create` and `page update`
 - Flat JSON format: `{"Name": "Task", "Status": "Done"}` instead of complex nested Notion structures
 - **70% reduction in complexity** for AI agents
@@ -381,23 +427,27 @@ No breaking changes! This is a quality-focused release. All existing commands an
 - New utility: `src/utils/property-expander.ts` (400 lines, fully tested)
 
 **4. Schema Examples**
+
 - NEW `--with-examples` flag for `db schema` command
 - Shows copy-pastable property payloads for each property type
 - Groups writable vs read-only properties
 - Makes it trivial for AI agents to construct valid property objects
 
 **5. Verbose Logging**
+
 - NEW `--verbose` (`-v`) flag for debugging
 - Shows cache hits/misses, retry attempts, API latency
 - Helps AI agents understand what's happening behind the scenes
 - Documentation: `docs/VERBOSE_LOGGING.md`
 
 **6. Filter Simplification**
+
 - Simplified filter syntax for database queries
 - Better validation and error messages
 - Documentation: `docs/FILTER_GUIDE.md`, `docs/FILTER_MIGRATION.md`
 
 **7. Output Format Enhancements**
+
 - NEW `--compact-json` flag: minified JSON (one line)
 - NEW `--pretty` flag: enhanced table formatting
 - NEW `--markdown` flag: markdown table output
@@ -415,6 +465,7 @@ No breaking changes! This is a quality-focused release. All existing commands an
 ### Technical Details
 
 **New Files:**
+
 - `src/base-command.ts` - Base command class with envelope support
 - `src/base-flags.ts` - Reusable flag sets for consistency
 - `src/envelope.ts` - Envelope response formatting
@@ -428,17 +479,20 @@ No breaking changes! This is a quality-focused release. All existing commands an
 - `AI_AGENT_QUICK_REFERENCE.md` - Quick reference for AI agents (root level for easy access)
 
 **Modified Files:**
+
 - `src/commands/page/create.ts` - Added `--simple-properties` support
 - `src/commands/page/update.ts` - Added `--simple-properties` support
 - `src/commands/db/schema.ts` - Added `--with-examples` flag
 - All command files updated to use envelope format
 
 **Type Safety:**
+
 - Full TypeScript type definitions for all new features
 - Interfaces for `Envelope`, `EnvelopeMetadata`, `SimpleProperties`
 - Type-safe property expansion and validation
 
 **Testing:**
+
 - 30+ test cases for property expander
 - Envelope response validation
 - All existing tests still passing
@@ -446,6 +500,7 @@ No breaking changes! This is a quality-focused release. All existing commands an
 ### Why This Matters
 
 **For AI Agents:**
+
 - **Simple Properties:** Dramatically reduces errors from malformed property structures
 - **JSON Envelopes:** Predictable response format makes parsing trivial
 - **Health Check:** Easy connectivity verification before complex operations
@@ -453,6 +508,7 @@ No breaking changes! This is a quality-focused release. All existing commands an
 - **Schema Examples:** Copy-paste examples eliminate guesswork
 
 **For Developers:**
+
 - Consistent API across all commands
 - Better error messages with actionable suggestions
 - Easier to debug with verbose mode
@@ -479,12 +535,14 @@ notion-cli page create -d DB_ID -S --properties '{
 ```
 
 **Health Check:**
+
 ```bash
 notion-cli whoami
 # Returns bot info, workspace, cache stats, API latency
 ```
 
 **Schema with Examples:**
+
 ```bash
 notion-cli db schema DB_ID --with-examples
 # Shows example payloads for each property
@@ -495,6 +553,7 @@ notion-cli db schema DB_ID --with-examples
 **No breaking changes!** All existing commands work exactly as before.
 
 **New recommended workflow:**
+
 1. Run `whoami` to verify connectivity
 2. Run `db schema DB_ID --with-examples` to understand structure
 3. Use `-S` flag with simple properties for page create/update
@@ -507,6 +566,7 @@ notion-cli db schema DB_ID --with-examples
 ### Added - Workspace Management Features
 
 **Smart ID Resolution:**
+
 - Automatic conversion between `database_id` and `data_source_id`
 - System detects and converts wrong ID type automatically
 - Helpful messaging when conversion happens
@@ -514,6 +574,7 @@ notion-cli db schema DB_ID --with-examples
 - Documentation: `docs/smart-id-resolution.md`
 
 **Workspace Database Caching:**
+
 - NEW `sync` command - Cache all workspace databases locally
 - NEW `list` command - Browse cached databases with rich metadata
 - NEW `config set-token` command - Easy token setup with guided workflow
@@ -534,6 +595,7 @@ notion-cli db schema DB_ID --with-examples
 ### Added - Schema Discovery for AI Agents
 
 **NEW `db schema` Command:**
+
 - Extract clean, AI-parseable database schemas with `notion-cli db schema <DATA_SOURCE_ID>`
 - Automatic property type detection for all Notion property types (title, select, multi-select, date, number, formula, rollup, relation, etc.)
 - Option enumeration for select/multi-select properties - get valid values instantly
@@ -542,6 +604,7 @@ notion-cli db schema DB_ID --with-examples
 - Command aliases: `db:s`, `ds:schema`, `ds:s`
 
 **Schema Extractor Utility (`src/utils/schema-extractor.ts`):**
+
 - `extractSchema()` - Transform complex Notion API responses into simple, flat structures
 - `filterProperties()` - Extract specific properties by name
 - `formatSchemaForTable()` - Human-readable table data
@@ -550,6 +613,7 @@ notion-cli db schema DB_ID --with-examples
 - Full TypeScript type definitions for schema structures
 
 **AI Agent Cookbook:**
+
 - New comprehensive guide: `docs/AI-AGENT-COOKBOOK.md`
 - 12+ practical recipes for AI automation workflows
 - Complete code examples with expected outputs
@@ -560,6 +624,7 @@ notion-cli db schema DB_ID --with-examples
 - Data extraction and transformation recipes
 
 **Documentation Enhancements:**
+
 - Updated README with schema discovery quick start
 - Added schema command to all command listings
 - New "Schema Discovery" use case section
@@ -576,6 +641,7 @@ notion-cli db schema DB_ID --with-examples
 ### Technical Details
 
 **Command Architecture:**
+
 - Follows existing oclif patterns from `db retrieve` command
 - Uses established caching layer (10-minute TTL for schemas)
 - Integrates with existing retry logic for reliability
@@ -583,16 +649,19 @@ notion-cli db schema DB_ID --with-examples
 - Multiple output formats (JSON, YAML, table, markdown)
 
 **Type Safety:**
+
 - Full TypeScript type definitions
 - Interfaces for `PropertySchema` and `DataSourceSchema`
 - Type-safe property extraction and transformation
 
 **Performance:**
+
 - Leverages existing cache infrastructure
 - Schema requests cached for 10 minutes by default
 - Same retry and circuit breaker patterns as other commands
 
 **Compatibility:**
+
 - No breaking changes to existing commands
 - All existing functionality preserved
 - New command is additive only
@@ -600,6 +669,7 @@ notion-cli db schema DB_ID --with-examples
 ### Why This Matters
 
 **For AI Agents:**
+
 - Eliminates guessing about property names and types
 - Provides valid options for select/multi-select fields upfront
 - Enables dynamic, schema-aware automation
@@ -607,6 +677,7 @@ notion-cli db schema DB_ID --with-examples
 - Makes Notion databases self-documenting
 
 **For Developers:**
+
 - Faster integration with unknown databases
 - Clear property type information
 - Instant documentation generation
@@ -635,6 +706,7 @@ notion-cli db schema abc123 --output json | \
 No migration needed! This is a purely additive feature. All existing commands continue to work exactly as before.
 
 **New workflow recommendation:**
+
 1. Always run `db schema` first when working with a new database
 2. Use schema output to build correct property structures
 3. Validate your data against the schema before creating pages
@@ -646,6 +718,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 ### Added - Enhanced Reliability & Performance
 
 **Retry Logic with Exponential Backoff:**
+
 - Automatic retry on failures (up to 3 attempts by default)
 - Intelligent error categorization (retryable vs non-retryable)
 - Exponential backoff with jitter to prevent thundering herd
@@ -654,6 +727,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 - Configurable via environment variables
 
 **In-Memory Caching Layer:**
+
 - Intelligent caching for frequently accessed resources
 - TTL-based expiration (data sources: 10min, users: 1hr, blocks/pages: 30s-1m)
 - Automatic cache invalidation on write operations
@@ -662,6 +736,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 - Configurable cache size and TTLs
 
 **Configuration Options:**
+
 - `NOTION_CLI_MAX_RETRIES` - Maximum retry attempts
 - `NOTION_CLI_BASE_DELAY` - Base delay between retries (ms)
 - `NOTION_CLI_MAX_DELAY` - Maximum delay cap (ms)
@@ -691,6 +766,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 ### Added - Initial Release
 
 **Core Notion API v5.2.1 Support:**
+
 - Data source operations (query, retrieve, update, create)
 - Page operations (create, retrieve, update, archive)
 - Block operations (append, retrieve, update, delete)
@@ -698,6 +774,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 - Search operations
 
 **Output Formats:**
+
 - JSON output mode (`--output json`, `--json`)
 - CSV format (`--output csv`)
 - YAML format (`--output yaml`)
@@ -705,6 +782,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 - Raw API responses (`--raw`)
 
 **Automation Features:**
+
 - Non-interactive design
 - Structured JSON responses with `success` flag
 - Exit codes (0 = success, 1 = error)
@@ -712,6 +790,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 - Machine-readable error responses
 
 **Command Aliases:**
+
 - `db:*` commands available as `ds:*` (data-source)
 - Short aliases for common commands (e.g., `db:r`, `db:u`)
 
@@ -736,6 +815,7 @@ No migration needed! This is a purely additive feature. All existing commands co
 ---
 
 **Links:**
-- [GitHub Releases](https://github.com/Coastal-Programs/notion-cli/releases)
+
+- [GitHub Releases](https://github.com/infograb/notion-cli/releases)
 - [Notion API Documentation](https://developers.notion.com/)
 - [AI Agent Cookbook](./docs/AI-AGENT-COOKBOOK.md)
