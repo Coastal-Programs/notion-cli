@@ -24,13 +24,13 @@ This guide provides comprehensive instructions for AI agents to effectively use 
 ### Installation
 
 ```bash
-# Mac/Linux: Install from GitHub
-npm install -g Coastal-Programs/notion-cli
+# Install via npm (downloads platform-specific binary)
+npm install -g @coastal-programs/notion-cli
 
-# Windows: Use local install (GitHub has symlink issues)
+# Or build from source
 git clone https://github.com/Coastal-Programs/notion-cli
 cd notion-cli
-npm install -g .
+make build
 ```
 
 ### Verify Installation
@@ -43,36 +43,7 @@ notion-cli --version
 
 ## First-Time Setup
 
-### Option 1: Interactive Setup Wizard (Recommended)
-
-The `init` command guides you through the complete setup process:
-
-```bash
-notion-cli init
-
-# Step 1: Token Setup
-#   - Prompts for Notion API token
-#   - Tests token validity
-#   - Saves to environment/config
-
-# Step 2: Connection Test
-#   - Verifies API connectivity
-#   - Shows workspace information
-#   - Confirms bot permissions
-
-# Step 3: Workspace Sync
-#   - Offers to cache all databases
-#   - Builds local database index
-#   - Enables name-based lookups
-```
-
-**Automation Mode:**
-```bash
-# For CI/CD and automated environments
-notion-cli init --json
-```
-
-### Option 2: Manual Token Setup
+### Token Setup
 
 ```bash
 # Mac/Linux
@@ -102,16 +73,13 @@ Run comprehensive diagnostics to verify your setup:
 notion-cli doctor
 
 # Checks performed:
-# ✓ Node.js version compatibility
-# ✓ Token configuration
-# ✓ API connectivity
-# ✓ Workspace access
-# ✓ Cache status
-# ✓ Dependencies
-# ✓ File permissions
+# - Token configuration
+# - API connectivity
+# - Workspace access
+# - Cache status
 
 # JSON output for automation
-notion-cli doctor --json
+notion-cli doctor --output json
 ```
 
 **Aliases:**
@@ -177,18 +145,15 @@ notion-cli db schema <ID> --properties Name,Status,Priority --json
 
 **4. Create/Update Pages**
 ```bash
-# Use simple properties mode for easier syntax
-notion-cli page create -d <DB_ID> -S --properties '{
-  "Name": "Task Title",
-  "Status": "In Progress",
-  "Priority": 5,
-  "Due Date": "tomorrow"
+# Create page with Notion API property format
+notion-cli page create -d <DB_ID> --properties '{
+  "Name": {"title": [{"text": {"content": "Task Title"}}]},
+  "Status": {"select": {"name": "In Progress"}}
 }'
 
 # Update existing page
-notion-cli page update <PAGE_ID> -S --properties '{
-  "Status": "Done",
-  "Completed": true
+notion-cli page update <PAGE_ID> --properties '{
+  "Status": {"select": {"name": "Done"}}
 }'
 ```
 
@@ -206,98 +171,9 @@ notion-cli db query <ID> --search "urgent" --json
 
 ---
 
-## Simple Properties Mode
+## Simple Properties Mode (Phase 2)
 
-### Overview
-
-The `-S` or `--simple-properties` flag enables flat JSON syntax instead of complex Notion API structures.
-
-**70% complexity reduction** - Perfect for AI agents!
-
-### Property Type Reference
-
-| Type | Simple Format | Example |
-|------|---------------|---------|
-| **title** | String | `"Name": "Task"` |
-| **rich_text** | String | `"Description": "Details"` |
-| **number** | Number | `"Priority": 5` |
-| **checkbox** | Boolean | `"Done": true` |
-| **select** | String | `"Status": "In Progress"` |
-| **multi_select** | Array | `"Tags": ["urgent", "bug"]` |
-| **status** | String | `"Status": "Active"` |
-| **date** | String/Object | `"Due": "2025-12-31"` |
-| **url** | String | `"Link": "https://..."` |
-| **email** | String | `"Email": "user@example.com"` |
-| **phone_number** | String | `"Phone": "+1-555-..."` |
-| **people** | Array | `"Assignee": ["user-id"]` |
-| **relation** | Array | `"Related": ["page-id"]` |
-| **files** | Array | `"Attachments": ["https://..."]` |
-
-### Relative Dates
-
-```json
-{
-  "Due Date": "today",
-  "Start Date": "tomorrow",
-  "End Date": "+7 days",
-  "Review Date": "+2 weeks",
-  "Archive Date": "+1 month"
-}
-```
-
-**Supported formats:**
-- `"today"`, `"tomorrow"`, `"yesterday"`
-- `"+N days"`, `"-N days"`
-- `"+N weeks"`, `"-N weeks"`
-- `"+N months"`, `"-N months"`
-- `"+N years"`, `"-N years"`
-
-### Case Insensitivity
-
-Property names and select values are case-insensitive:
-
-```json
-{
-  "name": "Task",          // Works!
-  "Name": "Task",          // Works!
-  "NAME": "Task",          // Works!
-  "status": "in progress", // Works!
-  "Status": "In Progress"  // Works!
-}
-```
-
-### Examples
-
-**Create Task:**
-```bash
-notion-cli page create -d <DB_ID> -S --properties '{
-  "Name": "Bug Fix: Login Error",
-  "Status": "In Progress",
-  "Priority": 8,
-  "Due Date": "+3 days",
-  "Tags": ["urgent", "bug"],
-  "Assignee": ["user-id-123"],
-  "Description": "User cannot log in with special characters"
-}'
-```
-
-**Update Task:**
-```bash
-notion-cli page update <PAGE_ID> -S --properties '{
-  "Status": "Done",
-  "Completed": true,
-  "Completion Date": "today"
-}'
-```
-
-**Clear Property:**
-```json
-{
-  "Description": null
-}
-```
-
-[📖 Full Simple Properties Documentation](../SIMPLE_PROPERTIES.md)
+> **Note:** Simple Properties (`-S` flag) is a Phase 2 feature not yet available in v6.0.0. For now, use the standard Notion API property format when creating/updating pages. This feature will be added in a future release.
 
 ---
 
@@ -480,10 +356,10 @@ notion-cli doctor
 notion-cli db schema <ID> --with-examples --json
 ```
 
-**3. Use Simple Properties Mode**
+**3. Discover Schema Before Creating Pages**
 ```bash
-# Reduces errors by 70%
-notion-cli page create -d <ID> -S --properties '{...}'
+# Understand the database structure first
+notion-cli db schema <ID> --output json
 ```
 
 **4. Use JSON Output for Parsing**
@@ -586,11 +462,9 @@ notion-cli doctor
 
 ## Additional Resources
 
-- [Simple Properties Guide](../SIMPLE_PROPERTIES.md)
 - [AI Agent Cookbook](./ai-agent-cookbook.md)
 - [Filter Guide](./filter-guide.md)
-- [Verbose Logging Guide](../VERBOSE_LOGGING.md)
-- [Output Formats Guide](../../OUTPUT_FORMATS.md)
+- [Output Formats Guide](./output-formats.md)
 
 ---
 
@@ -611,9 +485,9 @@ notion-cli list --json    # List cached databases
 # Schema Discovery
 notion-cli db schema <ID> --with-examples --json
 
-# Create/Update Pages (Simple Properties)
-notion-cli page create -d <ID> -S --properties '{...}'
-notion-cli page update <ID> -S --properties '{...}'
+# Create/Update Pages
+notion-cli page create -d <ID> --properties '{...}'
+notion-cli page update <ID> --properties '{...}'
 
 # Query Databases
 notion-cli db query <ID> --filter '{...}' --json
@@ -626,9 +500,8 @@ notion-cli cache:info --json
 1. `notion-cli init` - First-time setup
 2. `notion-cli doctor` - Verify health
 3. `notion-cli sync` - Cache workspace
-4. `notion-cli db schema <ID> --with-examples --json` - Discover structure
-5. Use `-S` flag for simple properties
-6. Use `--json` for all output
+4. `notion-cli db schema <ID> --output json` - Discover structure
+5. Use `--output json` for all output
 
 ---
 

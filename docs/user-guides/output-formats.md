@@ -4,7 +4,7 @@ The Notion CLI now supports multiple output formats to suit different use cases.
 
 ## Available Output Formats
 
-### 1. Default Table (oclif table)
+### 1. Default Table
 The standard table output with optional CSV export.
 
 ```bash
@@ -200,25 +200,11 @@ notion-cli search -q "Meeting" --pretty | less
 
 ## Implementation Details
 
-### TypeScript Types
-All output functions are properly typed in `C:\Users\jakes\Developer\GitHub\notion-cli\src\helper.ts`:
-
-```typescript
-export const outputCompactJson = (res: any) => void
-export const outputMarkdownTable = (data: any[], columns: Record<string, any>) => void
-export const outputPrettyTable = (data: any[], columns: Record<string, any>) => void
-```
+### Output Formatting
+Output formatting is implemented in `pkg/output/output.go` with support for JSON, table, CSV, and markdown formats. The `output.Printer` type handles all formatting across commands.
 
 ### Flag Definitions
-Flags are defined in `C:\Users\jakes\Developer\GitHub\notion-cli\src\base-flags.ts`:
-
-```typescript
-export const OutputFormatFlags = {
-  markdown: Flags.boolean({ char: 'm', exclusive: ['compact-json', 'pretty'] }),
-  'compact-json': Flags.boolean({ char: 'c', exclusive: ['markdown', 'pretty'] }),
-  pretty: Flags.boolean({ char: 'P', exclusive: ['markdown', 'compact-json'] }),
-}
-```
+Output format flags are defined as Cobra persistent flags on the root command in `internal/cli/root.go`. The flags `--output`, `--compact-json`, `--pretty`, and `--markdown` control output formatting.
 
 ## Backward Compatibility
 

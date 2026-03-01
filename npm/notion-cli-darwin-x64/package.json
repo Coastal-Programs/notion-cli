@@ -1,0 +1,12 @@
+{
+  "name": "@coastal-programs/notion-cli-darwin-x64",
+  "version": "6.0.0",
+  "description": "notion-cli binary for macOS x64 (Intel)",
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Coastal-Programs/notion-cli.git"
+  }
+}

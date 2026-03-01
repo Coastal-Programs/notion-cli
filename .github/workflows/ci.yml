@@ -1,153 +1,70 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [main]
   push:
-    branches: [ main, develop ]
+    branches: [main]
 
 jobs:
-  # Job 1: Quality checks (linting, type checking)
-  quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js 22.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.x'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run ESLint
-      run: npm run lint
-      continue-on-error: true
-
-    - name: Type check
-      run: npx tsc --noEmit
-
-  # Job 2: Security scanning
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js 22.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.x'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run npm audit
-      run: npm audit --audit-level=moderate
-      continue-on-error: true
-
-    - name: Check for known vulnerabilities
-      run: |
-        echo "Checking production dependencies..."
-        npm audit --production --audit-level=high
-
-  # Job 3: Build verification
   build:
-    name: Build
+    name: Build & Test
     runs-on: ubuntu-latest
-    needs: [quality]
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js 22.x
-      uses: actions/setup-node@v4
+    - name: Setup Go
+      uses: actions/setup-go@v5
       with:
-        node-version: '22.x'
-        cache: 'npm'
+        go-version: '1.21'
 
-    - name: Install dependencies
-      run: npm ci
+    - name: Build
+      run: make build
 
-    - name: Build project
-      run: npm run build
+    - name: Lint
+      run: make lint
 
-    - name: Upload build artifacts
+    - name: Test
+      run: go test ./... -v -race -count=1
+
+  cross-compile:
+    name: Cross-Compile
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+
+    - name: Build all platforms
+      run: make release
+
+    - name: Upload binaries
       uses: actions/upload-artifact@v4
       with:
-        name: dist
-        path: dist/
+        name: binaries
+        path: build/notion-cli-*
         retention-days: 7
 
-  # Job 4: Test with coverage
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    needs: [quality]
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js 22.x
-      uses: actions/setup-node@v4
-      with:
-        node-version: '22.x'
-        cache: 'npm'
-
-    - name: Install dependencies
-      run: npm ci
-
-    - name: Run tests with coverage
-      run: npm run test:coverage
-      env:
-        CI: true
-
-    # Upload coverage to Codecov for tracking and PR comments
-    # Free for public repositories: https://about.codecov.io/
-    # View reports: https://codecov.io/gh/Coastal-Programs/notion-cli
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        files: ./coverage/lcov.info
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false  # Non-blocking - CI passes even if upload fails
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: |
-          coverage/
-        retention-days: 30
-
-  # Job 5: Final status check
   ci-success:
     name: CI Success
     runs-on: ubuntu-latest
-    needs: [quality, security, build, test]
+    needs: [build, cross-compile]
     if: always()
 
     steps:
     - name: Check all jobs succeeded
       run: |
-        if [ "${{ needs.quality.result }}" != "success" ] || \
-           [ "${{ needs.build.result }}" != "success" ] || \
-           [ "${{ needs.test.result }}" != "success" ]; then
-          echo "❌ CI pipeline failed"
+        if [ "${{ needs.build.result }}" != "success" ] || \
+           [ "${{ needs.cross-compile.result }}" != "success" ]; then
+          echo "CI pipeline failed"
           exit 1
         fi
-        echo "✅ All CI checks passed!"
+        echo "All CI checks passed"

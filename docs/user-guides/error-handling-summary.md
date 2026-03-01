@@ -1,8 +1,10 @@
 # AI-Friendly Error Handling System - Summary
 
+> **Note:** This document was originally written for the TypeScript v5.x implementation. The error system is now implemented in Go (v6.0.0) in `internal/errors/errors.go`. File references below have been updated accordingly.
+
 **Project**: Notion CLI Enhanced Error Handling
 **Version**: 1.0.0
-**Status**: Design Complete - Ready for Implementation
+**Status**: Implemented in Go (v6.0.0)
 **Created**: 2025-10-22
 
 ---
@@ -93,7 +95,7 @@ Enhanced Error System
 ### 1. Implementation Files
 
 #### ✅ Core Error System
-**File**: `src/errors/enhanced-errors.ts` (542 lines)
+**File**: `internal/errors/errors.go` (542 lines)
 - NotionCLIError class
 - NotionCLIErrorCode enum (30+ codes)
 - NotionCLIErrorFactory class (10+ factory methods)
@@ -101,7 +103,7 @@ Enhanced Error System
 - handleCliError() function
 
 #### ✅ Clean Exports
-**File**: `src/errors/index.ts` (28 lines)
+**File**: `internal/errors/errors.go` (same file) (28 lines)
 - Centralized import point
 - Backward compatibility layer
 - Type exports
@@ -351,7 +353,9 @@ Enhanced Error System
 
 ### Quick Start
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 // 1. Import error system
 import {
   handleCliError,
@@ -389,7 +393,9 @@ export default class MyCommand extends Command {
 ### Best Practices
 
 1. **Always Provide Context**
-   ```typescript
+   ```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
    const context: ErrorContext = {
      resourceType: 'database',
      attemptedId: databaseId,
@@ -399,7 +405,9 @@ export default class MyCommand extends Command {
    ```
 
 2. **Validate Before API Calls**
-   ```typescript
+   ```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
    // Check ID format before making API call
    if (!/^[a-f0-9]{32}$/i.test(cleanId)) {
      throw NotionCLIErrorFactory.invalidIdFormat(input, 'database')
@@ -407,13 +415,17 @@ export default class MyCommand extends Command {
    ```
 
 3. **Use Factory Functions**
-   ```typescript
+   ```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
    // Use specialized factory instead of generic error
    throw NotionCLIErrorFactory.integrationNotShared('database', dbId)
    ```
 
 4. **Handle JSON Output**
-   ```typescript
+   ```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
    // Support both human and automation modes
    handleCliError(error, flags.json, context)
    ```
@@ -424,7 +436,9 @@ export default class MyCommand extends Command {
 
 ### Unit Tests (Per Error Type)
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 describe('NotionCLIErrorFactory', () => {
   it('creates token missing error with correct code')
   it('includes setup command in suggestions')
@@ -435,7 +449,9 @@ describe('NotionCLIErrorFactory', () => {
 
 ### Integration Tests (Per Command)
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 describe('db query command', () => {
   it('returns TOKEN_MISSING when token not set')
   it('returns INVALID_ID_FORMAT for bad ID')
@@ -521,8 +537,7 @@ describe('db query command', () => {
 ## File Locations
 
 ### Implementation
-- `src/errors/enhanced-errors.ts` - Main error system
-- `src/errors/index.ts` - Clean exports
+- `internal/errors/errors.go` - Error system with codes, suggestions, and factory functions
 
 ### Documentation
 - `docs/ERROR-HANDLING-ARCHITECTURE.md` - Complete technical spec
@@ -531,9 +546,8 @@ describe('db query command', () => {
 - `docs/ERROR-HANDLING-MIGRATION.md` - Migration guide
 - `docs/ERROR-HANDLING-SUMMARY.md` - This document
 
-### Tests (To Be Created)
-- `test/errors/enhanced-errors.test.ts` - Unit tests
-- `test/integration/error-handling.test.ts` - Integration tests
+### Tests
+- Tests are co-located with source files in Go (`make test`)
 
 ---
 
@@ -593,8 +607,7 @@ describe('db query command', () => {
 - [Migration Guide](./ERROR-HANDLING-MIGRATION.md)
 
 ### Code
-- Implementation: `src/errors/enhanced-errors.ts`
-- Exports: `src/errors/index.ts`
+- Implementation: `internal/errors/errors.go`
 
 ### Issues
 - GitHub: [Coastal-Programs/notion-cli/issues](https://github.com/Coastal-Programs/notion-cli/issues)
@@ -627,4 +640,4 @@ This enhanced error handling system represents a significant improvement in the 
 **Created**: 2025-10-22
 **Authors**: Claude Code (Backend Architect)
 **Status**: Complete & Ready for Implementation
-**Project**: Notion CLI v5.4.0
+**Project**: Notion CLI v6.0.0

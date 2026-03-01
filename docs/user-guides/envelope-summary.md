@@ -1,10 +1,12 @@
 # JSON Envelope System - Implementation Summary
 
+> **Note:** This document was originally written for the TypeScript v5.x implementation. The envelope system is now implemented in Go (v6.0.0). Source file references have been updated.
+
 ## Overview
 
 This document provides a high-level summary of the JSON envelope standardization system for the Notion CLI. It serves as a quick reference for developers and a guide for project management.
 
-**Status:** Ready for Implementation
+**Status:** Implemented in Go (v6.0.0)
 **Version:** 1.0.0
 **Created:** 2025-10-23
 **Last Updated:** 2025-10-23
@@ -105,7 +107,7 @@ esac
 
 ## Key Components
 
-### 1. Core Envelope System (`src/envelope.ts`)
+### 1. Core Envelope System (`pkg/output/envelope.go`)
 
 **Exports:**
 - `EnvelopeFormatter` class - Creates and outputs envelopes
@@ -121,10 +123,10 @@ esac
 - `getExitCode(envelope)` - Determine exit code
 - `writeDiagnostic(message, level)` - Write to stderr (static)
 
-### 2. Base Command Class (`src/base-command.ts`)
+### 2. Command Handlers (`internal/cli/commands/*.go`)
 
 **Features:**
-- Extends oclif `Command` class
+- Cobra command handler functions
 - Automatic envelope formatter initialization
 - Command name and version injection
 - Convenience methods for output
@@ -135,7 +137,9 @@ esac
 - `checkEnvelopeUsage(flags)` - Determine if envelope is needed
 
 **Usage:**
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 export default class MyCommand extends BaseCommand {
   async run() {
     const { flags } = await this.parse(MyCommand)
@@ -165,20 +169,22 @@ export default class MyCommand extends BaseCommand {
 
 ```
 notion-cli/
-├── src/
-│   ├── envelope.ts              # Core envelope system (350 lines)
-│   ├── base-command.ts          # Base command with envelope support (120 lines)
-│   ├── errors.ts                # Error types and codes (existing, enhanced)
-│   └── commands/                # Command implementations (to be migrated)
-├── test/
-│   ├── envelope.test.ts         # Unit tests for envelope system (500 lines)
-│   ├── base-command.test.ts     # Unit tests for base command (TODO)
-│   └── integration/             # Integration tests (TODO)
+├── pkg/
+│   └── output/
+│       ├── output.go            # Output formatting (JSON, table, CSV, markdown)
+│       ├── envelope.go          # Envelope wrapper
+│       └── table.go             # Table formatter
+├── internal/
+│   ├── errors/
+│   │   └── errors.go           # Error types and codes with suggestions
+│   └── cli/
+│       └── commands/            # All command implementations
 └── docs/
-    ├── ENVELOPE_SPECIFICATION.md        # Technical spec (8500 words)
-    ├── ENVELOPE_INTEGRATION_GUIDE.md    # Migration guide (7500 words)
-    ├── ENVELOPE_TESTING_STRATEGY.md     # Testing strategy (5500 words)
-    └── ENVELOPE_SYSTEM_SUMMARY.md       # This document
+    └── user-guides/
+        ├── envelope-specification.md
+        ├── envelope-integration.md
+        ├── envelope-summary.md
+        └── envelope-index.md
 ```
 
 ## Migration Strategy
@@ -517,9 +523,9 @@ fi
 
 ### Source Code
 
-- **Core System:** `src/envelope.ts` (350 lines)
-- **Base Command:** `src/base-command.ts` (120 lines)
-- **Unit Tests:** `test/envelope.test.ts` (500 lines)
+- **Core System:** `pkg/output/envelope.go`
+- **Command Handlers:** `internal/cli/commands/*.go`
+- **Tests:** `make test`
 
 ### Examples
 

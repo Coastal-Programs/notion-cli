@@ -27,7 +27,7 @@ This caused constant "object_not_found" errors and user frustration.
 
 ## Solution Implementation
 
-### Core Logic (src/utils/notion-resolver.ts)
+### Core Logic (`internal/resolver/resolver.go`)
 
 The resolver now includes smart database ID resolution with these stages:
 
@@ -62,10 +62,10 @@ Note: Use data_source_id for database operations.
       The database_id from parent.database_id won't work directly.
 ```
 
-## Files Modified
+## Files
 
 ### Main Implementation
-- **src/utils/notion-resolver.ts** - Core smart resolution logic
+- **internal/resolver/resolver.go** - Core smart resolution logic
   - Added `trySmartDatabaseResolution()` function
   - Added `resolveDatabaseIdToDataSourceId()` function
   - Integrated into existing `resolveNotionId()` function
@@ -85,7 +85,7 @@ Note: Use data_source_id for database operations.
   - Enhanced troubleshooting section
 
 ### Testing
-- **test/utils/notion-resolver.test.ts** - Test framework
+- Tests are in Go test files alongside source (`make test`)
   - Test cases for valid/invalid inputs
   - Manual testing guide
   - Edge case documentation
@@ -93,16 +93,8 @@ Note: Use data_source_id for database operations.
 ## Technical Details
 
 ### Type Safety
-```typescript
-// Uses Notion SDK type guards
-import { isFullPage } from '@notionhq/client'
 
-// Ensures we only access parent on full page objects
-if (!isFullPage(result)) continue
-if (result.parent && result.parent.type === 'database_id') {
-  // Safe to access parent properties
-}
-```
+The Go implementation uses Go's type system and struct field access to safely handle different parent types in Notion API responses.
 
 ### Error Handling
 - Catches 404 errors specifically (not other errors)
@@ -196,7 +188,7 @@ Manual testing performed:
 ## Deployment Notes
 
 ### Version
-- Feature version: v5.4.0
+- Feature version: v5.4.0 (TypeScript), ported to v6.0.0 (Go)
 - Implemented: 2025-10-22
 
 ### Breaking Changes
@@ -215,9 +207,8 @@ Manual testing performed:
 ## Support Resources
 
 ### Documentation
-- Full guide: `docs/smart-id-resolution.md`
-- API reference: `src/utils/notion-resolver.ts` (JSDoc comments)
-- Test guide: `test/utils/notion-resolver.test.ts`
+- Full guide: `docs/architecture/smart-id-resolution.md`
+- Implementation: `internal/resolver/resolver.go`
 
 ### Examples
 - README.md - Usage examples

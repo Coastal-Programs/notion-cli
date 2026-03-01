@@ -1,5 +1,7 @@
 # AI Discovery Hints Implementation
 
+> **Note:** This document was originally written for the TypeScript v5.x implementation. The hint concept is carried forward in the Go v6.0.0 rewrite. File references below refer to the old TypeScript source paths; the equivalent Go implementations are in `internal/cli/commands/*.go`.
+
 ## Summary
 Added discovery hints to make the `-r` flag more obvious to AI assistants and users, addressing the critical need for AI assistants to discover that `-r` returns full JSON data vs minimal table output.
 
@@ -24,7 +26,9 @@ Use -r flag for full JSON output with all properties (recommended for AI assista
 Updated `-r` flag descriptions across all commands to explicitly mention AI assistants:
 
 **Before:**
-```typescript
+```go
+// Conceptual pattern (see internal/cli/commands/*.go for Go implementation)
+//
 raw: Flags.boolean({
   char: 'r',
   description: 'output raw json',
@@ -32,7 +36,9 @@ raw: Flags.boolean({
 ```
 
 **After:**
-```typescript
+```go
+// Conceptual pattern (see internal/cli/commands/*.go for Go implementation)
+//
 raw: Flags.boolean({
   char: 'r',
   description: 'output raw json (recommended for AI assistants - returns all fields)',
@@ -42,7 +48,9 @@ raw: Flags.boolean({
 ### 3. Prioritized Examples in Help
 Moved AI-friendly examples to the top of each command's help text:
 
-```typescript
+```go
+// Conceptual pattern (see internal/cli/commands/*.go for Go implementation)
+//
 static examples = [
   {
     description: 'Retrieve a page with full data (recommended for AI assistants)',
@@ -57,7 +65,9 @@ static examples = [
 ### New Helper Function
 Added `showRawFlagHint()` in `src/helper.ts`:
 
-```typescript
+```go
+// Conceptual pattern (see internal/cli/commands/*.go for Go implementation)
+//
 /**
  * Show a hint to users (especially AI assistants) that more data is available with the -r flag
  * This makes the -r flag more discoverable for automation and AI use cases
@@ -189,13 +199,13 @@ notion-cli page retrieve <PAGE_ID> -r
 notion-cli page retrieve <PAGE_ID> --pretty
 ```
 
-## Files Modified
+## Implementation Files
 
-1. `src/helper.ts` - Added `showRawFlagHint()` function
-2. `src/commands/page/retrieve.ts` - Added hint, updated examples/flags
-3. `src/commands/db/retrieve.ts` - Added hint, updated examples/flags
-4. `src/commands/db/query.ts` - Added hint, updated examples/flags
-5. `src/commands/search.ts` - Added hint, updated examples/flags
+In the Go rewrite, hints are implemented in the command handler functions:
+1. `internal/cli/commands/page.go` - Page retrieve hint
+2. `internal/cli/commands/db.go` - Database retrieve/query hints
+3. `internal/cli/commands/search.go` - Search hint
+4. `pkg/output/output.go` - Output formatting utilities
 
 ## Future Enhancements
 

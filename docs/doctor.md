@@ -19,6 +19,15 @@ FLAGS
 DESCRIPTION
   Run health checks and diagnostics for Notion CLI
 
+  Performs the following checks:
+  - Go runtime version
+  - API token configuration (env var or config file)
+  - Token format validation (secret_ or ntn_ prefix)
+  - Network connectivity to api.notion.com
+  - API connection test with latency measurement
+  - Data directory status
+  - Workspace cache freshness
+
 ALIASES
   $ notion-cli diagnose
   $ notion-cli healthcheck
@@ -32,5 +41,4 @@ EXAMPLES
 
     $ notion-cli doctor --json
 ```
-
 

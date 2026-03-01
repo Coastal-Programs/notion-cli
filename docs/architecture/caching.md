@@ -141,52 +141,20 @@ This document describes the persistent caching system for notion-cli that enable
 
 ### Alias Generation Rules
 
-Aliases are auto-generated from the title to improve fuzzy matching:
+Aliases are auto-generated from the title to improve fuzzy matching. The implementation lives in `internal/cache/workspace.go`.
 
-```typescript
-function generateAliases(title: string): string[] {
-  const aliases = new Set<string>()
-  const normalized = title.toLowerCase().trim()
+**Example: "Tasks Database"**
+Generates: `["tasks database", "tasks", "task", "tasks db", "task db", "td"]`
 
-  // Add full title (normalized)
-  aliases.add(normalized)
+**Example: "Meeting Notes"**
+Generates: `["meeting notes", "meeting note", "meeting", "meeting db", "mn"]`
 
-  // Add title without common suffixes
-  const withoutSuffixes = normalized
-    .replace(/\s+(database|db|table|list|tracker|log)$/i, '')
-  if (withoutSuffixes !== normalized) {
-    aliases.add(withoutSuffixes)
-  }
-
-  // Add title with common suffixes
-  aliases.add(`${withoutSuffixes} db`)
-  aliases.add(`${withoutSuffixes} database`)
-
-  // Add singular/plural variants
-  if (withoutSuffixes.endsWith('s')) {
-    aliases.add(withoutSuffixes.slice(0, -1)) // Remove 's'
-  } else {
-    aliases.add(`${withoutSuffixes}s`) // Add 's'
-  }
-
-  // Add acronym if multi-word (e.g., "Meeting Notes" → "mn")
-  const words = withoutSuffixes.split(/\s+/)
-  if (words.length > 1) {
-    const acronym = words.map(w => w[0]).join('')
-    if (acronym.length >= 2) {
-      aliases.add(acronym)
-    }
-  }
-
-  return Array.from(aliases)
-}
-
-// Example: "Tasks Database"
-// Generates: ["tasks database", "tasks", "task", "tasks db", "task db", "td"]
-
-// Example: "Meeting Notes"
-// Generates: ["meeting notes", "meeting note", "meeting", "meeting db", "mn"]
-```
+The algorithm:
+1. Normalize title (lowercase, trim)
+2. Strip common suffixes (database, db, table, list, tracker, log)
+3. Add common suffix variants (db, database)
+4. Add singular/plural variants
+5. Generate acronym for multi-word titles
 
 ## Sync Logic
 
@@ -263,260 +231,41 @@ function generateAliases(title: string): string[] {
 
 #### Pagination Handling
 
-```typescript
-async function fetchAllDatabases(): Promise<DataSourceObjectResponse[]> {
-  const databases: DataSourceObjectResponse[] = []
-  let cursor: string | undefined = undefined
-
-  while (true) {
-    const response = await enhancedFetchWithRetry(
-      () => client.search({
-        filter: {
-          value: 'data_source',
-          property: 'object',
-        },
-        start_cursor: cursor,
-        page_size: 100, // Max allowed by API
-      }),
-      {
-        context: 'sync:fetchAllDatabases',
-        config: { maxRetries: 5 } // Higher retries for sync
-      }
-    )
-
-    databases.push(...response.results as DataSourceObjectResponse[])
-
-    if (!response.has_more || !response.next_cursor) {
-      break
-    }
-
-    cursor = response.next_cursor
-  }
-
-  return databases
-}
-```
+The sync implementation in `internal/cli/commands/sync.go` handles Notion API pagination, fetching up to 100 databases per page and continuing until all results are retrieved. Retries use the infrastructure in `internal/retry/retry.go`.
 
 #### Atomic File Write
 
-Prevent corruption if process crashes during write:
-
-```typescript
-async function writeCache(cache: DatabaseCache): Promise<void> {
-  const cachePath = getCachePath() // ~/.notion-cli/databases.json
-  const tmpPath = `${cachePath}.tmp`
-
-  // Write to temporary file
-  await fs.writeFile(
-    tmpPath,
-    JSON.stringify(cache, null, 2),
-    'utf8'
-  )
-
-  // Atomic rename (replaces old file)
-  await fs.rename(tmpPath, cachePath)
-}
-```
+The workspace cache (`internal/cache/workspace.go`) writes to a temporary file first, then performs an atomic rename to prevent corruption if the process crashes during write.
 
 #### Sync Lock File
 
-Prevent concurrent sync operations:
-
-```typescript
-async function acquireSyncLock(): Promise<boolean> {
-  const lockPath = path.join(getCacheDir(), '.sync.lock')
-
-  try {
-    // Create lock file (fails if exists)
-    await fs.writeFile(lockPath, Date.now().toString(), { flag: 'wx' })
-    return true
-  } catch (error) {
-    if (error.code === 'EEXIST') {
-      // Check if lock is stale (>5 minutes old)
-      const lockContent = await fs.readFile(lockPath, 'utf8')
-      const lockTime = parseInt(lockContent, 10)
-      const isStale = Date.now() - lockTime > 5 * 60 * 1000
-
-      if (isStale) {
-        // Remove stale lock and retry
-        await fs.unlink(lockPath)
-        return acquireSyncLock()
-      }
-
-      return false // Sync in progress
-    }
-    throw error
-  }
-}
-
-async function releaseSyncLock(): Promise<void> {
-  const lockPath = path.join(getCacheDir(), '.sync.lock')
-  await fs.unlink(lockPath).catch(() => {}) // Ignore errors
-}
-```
+Concurrent sync operations are prevented using a lock file mechanism. Stale locks (older than 5 minutes) are automatically removed.
 
 ## Name Resolution Algorithm
 
 ### Resolution Flow
 
-```typescript
-/**
- * Resolve database name/ID/URL to clean Notion ID
- *
- * @param input - Database name, ID, or URL
- * @param options - Resolution options
- * @returns Clean Notion ID
- */
-async function resolveDatabase(
-  input: string,
-  options: {
-    fuzzyThreshold?: number // Default: 0.7 (70% match)
-    syncIfNotFound?: boolean // Default: true
-    includeArchived?: boolean // Default: false
-  } = {}
-): Promise<string> {
-  const {
-    fuzzyThreshold = 0.7,
-    syncIfNotFound = true,
-    includeArchived = false,
-  } = options
+The name resolution algorithm is implemented in `internal/resolver/resolver.go`. It follows a cascading strategy:
 
-  // Step 1: Is it a URL? Extract ID
-  if (isNotionUrl(input)) {
-    return extractNotionId(input)
-  }
-
-  // Step 2: Is it a clean ID? (32 hex chars)
-  if (/^[a-f0-9]{32}$/i.test(input.replace(/-/g, ''))) {
-    return extractNotionId(input)
-  }
-
-  // Step 3: Treat as name - search cache
-  const cache = await loadCache()
-  const normalized = input.toLowerCase().trim()
-
-  // 3a. Exact match on title
-  let match = cache.databases.find(
-    db => db.titleNormalized === normalized &&
-          (includeArchived || !db.archived)
-  )
-  if (match) return match.id
-
-  // 3b. Exact match on alias
-  match = cache.databases.find(
-    db => db.aliases.includes(normalized) &&
-          (includeArchived || !db.archived)
-  )
-  if (match) return match.id
-
-  // 3c. Fuzzy match
-  const fuzzyMatches = cache.databases
-    .filter(db => includeArchived || !db.archived)
-    .map(db => ({
-      db,
-      score: Math.max(
-        fuzzyScore(normalized, db.titleNormalized),
-        ...db.aliases.map(alias => fuzzyScore(normalized, alias))
-      )
-    }))
-    .filter(({ score }) => score >= fuzzyThreshold)
-    .sort((a, b) => b.score - a.score)
-
-  if (fuzzyMatches.length > 0) {
-    return fuzzyMatches[0].db.id
-  }
-
-  // 3d. Not found in cache - sync and retry
-  if (syncIfNotFound) {
-    await syncCache()
-    return resolveDatabase(input, {
-      ...options,
-      syncIfNotFound: false // Prevent infinite recursion
-    })
-  }
-
-  // 3e. Still not found - search API directly
-  const apiResult = await searchDatabaseByName(input)
-  if (apiResult) {
-    return apiResult.id
-  }
-
-  // 3f. Give up
-  throw new Error(
-    `Could not find database matching: "${input}"\n\n` +
-    `Tried:\n` +
-    `  - URL extraction\n` +
-    `  - ID validation\n` +
-    `  - Cache lookup (exact, alias, fuzzy)\n` +
-    `  - Cache sync\n` +
-    `  - API search\n\n` +
-    `Suggestions:\n` +
-    `  - Verify the database exists and is shared with your integration\n` +
-    `  - Try using the full database ID or URL\n` +
-    `  - Run 'notion-cli db sync' to refresh the cache`
-  )
-}
-```
+1. **URL extraction**: If input is a Notion URL, extract the ID
+2. **Direct ID validation**: If input is a 32-character hex string, use it directly
+3. **Cache lookup**: Search the workspace cache:
+   - 3a. Exact match on normalized title
+   - 3b. Exact match on alias
+   - 3c. Fuzzy match using Levenshtein distance (threshold: 0.7)
+4. **Sync and retry**: If not found in cache, trigger a sync and retry
+5. **API search**: Fall back to the Notion search API
+6. **Error**: Provide a helpful error message with suggestions
 
 ### Fuzzy Matching Algorithm
 
-Using Levenshtein distance with normalization:
+Uses normalized Levenshtein distance: `score = 1 - (distance / maxLength)`
 
-```typescript
-/**
- * Calculate fuzzy match score (0.0 to 1.0)
- *
- * Uses normalized Levenshtein distance:
- * score = 1 - (distance / maxLength)
- */
-function fuzzyScore(query: string, target: string): number {
-  const distance = levenshtein(query, target)
-  const maxLength = Math.max(query.length, target.length)
-
-  if (maxLength === 0) return 1.0
-
-  return 1 - (distance / maxLength)
-}
-
-/**
- * Levenshtein distance (edit distance)
- * Measures minimum number of edits to transform query into target
- */
-function levenshtein(a: string, b: string): number {
-  const matrix: number[][] = []
-
-  // Initialize matrix
-  for (let i = 0; i <= b.length; i++) {
-    matrix[i] = [i]
-  }
-  for (let j = 0; j <= a.length; j++) {
-    matrix[0][j] = j
-  }
-
-  // Fill matrix
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      if (b.charAt(i - 1) === a.charAt(j - 1)) {
-        matrix[i][j] = matrix[i - 1][j - 1]
-      } else {
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j - 1] + 1, // substitution
-          matrix[i][j - 1] + 1,     // insertion
-          matrix[i - 1][j] + 1      // deletion
-        )
-      }
-    }
-  }
-
-  return matrix[b.length][a.length]
-}
-
-// Examples:
-// fuzzyScore("tasks", "tasks database") = 0.73
-// fuzzyScore("task", "tasks") = 0.80
-// fuzzyScore("meeting", "meetings") = 0.89
-// fuzzyScore("td", "tasks database") = 0.14 (too low)
-```
+Example scores:
+- `fuzzyScore("tasks", "tasks database")` = 0.73
+- `fuzzyScore("task", "tasks")` = 0.80
+- `fuzzyScore("meeting", "meetings")` = 0.89
+- `fuzzyScore("td", "tasks database")` = 0.14 (too low, below threshold)
 
 ## Cache Invalidation Strategy
 
@@ -534,67 +283,11 @@ function levenshtein(a: string, b: string): number {
 
 ### Cache TTL (Time To Live)
 
-```typescript
-const CACHE_TTL = {
-  default: 60 * 60 * 1000, // 1 hour (configurable)
-  max: 24 * 60 * 60 * 1000, // 24 hours (absolute limit)
-}
-
-function isCacheStale(cache: DatabaseCache): boolean {
-  if (!cache.lastSync) return true
-
-  const age = Date.now() - new Date(cache.lastSync).getTime()
-  const ttl = parseInt(
-    process.env.NOTION_CLI_DB_CACHE_TTL || String(CACHE_TTL.default),
-    10
-  )
-
-  return age > ttl
-}
-```
+Default TTL is 1 hour, configurable via `NOTION_CLI_DB_CACHE_TTL`. Maximum absolute TTL is 24 hours. The in-memory cache (`internal/cache/cache.go`) uses per-resource-type TTLs: blocks (30s), pages (1min), users (1hr), databases (10min).
 
 ### Incremental Updates
 
-On database mutation operations, update cache immediately:
-
-```typescript
-export async function createDb(
-  dbProps: CreateDatabaseParameters
-): Promise<CreateDatabaseResponse> {
-  const result = await enhancedFetchWithRetry(
-    () => client.databases.create(dbProps),
-    { context: 'createDb' }
-  )
-
-  // Invalidate search cache (legacy in-memory)
-  cacheManager.invalidate('search')
-
-  // Update persistent database cache
-  await updateDatabaseCache(result)
-
-  return result
-}
-
-async function updateDatabaseCache(
-  database: GetDatabaseResponse | CreateDatabaseResponse
-): Promise<void> {
-  const cache = await loadCache()
-
-  // Remove old entry if exists
-  cache.databases = cache.databases.filter(db => db.id !== database.id)
-
-  // Add new entry
-  const entry = await buildCacheEntry(database)
-  cache.databases.push(entry)
-
-  // Update metadata
-  cache.metadata.totalDatabases = cache.databases.length
-  cache.lastSync = new Date().toISOString()
-
-  // Write back
-  await writeCache(cache)
-}
-```
+On database mutation operations, the cache is updated immediately. The workspace cache (`internal/cache/workspace.go`) handles adding/updating/removing entries after create, update, or delete operations.
 
 ## API Rate Limiting Considerations
 
@@ -609,93 +302,21 @@ Notion API rate limits (as of 2025):
 
 1. **Batch Processing**: Fetch 100 databases per search page (max allowed)
 
-2. **Parallel Detail Fetching**: Fetch database details in parallel (with concurrency limit)
+2. **Parallel Detail Fetching**: Fetch database details in parallel with a concurrency limit (default: 3 concurrent requests to respect rate limits)
 
-```typescript
-async function syncWithRateLimit(): Promise<void> {
-  const databases = await fetchAllDatabases() // Paginated search
+3. **Smart Retry**: Uses the retry infrastructure in `internal/retry/retry.go` with exponential backoff and jitter
 
-  // Fetch details with concurrency limit
-  const CONCURRENCY = 3 // 3 requests per second
-  const cacheEntries: CacheEntry[] = []
-
-  for (let i = 0; i < databases.length; i += CONCURRENCY) {
-    const batch = databases.slice(i, i + CONCURRENCY)
-    const entries = await Promise.all(
-      batch.map(db => buildCacheEntryFromSearch(db))
-    )
-    cacheEntries.push(...entries)
-
-    // Respect rate limit (wait 1 second between batches)
-    if (i + CONCURRENCY < databases.length) {
-      await sleep(1000)
-    }
-  }
-
-  // Write cache
-  await writeCache({
-    version: '1.0.0',
-    lastSync: new Date().toISOString(),
-    databases: cacheEntries,
-    metadata: buildMetadata(cacheEntries),
-  })
-}
-```
-
-3. **Smart Retry**: Use existing retry infrastructure with exponential backoff
-
-4. **Partial Results**: If sync fails midway, cache partial results with warning flag
-
-```typescript
-try {
-  await syncWithRateLimit()
-} catch (error) {
-  // Save partial results if we got some data
-  if (cacheEntries.length > 0) {
-    cache.syncStatus.errors.push({
-      timestamp: new Date().toISOString(),
-      message: error.message,
-      partial: true,
-    })
-    await writeCache(cache)
-  }
-  throw error
-}
-```
+4. **Partial Results**: If sync fails midway, partial results are cached with a warning flag
 
 ## Error Handling Patterns
 
 ### Error Hierarchy
 
-```typescript
-class DatabaseCacheError extends Error {
-  constructor(message: string, public code: string) {
-    super(message)
-    this.name = 'DatabaseCacheError'
-  }
-}
+Error handling uses `internal/errors/errors.go` with the `NotionCLIError` type, which includes error codes and suggestions. Key error codes for cache operations:
 
-class CacheSyncError extends DatabaseCacheError {
-  constructor(message: string, public cause?: Error) {
-    super(message, 'SYNC_ERROR')
-  }
-}
-
-class DatabaseNotFoundError extends DatabaseCacheError {
-  constructor(query: string) {
-    super(
-      `Database not found: "${query}"`,
-      'DATABASE_NOT_FOUND'
-    )
-  }
-}
-
-class CacheCorruptedError extends DatabaseCacheError {
-  constructor(message: string) {
-    super(message, 'CACHE_CORRUPTED')
-  }
-}
-```
+- `SYNC_ERROR` - Sync operation failed
+- `DATABASE_NOT_FOUND` - Database not found in cache or API
+- `CACHE_CORRUPTED` - Cache file is invalid or corrupted
 
 ### Error Recovery Strategies
 
@@ -711,43 +332,11 @@ class CacheCorruptedError extends DatabaseCacheError {
 
 ### Graceful Degradation
 
-```typescript
-async function loadCache(): Promise<DatabaseCache> {
-  try {
-    const cache = await readCacheFile()
+The cache loading logic (`internal/cache/workspace.go`) handles failure gracefully:
 
-    // Validate cache structure
-    if (!cache.version || !Array.isArray(cache.databases)) {
-      throw new CacheCorruptedError('Invalid cache structure')
-    }
-
-    // Warn if cache is stale
-    if (isCacheStale(cache)) {
-      console.warn(
-        'Warning: Database cache is stale. ' +
-        'Run "notion-cli db sync" to refresh.'
-      )
-    }
-
-    return cache
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      // Cache doesn't exist - create empty cache
-      return createEmptyCache()
-    }
-
-    if (error instanceof CacheCorruptedError) {
-      // Backup corrupted cache
-      await backupCorruptedCache()
-
-      // Create new cache
-      return createEmptyCache()
-    }
-
-    throw error
-  }
-}
-```
+1. **Missing cache file**: Creates an empty cache (first-time setup)
+2. **Corrupted cache**: Backs up the corrupted file and creates a new empty cache
+3. **Stale cache**: Warns the user and suggests running `notion-cli sync`
 
 ## Performance Characteristics
 
@@ -785,16 +374,10 @@ async function loadCache(): Promise<DatabaseCache> {
 
 ### Integration with In-Memory Cache
 
-The persistent database cache complements the existing in-memory cache:
+The persistent database cache complements the in-memory TTL cache (`internal/cache/cache.go`):
 
-```typescript
-// In-memory cache: Fast, temporary, per-process
-cacheManager.get('dataSource', databaseId) // Retrieves full API response
-
-// Persistent cache: Slower, permanent, cross-process
-resolveDatabase('tasks db') // Resolves name → ID
-getDatabaseSchema(databaseId) // Retrieves schema from cache
-```
+- **In-memory cache**: Fast, temporary, per-process - stores full API responses
+- **Persistent cache**: File-based, cross-process - stores database metadata for name resolution
 
 **When to use each:**
 
@@ -935,115 +518,23 @@ Extend cache to include pages for full-text search:
 
 ### Phase 3: Incremental Sync
 
-Only fetch databases modified since last sync:
-
-```typescript
-async function incrementalSync(lastSync: Date): Promise<void> {
-  // Search with last_edited_time filter
-  const databases = await client.search({
-    filter: {
-      property: 'object',
-      value: 'data_source',
-    },
-    // Note: Notion API doesn't support time-based filters on search yet
-    // This is a future enhancement when API supports it
-  })
-
-  // For now, fall back to full sync
-  await fullSync()
-}
-```
+Only fetch databases modified since last sync. Currently falls back to full sync since the Notion API doesn't support time-based filters on the search endpoint.
 
 ### Phase 4: Vector Search
 
-Use embeddings for semantic search:
-
-```typescript
-// "tasks due this week" → finds "Weekly Tasks" database
-async function semanticResolve(query: string): Promise<string> {
-  const embedding = await getEmbedding(query)
-  const matches = cache.databases.map(db => ({
-    db,
-    score: cosineSimilarity(embedding, db.embedding)
-  }))
-  return matches[0].db.id
-}
-```
+Use embeddings for semantic search (e.g., "tasks due this week" finds "Weekly Tasks" database).
 
 ## Testing Strategy
 
-### Unit Tests
+Tests are implemented as Go test files alongside their source code. Run with `make test`.
 
-```typescript
-describe('Database Cache', () => {
-  describe('Alias Generation', () => {
-    it('generates aliases for simple title', () => {
-      expect(generateAliases('Tasks')).toContain('tasks')
-      expect(generateAliases('Tasks')).toContain('task')
-      expect(generateAliases('Tasks')).toContain('tasks db')
-    })
+### Key Test Areas
 
-    it('generates acronyms for multi-word titles', () => {
-      expect(generateAliases('Meeting Notes')).toContain('mn')
-    })
-  })
-
-  describe('Name Resolution', () => {
-    it('resolves exact title match', async () => {
-      const id = await resolveDatabase('Tasks Database')
-      expect(id).toBe('1fb79d4c71bb8032b722c82305b63a00')
-    })
-
-    it('resolves alias match', async () => {
-      const id = await resolveDatabase('tasks')
-      expect(id).toBe('1fb79d4c71bb8032b722c82305b63a00')
-    })
-
-    it('resolves fuzzy match', async () => {
-      const id = await resolveDatabase('task db')
-      expect(id).toBe('1fb79d4c71bb8032b722c82305b63a00')
-    })
-
-    it('throws error for non-existent database', async () => {
-      await expect(
-        resolveDatabase('nonexistent', { syncIfNotFound: false })
-      ).rejects.toThrow('Could not find database')
-    })
-  })
-
-  describe('Fuzzy Matching', () => {
-    it('calculates fuzzy scores correctly', () => {
-      expect(fuzzyScore('tasks', 'tasks')).toBe(1.0)
-      expect(fuzzyScore('task', 'tasks')).toBeGreaterThan(0.8)
-      expect(fuzzyScore('xyz', 'tasks')).toBeLessThan(0.5)
-    })
-  })
-})
-```
-
-### Integration Tests
-
-```typescript
-describe('Database Cache Integration', () => {
-  it('syncs databases from API', async () => {
-    await syncCache()
-    const cache = await loadCache()
-    expect(cache.databases.length).toBeGreaterThan(0)
-  })
-
-  it('handles concurrent sync attempts', async () => {
-    const promises = [syncCache(), syncCache(), syncCache()]
-    const results = await Promise.allSettled(promises)
-    expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1)
-  })
-
-  it('recovers from corrupted cache', async () => {
-    await writeCacheFile('invalid json{')
-    const cache = await loadCache()
-    expect(cache.databases).toEqual([])
-  })
-})
-```
+- **Alias Generation**: Verifies aliases for simple titles, multi-word titles, and acronyms
+- **Name Resolution**: Tests exact match, alias match, fuzzy match, and not-found scenarios
+- **Fuzzy Matching**: Validates score calculations for identical, similar, and dissimilar strings
+- **Sync**: Tests API pagination, concurrent sync prevention, and partial result handling
+- **Cache Recovery**: Tests handling of missing, corrupted, and stale cache files
 
 ## Security Considerations
 
@@ -1066,38 +557,11 @@ describe('Database Cache Integration', () => {
 
 ### Cache Metrics
 
-```typescript
-interface CacheMetrics {
-  hits: number
-  misses: number
-  syncCount: number
-  syncErrors: number
-  avgSyncDuration: number
-  lastSyncDuration: number
-  cacheSize: number
-  cacheAge: number
-}
-```
+The cache tracks hits, misses, sync count, sync errors, average sync duration, cache size, and cache age. These are accessible via the `cache info` command.
 
 ### Logging
 
-```typescript
-// Debug logging (when DEBUG=true)
-console.log('[DB-CACHE] Loading cache from disk...')
-console.log('[DB-CACHE] Cache hit: "tasks" → 1fb79d4c...')
-console.log('[DB-CACHE] Cache miss: "unknown db" → triggering sync')
-console.log('[DB-CACHE] Sync started: fetching databases...')
-console.log('[DB-CACHE] Sync complete: 42 databases in 25s')
-```
-
-### Telemetry (optional)
-
-```typescript
-// Send metrics to monitoring service
-trackEvent('db_cache_hit', { query: 'tasks', matchType: 'exact' })
-trackEvent('db_cache_miss', { query: 'unknown db' })
-trackEvent('db_cache_sync', { duration: 25000, count: 42 })
-```
+Debug logging is available via the `--verbose` flag, showing cache hits/misses, sync progress, and timing information.
 
 ## Summary
 

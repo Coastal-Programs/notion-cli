@@ -1,13 +1,15 @@
 # JSON Envelope Specification
 
+> **Note:** This specification was originally designed for the TypeScript v5.x implementation. The same envelope format is implemented in Go (v6.0.0) in `pkg/output/envelope.go`. Code examples below show conceptual patterns.
+
 ## Overview
 
 The JSON envelope standardization system ensures consistent, machine-readable output across all Notion CLI commands. This specification defines the structure, behavior, and integration patterns for envelope-based output.
 
 **Version:** 1.0.0
-**Status:** Implementation Ready
-**Target API:** Notion API v5.2.1
-**CLI Version:** 5.4.0+
+**Status:** Implemented in Go (v6.0.0)
+**Target API:** Notion API
+**CLI Version:** 6.0.0+
 
 ## Motivation
 
@@ -42,7 +44,9 @@ The JSON envelope standardization system ensures consistent, machine-readable ou
 
 ### Success Envelope
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 interface SuccessEnvelope<T> {
   success: true
   data: T
@@ -76,7 +80,9 @@ interface SuccessEnvelope<T> {
 
 ### Error Envelope
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 interface ErrorEnvelope {
   success: false
   error: {
@@ -138,7 +144,9 @@ interface ErrorEnvelope {
 
 ### Error Code Mapping
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // CLI/Validation Errors (Exit Code 2)
 const cliErrors = [
   'VALIDATION_ERROR',
@@ -260,7 +268,9 @@ $ notion-cli db retrieve invalid-id --json
 
 ### Implementation
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Good: Diagnostic to stderr
 EnvelopeFormatter.writeDiagnostic('Retrying request...', 'warn')
 
@@ -273,7 +283,9 @@ console.log('Processing...') // DON'T DO THIS in JSON mode
 
 ### Diagnostic Helpers
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Write to stderr (won't pollute JSON output)
 EnvelopeFormatter.writeDiagnostic(message, 'info' | 'warn' | 'error')
 
@@ -323,7 +335,9 @@ Every envelope includes these metadata fields:
 
 Commands can add custom metadata:
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Add pagination info
 envelope.wrapSuccess(data, {
   page_size: 100,
@@ -360,7 +374,9 @@ envelope.wrapSuccess(data, {
 
 ### TypeScript Interfaces
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import {
   SuccessEnvelope,
   ErrorEnvelope,
@@ -389,7 +405,9 @@ if (isErrorEnvelope(envelope)) {
 
 ### Generic Type Support
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Database query result
 type QueryResult = {
   results: PageObjectResponse[]
@@ -476,7 +494,9 @@ Envelopes work seamlessly with the caching system:
 
 Never include sensitive data in error details:
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Good: Generic error
 error: {
   code: "UNAUTHORIZED",
@@ -498,7 +518,9 @@ error: {
 
 Stack traces are included only in non-production mode:
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 if (process.env.NODE_ENV !== 'production') {
   errorDetails.details.stack = error.stack
 }
@@ -508,7 +530,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 ### Unit Tests
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 describe('EnvelopeFormatter', () => {
   it('should create success envelope with metadata', () => {
     const formatter = new EnvelopeFormatter('test command', '1.0.0')
@@ -542,7 +566,9 @@ describe('EnvelopeFormatter', () => {
 
 ### Integration Tests
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 describe('page retrieve with envelope', () => {
   it('should return success envelope with --json', async () => {
     const result = await runCommand(['page', 'retrieve', 'abc-123', '--json'])
@@ -579,9 +605,9 @@ describe('page retrieve with envelope', () => {
 ## References
 
 - **Source Files:**
-  - `src/envelope.ts` - Core envelope system
-  - `src/base-command.ts` - Base command with envelope support
-  - `src/errors.ts` - Error types and codes
+  - `pkg/output/envelope.go` - Core envelope system
+  - `internal/cli/commands/*.go` - Command handlers with envelope support
+  - `internal/errors/errors.go` - Error types and codes
 
 - **Related Documentation:**
   - `ENHANCEMENTS.md` - Caching and retry features

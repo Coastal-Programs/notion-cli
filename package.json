@@ -1,90 +1,37 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "5.9.0",
-  "description": "Unofficial Notion CLI optimized for automation and AI agents. Non-interactive interface for Notion API v5.2.1 with intelligent caching, retry logic, structured error handling, and comprehensive testing.",
+  "version": "6.0.0",
+  "description": "Unofficial Notion CLI optimized for automation and AI agents. Single-binary Go implementation with intelligent caching, retry logic, structured error handling.",
   "author": "Jake Schepis <jake@coastalprograms.com>",
   "bin": {
-    "notion-cli": "./bin/run"
+    "notion-cli": "./bin/notion-cli.js"
   },
   "homepage": "https://github.com/Coastal-Programs/notion-cli#readme",
   "license": "MIT",
-  "main": "dist/index.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/Coastal-Programs/notion-cli.git"
   },
   "files": [
     "/bin",
-    "/dist",
-    "/scripts",
-    "/npm-shrinkwrap.json",
-    "/oclif.manifest.json"
+    "/install.js"
   ],
-  "dependencies": {
-    "@notionhq/client": "^5.9.0",
-    "@oclif/core": "^4.8.0",
-    "@oclif/plugin-help": "^6.2.37",
-    "dayjs": "^1.11.19",
-    "notion-to-md": "^3.1.6",
-    "update-notifier": "^7.3.1"
-  },
-  "devDependencies": {
-    "@oclif/test": "^3.2.15",
-    "@types/chai": "^4",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^22.19.8",
-    "@types/sinon": "^21.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.54.0",
-    "@typescript-eslint/parser": "^8.54.0",
-    "chai": "^4",
-    "cli-table3": "^0.6.5",
-    "eslint": "^9.39.2",
-    "eslint-config-oclif": "^6.0.137",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-mocha": "^11.2.0",
-    "eslint-plugin-n": "^17.23.2",
-    "eslint-plugin-unicorn": "^62.0.0",
-    "globby": "^11",
-    "mocha": "^11.7.5",
-    "nock": "^13.5.6",
-    "node-fetch": "^2.7.0",
-    "nyc": "^17.1.0",
-    "oclif": "^4.22.73",
-    "prettier": "^3.8.1",
-    "shx": "^0.4.0",
-    "sinon": "^21.0.1",
-    "ts-node": "^10.9.2",
-    "tslib": "^2.8.1",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0",
-    "undici": "^7.20.0"
-  },
-  "oclif": {
-    "bin": "notion-cli",
-    "dirname": "notion-cli",
-    "commands": "./dist/commands",
-    "plugins": [
-      "@oclif/plugin-help"
-    ],
-    "topicSeparator": " ",
-    "topics": {
-      "hello": {
-        "description": "Say hello to the world and others"
-      }
-    }
-  },
   "scripts": {
-    "build": "shx rm -rf dist && tsc -b",
-    "lint": "eslint .",
-    "postpack": "shx rm -f oclif.manifest.json",
-    "postinstall": "node scripts/postinstall.js",
-    "prepack": "npm run build && oclif manifest",
-    "test": "TS_NODE_PROJECT=tsconfig.test.json mocha --forbid-only \"test/**/*.test.ts\"",
-    "readme": "oclif readme --multi --no-aliases && shx sed -i \"s/^_See code:.*$//g\" docs/*.md > /dev/null",
-    "test:coverage": "nyc --reporter=lcov --reporter=text npm test"
+    "postinstall": "node install.js",
+    "build": "make build",
+    "test": "make test",
+    "lint": "make lint",
+    "release": "make release"
+  },
+  "optionalDependencies": {
+    "@coastal-programs/notion-cli-darwin-arm64": "6.0.0",
+    "@coastal-programs/notion-cli-darwin-x64": "6.0.0",
+    "@coastal-programs/notion-cli-linux-x64": "6.0.0",
+    "@coastal-programs/notion-cli-linux-arm64": "6.0.0",
+    "@coastal-programs/notion-cli-win32-x64": "6.0.0"
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=18.0.0"
   },
   "bugs": {
     "url": "https://github.com/Coastal-Programs/notion-cli/issues",
@@ -100,16 +47,9 @@
     "productivity",
     "database",
     "workspace",
-    "schema-discovery",
-    "workspace-cache",
-    "database-sync",
-    "simple-properties",
+    "golang",
     "json-envelope",
-    "typescript",
-    "oclif",
-    "notion-integration",
     "command-line",
     "developer-tools"
-  ],
-  "types": "dist/index.d.ts"
+  ]
 }

@@ -1,5 +1,7 @@
 # Envelope Integration Guide
 
+> **Note:** This document was originally written for the TypeScript v5.x implementation. The envelope system is now implemented in Go (v6.0.0). Code examples below show the conceptual patterns from the TypeScript era; refer to `pkg/output/envelope.go` and `internal/cli/commands/*.go` for the actual Go implementations.
+
 ## Overview
 
 This guide provides step-by-step instructions for integrating the JSON envelope system into existing and new commands. It includes code examples, migration patterns, and best practices.
@@ -10,7 +12,9 @@ This guide provides step-by-step instructions for integrating the JSON envelope 
 
 ### For New Commands
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { BaseCommand } from '../../base-command'
 import { Args, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
@@ -69,7 +73,9 @@ See the [Migration Checklist](#migration-checklist) below.
 
 **Use Case:** Commands that retrieve a single resource
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { BaseCommand } from '../../base-command'
 import { Args, ux } from '@oclif/core'
 import * as notion from '../../notion'
@@ -126,7 +132,9 @@ export default class PageRetrieve extends BaseCommand {
 
 **Use Case:** Commands that return multiple results with optional pagination
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { BaseCommand } from '../../base-command'
 import { Args, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
@@ -191,7 +199,9 @@ export default class DbQuery extends BaseCommand {
 
 **Use Case:** Commands that modify resources
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { BaseCommand } from '../../base-command'
 import { Args, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
@@ -250,7 +260,9 @@ export default class PageCreate extends BaseCommand {
 
 **Use Case:** Commands with complex filtering and search
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { BaseCommand } from '../../base-command'
 import { Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
@@ -307,7 +319,9 @@ export default class Search extends BaseCommand {
 
 **Use Case:** Local commands like config, cache stats, etc.
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { BaseCommand } from '../../base-command'
 import { Flags } from '@oclif/core'
 import { cacheManager } from '../../cache'
@@ -349,7 +363,9 @@ export default class CacheStats extends BaseCommand {
 
 ### Pattern 1: Standard Error Handling
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 try {
   const result = await notion.retrievePage({ page_id: args.page_id })
 
@@ -371,7 +387,9 @@ try {
 
 ### Pattern 2: Custom Error Context
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 try {
   const result = await notion.queryDataSource(queryParams)
 
@@ -391,7 +409,9 @@ try {
 
 ### Pattern 3: Validation Errors
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { NotionCLIError, ErrorCode } from '../../errors'
 
 async run(): Promise<void> {
@@ -504,7 +524,9 @@ import { AutomationFlags, OutputFormatFlags } from '../../base-flags'
 
 ### Before (Original Command)
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { Args, Command, Flags, ux } from '@oclif/core'
 import * as notion from '../../notion'
 import { PageObjectResponse } from '@notionhq/client/build/src/api-endpoints'
@@ -582,7 +604,9 @@ export default class PageRetrieve extends Command {
 
 ### After (With Envelope Support)
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 import { Args, Flags, ux } from '@oclif/core'
 import { BaseCommand } from '../../base-command'
 import * as notion from '../../notion'
@@ -707,7 +731,9 @@ export default class PageRetrieve extends BaseCommand {
 
 ### Unit Tests
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // test/envelope.test.ts
 import { expect } from 'chai'
 import { EnvelopeFormatter } from '../src/envelope'
@@ -816,7 +842,9 @@ describe('EnvelopeFormatter', () => {
 
 ### Integration Tests
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // test/commands/page/retrieve.test.ts
 import { expect, test } from '@oclif/test'
 
@@ -904,7 +932,9 @@ describe('page retrieve with envelope', () => {
 
 **Fix:** Remove any code after `outputSuccess()` - it never returns
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Bad
 if (flags.json) {
   this.outputSuccess(data, flags)
@@ -929,7 +959,9 @@ if (flags.json || flags['compact-json']) {
 
 **Fix:** Use standard ErrorCode enum values or add custom suggestions
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 throw new NotionCLIError(
   ErrorCode.VALIDATION_ERROR,
   'Custom error message',
@@ -944,7 +976,9 @@ throw new NotionCLIError(
 
 **Fix:** Use EnvelopeFormatter.writeDiagnostic() for logs
 
-```typescript
+```go
+// Pseudocode - see pkg/output/envelope.go for actual Go implementation
+//
 // Bad
 console.log('Processing...') // Goes to stdout
 

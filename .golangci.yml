@@ -1,0 +1,21 @@
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+linters-settings:
+  errcheck:
+    check-blank: false
+
+issues:
+  exclude-dirs:
+    - vendor
+    - node_modules
+    - npm
+
+run:
+  timeout: 5m

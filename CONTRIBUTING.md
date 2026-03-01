@@ -39,26 +39,33 @@ This project follows a simple code of conduct: be respectful, constructive, and 
 
 ### Prerequisites
 
-- Node.js >= 18.0.0
-- npm >= 8.0.0
+- Go 1.21 or later
+- Make
 - Git
+- golangci-lint (optional, for extended linting)
 
 ### Installation
 
 ```bash
-# Install dependencies
-npm install
+# Download Go module dependencies
+go mod download
 
-# Build the project
-npm run build
+# Build the binary
+make build
 
-# Link for local testing
-npm link
+# Run the test suite
+make test
+```
+
+The built binary is placed at `build/notion-cli`. You can also install it directly into your `$GOPATH/bin`:
+
+```bash
+make install
 ```
 
 ### Environment Setup
 
-Create a `.env` file or set environment variables:
+Set the Notion API token as an environment variable:
 
 ```bash
 export NOTION_TOKEN="secret_your_token_here"
@@ -68,89 +75,73 @@ Get your token from: https://www.notion.so/my-integrations
 
 ## Code Style Guidelines
 
-### TypeScript
+### Go Conventions
 
-- Use TypeScript for all new code
-- Enable strict type checking
-- Avoid `any` types when possible
-- Add return types to all functions
-- Use interfaces for object shapes
+- Follow standard Go conventions as described in [Effective Go](https://go.dev/doc/effective_go)
+- All code must be formatted with `gofmt` (run `make fmt`)
+- All code must pass `go vet` and `golangci-lint` (run `make lint`)
+- Keep functions focused and short
+- Return errors rather than panicking
+- Use `context.Context` for all API calls
+
+### Code Patterns
+
+- All commands use Cobra; register via `Register*Commands(root *cobra.Command)`
+- Use `pkg/output.Printer` for all output, never `fmt.Println` directly
+- Use `internal/errors.NotionCLIError` for errors, never raw errors
+- Use envelope format for JSON output: `{success, data, metadata}`
+- Use `internal/resolver.ExtractID()` for all ID/URL inputs
 
 **Example:**
 
-```typescript
-interface PageCreateOptions {
-  databaseId: string;
-  properties: Record<string, any>;
-}
+```go
+// RegisterPageCommands adds all page subcommands to the root command.
+func RegisterPageCommands(root *cobra.Command) {
+	pageCmd := &cobra.Command{
+		Use:   "page",
+		Short: "Page operations",
+	}
 
-async function createPage(options: PageCreateOptions): Promise<Page> {
-  // Implementation
+	pageCmd.AddCommand(newPageCreateCmd())
+	pageCmd.AddCommand(newPageRetrieveCmd())
+	root.AddCommand(pageCmd)
 }
 ```
-
-### ESLint
-
-This project uses **ESLint v9** with flat config. All code must pass linting:
-
-```bash
-# Run linter
-npm run lint
-
-# Auto-fix issues
-npm run lint -- --fix
-```
-
-**Key ESLint Rules:**
-
-- No unused variables
-- Consistent indentation (2 spaces)
-- Single quotes for strings
-- Semicolons required
-- No console.log in production code (use debug logger)
-
-### Code Formatting
-
-We use **Prettier** for consistent formatting:
-
-- 2 spaces for indentation
-- Single quotes
-- Semicolons required
-- Trailing commas where valid
-- Max line length: 100 characters
 
 ### Naming Conventions
 
-- **Files:** kebab-case (`db-query.ts`)
-- **Classes:** PascalCase (`DbQuery`)
-- **Functions:** camelCase (`retrieveDatabase`)
-- **Constants:** SCREAMING_SNAKE_CASE (`DEFAULT_TIMEOUT`)
-- **Interfaces:** PascalCase with descriptive names (`NotionAPIResponse`)
+- **Files:** snake_case (`cache_cmd.go`, `workspace.go`)
+- **Exported functions/types:** PascalCase (`NewCache`, `NotionCLIError`)
+- **Unexported functions/types:** camelCase (`doRequest`, `parseResponse`)
+- **Constants:** PascalCase for exported, camelCase for unexported (`DefaultTimeout`, `maxRetries`)
+- **Acronyms:** ALL_CAPS within identifiers (`ExtractID`, `ParseJSON`, `HTTPClient`)
+- **Packages:** lowercase, single word when possible (`cache`, `retry`, `errors`)
 
 ### Documentation
 
-All public APIs must have JSDoc comments:
+All exported functions, types, and packages must have GoDoc comments. Comments should start with the name of the thing being documented:
 
-```typescript
-/**
- * Retrieve a database by ID
- *
- * @param databaseId - The ID of the database to retrieve
- * @param options - Optional retrieval options
- * @returns Promise resolving to database object
- * @throws {NotionCLIError} If database not found or API error occurs
- *
- * @example
- * ```typescript
- * const db = await retrieveDatabase('abc123');
- * console.log(db.title);
- * ```
- */
-async function retrieveDatabase(
-  databaseId: string,
-  options?: RetrievalOptions
-): Promise<Database> {
-  // Implementation
+```go
+// NotionCLIError represents a structured error with an error code,
+// user-facing message, and optional suggestions for resolution.
+type NotionCLIError struct {
+	Code       string
+	Message    string
+	Suggestions []string
+}
+
+// NewCache creates a new in-memory TTL cache with the given maximum
+// number of entries. If maxSize is zero or negative, a default of
+// 1000 is used.
+func NewCache(maxSize int) *Cache {
+	// Implementation
+}
+
+// ExtractID parses a Notion URL or raw ID string and returns
+// the normalized UUID. It returns an error if the input cannot
+// be resolved to a valid Notion ID.
+func ExtractID(input string) (string, error) {
+	// Implementation
 }
 ```
 
@@ -160,13 +151,20 @@ async function retrieveDatabase(
 
 ```bash
 # Run all tests
-npm test
+make test
 
-# Run specific test file
-npm test -- test/commands/db/query.test.ts
+# Run tests for a specific package
+go test ./internal/cache/... -v
 
-# Run tests with verbose output
-npm test -- --reporter spec
+# Run a specific test function
+go test ./internal/cache/... -run TestSetAndGet -v
+
+# Run tests with race detection
+go test -race ./...
+
+# Run tests with coverage
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
 ```
 
 ### Test Coverage
@@ -174,41 +172,54 @@ npm test -- --reporter spec
 - All new features must include tests
 - Aim for 80%+ code coverage
 - Test both success and error cases
-- Use mocks for external API calls
+- Use `net/http/httptest` for mocking HTTP API calls
 
 ### Test Structure
 
-We use **Mocha** and **Chai** for testing:
+Tests use Go's built-in `testing` package. Test files live alongside the code they test with a `_test.go` suffix:
 
-```typescript
-import { expect } from 'chai'
-import { describe, it } from 'mocha'
+```go
+package cache
 
-describe('db query command', () => {
-  it('should query database successfully', async () => {
-    // Arrange
-    const databaseId = 'test-id'
+import (
+	"testing"
+	"time"
+)
 
-    // Act
-    const result = await queryDatabase(databaseId)
+func TestNewCache(t *testing.T) {
+	c := NewCache(100)
+	defer c.Stop()
 
-    // Assert
-    expect(result).to.have.property('results')
-  })
+	if c.Size() != 0 {
+		t.Errorf("expected empty cache, got size %d", c.Size())
+	}
+}
 
-  it('should handle errors gracefully', async () => {
-    // Test error case
-  })
-})
+func TestSetAndGet(t *testing.T) {
+	c := NewCache(100)
+	defer c.Stop()
+
+	c.Set("key1", "value1", 1*time.Minute)
+
+	val, ok := c.Get("key1")
+	if !ok {
+		t.Fatal("expected key1 to exist")
+	}
+	if val != "value1" {
+		t.Errorf("expected value1, got %v", val)
+	}
+}
 ```
 
 ### Test Guidelines
 
-1. **Mock external dependencies** - Don't make real API calls in tests
-2. **Use descriptive test names** - Clearly state what is being tested
-3. **Follow AAA pattern** - Arrange, Act, Assert
-4. **Test edge cases** - Empty inputs, null values, large datasets
-5. **Keep tests isolated** - No dependencies between tests
+1. **Mock external dependencies** - Use `net/http/httptest` for HTTP calls, never make real API calls
+2. **Use descriptive test names** - `TestSetAndGet`, `TestNewCacheInvalidSize`, `TestRetryOnRateLimit`
+3. **Use table-driven tests** where appropriate for testing multiple inputs
+4. **Test edge cases** - Empty inputs, nil values, zero values, boundary conditions
+5. **Keep tests isolated** - No shared mutable state between tests
+6. **Use `t.Helper()`** in test helper functions for better error reporting
+7. **Use `t.Parallel()`** where safe to speed up the test suite
 
 ## Pull Request Process
 
@@ -222,15 +233,15 @@ describe('db query command', () => {
 
 2. **Run all checks**:
    ```bash
-   npm run build
-   npm test
-   npm run lint
+   make build
+   make test
+   make lint
    ```
 
 3. **Update documentation** if needed:
    - Update README.md for new features
    - Add CHANGELOG.md entry
-   - Update JSDoc comments
+   - Update GoDoc comments
 
 ### Submitting
 
@@ -243,7 +254,6 @@ describe('db query command', () => {
    - Clear title describing the change
    - Detailed description of what changed and why
    - Reference any related issues (`Fixes #123`)
-   - Screenshots for UI changes
 
 3. **Fill out PR template** completely
 
@@ -256,14 +266,16 @@ describe('db query command', () => {
 
 ### PR Checklist
 
-- [ ] Code follows style guidelines
-- [ ] All tests pass
+- [ ] Code follows Go style guidelines
+- [ ] All tests pass (`make test`)
 - [ ] New tests added for new features
+- [ ] Lint passes (`make lint`)
+- [ ] Code is formatted (`make fmt`)
 - [ ] Documentation updated
 - [ ] CHANGELOG.md updated
-- [ ] Commit messages follow format
+- [ ] Commit messages follow conventional format
 - [ ] No merge conflicts
-- [ ] Build succeeds
+- [ ] Build succeeds (`make build`)
 
 ## Commit Message Format
 
@@ -293,7 +305,7 @@ We follow **Conventional Commits** specification:
 feat(db): add schema discovery command
 
 Implement new 'db schema' command to extract database schemas
-in AI-parseable format. Supports JSON, YAML, and markdown output.
+in AI-parseable format. Supports JSON and table output.
 
 Closes #42
 ```
@@ -308,10 +320,10 @@ Fixes #56
 ```
 
 ```
-docs: update README with simple properties examples
+refactor(notion): simplify HTTP client retry logic
 
-Added comprehensive examples for simple properties mode,
-including all 13 supported property types.
+Consolidate retry and backoff into a single configurable function
+to reduce code duplication across request methods.
 ```
 
 ### Commit Guidelines
@@ -326,31 +338,55 @@ including all 13 supported property types.
 
 ```
 notion-cli/
-├── src/
-│   ├── commands/          # CLI command implementations
-│   │   ├── db/            # Database commands
-│   │   ├── page/          # Page commands
-│   │   ├── block/         # Block commands
-│   │   ├── user/          # User commands
-│   │   └── ...
-│   ├── utils/             # Utility functions
-│   │   ├── schema-extractor.ts
-│   │   ├── property-expander.ts
-│   │   ├── workspace-cache.ts
-│   │   └── ...
-│   ├── base-command.ts    # Base command class
-│   ├── base-flags.ts      # Reusable CLI flags
-│   ├── envelope.ts        # JSON response formatting
-│   ├── notion.ts          # Notion API client wrapper
-│   ├── cache.ts           # In-memory caching
-│   └── errors.ts          # Error handling
-├── test/                  # Test files
-│   ├── commands/          # Command tests
-│   └── utils/             # Utility tests
-├── docs/                  # Documentation
-├── dist/                  # Compiled output (gitignored)
-└── package.json           # Project config
+├── cmd/
+│   └── notion-cli/
+│       └── main.go              # Entry point
+├── internal/
+│   ├── cli/
+│   │   ├── root.go              # Cobra root command + global flags
+│   │   └── commands/
+│   │       ├── db.go            # db query, retrieve, create, update, schema
+│   │       ├── page.go          # page create, retrieve, update, property_item
+│   │       ├── block.go         # block append, retrieve, delete, update, children
+│   │       ├── user.go          # user list, retrieve, bot
+│   │       ├── search.go        # search command
+│   │       ├── sync.go          # workspace sync
+│   │       ├── list.go          # list cached databases
+│   │       ├── batch.go         # batch retrieve
+│   │       ├── whoami.go        # connectivity check
+│   │       ├── doctor.go        # health checks
+│   │       ├── config.go        # config get/set/path/list
+│   │       └── cache_cmd.go     # cache info/stats
+│   ├── notion/
+│   │   └── client.go            # HTTP client, auth, request/response
+│   ├── cache/
+│   │   ├── cache.go             # In-memory TTL cache
+│   │   └── workspace.go         # Workspace database cache
+│   ├── retry/
+│   │   └── retry.go             # Exponential backoff with jitter
+│   ├── errors/
+│   │   └── errors.go            # NotionCLIError with codes, suggestions
+│   ├── config/
+│   │   └── config.go            # Config loading (env vars + JSON file)
+│   └── resolver/
+│       └── resolver.go          # URL/ID/name resolution
+├── pkg/
+│   └── output/
+│       ├── output.go            # JSON/text/table/CSV formatting
+│       ├── envelope.go          # Envelope wrapper
+│       └── table.go             # Table formatter
+├── docs/                        # Documentation
+├── go.mod                       # Go module definition
+├── go.sum                       # Dependency checksums
+└── Makefile                     # Build, test, lint, release targets
 ```
+
+### Key Directories
+
+- **cmd/** - Application entry points. Each subdirectory is a separate binary.
+- **internal/** - Private application code. Cannot be imported by other modules.
+- **pkg/** - Public library code. Can be imported by external projects.
+- **docs/** - User-facing documentation and guides.
 
 ## Reporting Issues
 
@@ -360,7 +396,7 @@ Include:
 - Clear description of the issue
 - Steps to reproduce
 - Expected vs actual behavior
-- Environment (Node version, OS, npm version)
+- Environment (Go version, OS, architecture)
 - Error messages and stack traces
 - Minimal reproduction example
 
@@ -382,51 +418,78 @@ See [SECURITY.md](SECURITY.md) for reporting instructions.
 
 ### Debugging
 
-Enable debug logging:
+Use the `--verbose` flag to enable debug output:
 
 ```bash
-export DEBUG=notion-cli:*
-notion-cli db query <id> --verbose
+./build/notion-cli db query <id> --verbose
 ```
 
 ### Testing Local Changes
 
 ```bash
-# Link local version
-npm link
+# Build and test the binary
+make build
+./build/notion-cli --version
+./build/notion-cli whoami
 
-# Test commands
-notion-cli --version
+# Or install to $GOPATH/bin
+make install
 notion-cli db query <id>
-
-# Unlink when done
-npm unlink -g @coastal-programs/notion-cli
 ```
 
-### Working with oclif
+### Working with Cobra
 
-This project uses **oclif v2** framework:
+This project uses the **Cobra** CLI framework:
 
-- Commands extend `Command` class
-- Flags defined with `@oclif/core` Flags
-- Use `this.log()` for output, not `console.log()`
-- Exit with `process.exit(0)` for success, `process.exit(1)` for errors
+- Commands are created with `&cobra.Command{}`
+- Flags are registered with `cmd.Flags()` (local) or `cmd.PersistentFlags()` (inherited)
+- Use `RunE` (not `Run`) so commands can return errors
+- Register subcommands via `Register*Commands(root *cobra.Command)` functions
 
 ### Common Tasks
 
 ```bash
-# Add a new command
-npm run generate:command
+# Build the binary
+make build
 
-# Rebuild on file changes
-npm run build -- --watch
+# Run the full test suite
+make test
 
-# Clear cache during development
-rm -rf ~/.notion-cli/
+# Run linters (go vet + golangci-lint)
+make lint
 
-# Run single test file
-npm test -- test/commands/db/retrieve.test.ts
+# Format all Go code
+make fmt
+
+# Tidy module dependencies
+make tidy
+
+# Cross-compile for all platforms
+make release
+
+# Clean build artifacts
+make clean
+
+# Run a specific test with verbose output
+go test ./internal/retry/... -run TestExponentialBackoff -v
+
+# Check test coverage for a package
+go test -coverprofile=coverage.out ./internal/cache/...
+go tool cover -func=coverage.out
+
+# Clear local config/cache during development
+rm -rf ~/.config/notion-cli/
 ```
+
+### Adding a New Command
+
+1. Create a new file in `internal/cli/commands/` (e.g., `newcmd.go`)
+2. Define the command using `&cobra.Command{}`
+3. Create a `RegisterNewCmdCommands(root *cobra.Command)` function
+4. Call the register function from `internal/cli/root.go`
+5. Add tests in a corresponding `_test.go` file
+6. Use `pkg/output.Printer` for all output
+7. Use `internal/errors.NotionCLIError` for error handling
 
 ## Questions?
 
@@ -440,4 +503,4 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-Thank you for contributing to notion-cli! 🚀
+Thank you for contributing to notion-cli!

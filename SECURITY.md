@@ -4,42 +4,49 @@
 
 We actively support the following versions with security updates:
 
-| Version | Supported          | Notes                          |
-| ------- | ------------------ | ------------------------------ |
-| 5.6.x   | :white_check_mark: | Current release, fully supported |
-| 5.5.x   | :white_check_mark: | Previous release, critical fixes only |
-| 5.4.x   | :x:                | Upgrade to 5.6.x recommended |
-| < 5.4   | :x:                | No longer supported |
+| Version | Supported          | Notes                                      |
+| ------- | ------------------ | ------------------------------------------ |
+| 6.x     | :white_check_mark: | Current release (Go rewrite), fully supported |
+| 5.x     | :x:                | Legacy TypeScript version, no longer maintained |
+| < 5.0   | :x:                | No longer supported                        |
 
-## Security Status
+## Supply Chain Security
 
-### Current Release (v5.6.0)
+### v6.x (Go Binary)
 
-- **Production Dependencies:** 0 vulnerabilities
-- **Development Dependencies:** 11 low/moderate vulnerabilities (non-critical)
-- **Last Security Audit:** 2025-10-25
+The v6.0.0 rewrite from TypeScript to Go dramatically reduced the attack surface:
 
-### Fixed Vulnerabilities
+- **2 runtime dependencies**: `github.com/spf13/cobra` and `github.com/spf13/pflag`
+- **Single static binary**: ~8MB, no interpreter or runtime required
+- **No npm production dependencies**: The npm package is a thin wrapper that downloads and runs the platform-specific Go binary
+- **No external code execution**: The CLI does not evaluate user-provided code, load plugins, or shell out to external programs
+- **Cross-compiled binaries**: Built from source for darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, and windows/amd64
 
-The following vulnerabilities were resolved in recent releases:
+Compared to v5.x (573 npm dependencies), v6.x has a near-zero supply chain risk profile.
 
-**v5.5.0 (2025-10-24):**
-- CVE-2023-48618: katex XSS vulnerability (removed @tryfabric/martian)
-- CVE-2024-28245: katex XSS vulnerability (removed @tryfabric/martian)
-- CVE-2021-23906: yargs-parser prototype pollution
-- CVE-2020-28469: glob-parent ReDoS vulnerability
+## Data Storage and File Permissions
 
-**v5.6.0 (2025-10-25):**
-- 14 development dependency vulnerabilities
-- Zero critical or high-severity issues remaining in production
+### Configuration File
 
-### Known Issues
+- **Path**: `~/.config/notion-cli/config.json`
+- **Permissions**: `0o600` (owner read/write only)
+- **Contents**: Notion API token and user preferences
+- **Atomic writes**: Configuration is written to a temporary file and atomically renamed to prevent corruption
 
-**Development Dependencies (Non-Critical):**
-- 2 moderate severity vulnerabilities in oclif v2 dependencies
-- 9 low severity vulnerabilities in test infrastructure
-- **Impact:** Development environment only, no production runtime impact
-- **Status:** Tracked for resolution in future oclif v4 migration
+### Workspace Cache
+
+- **Path**: `~/.notion-cli/databases.json`
+- **Permissions**: `0o600` (owner read/write only)
+- **Directory permissions**: `0o700` (owner access only)
+- **Contents**: Cached database metadata (IDs, titles, aliases) -- no page content or sensitive data
+- **Atomic writes**: Cache is written to a temporary file and atomically renamed to prevent corruption
+
+### Token Handling
+
+- **Token masking**: All CLI output masks tokens by default, displaying only the prefix and last 3 characters (e.g., `secret_***...***abc`)
+- **Opt-in reveal**: The `--show-secret` flag is required to display the full token value
+- **Environment variable**: `NOTION_TOKEN` is the primary token source; it takes precedence over the config file
+- **No token logging**: Tokens are never written to log files or included in error reports
 
 ## Reporting a Vulnerability
 
@@ -65,11 +72,11 @@ The following vulnerabilities were resolved in recent releases:
 
 ### What to Expect
 
-1. **Acknowledgment:** We'll confirm receipt of your report within 48 hours
-2. **Investigation:** We'll investigate and validate the vulnerability
-3. **Updates:** You'll receive updates on our progress every 7 days
-4. **Resolution:** We'll work on a fix and coordinate release timing
-5. **Credit:** You'll be credited in release notes (unless you prefer anonymity)
+1. **Acknowledgment:** We will confirm receipt of your report within 48 hours
+2. **Investigation:** We will investigate and validate the vulnerability
+3. **Updates:** You will receive updates on our progress every 7 days
+4. **Resolution:** We will work on a fix and coordinate release timing
+5. **Credit:** You will be credited in release notes (unless you prefer anonymity)
 
 ### Disclosure Policy
 
@@ -82,77 +89,65 @@ The following vulnerabilities were resolved in recent releases:
 
 ### Token Management
 
-**NEVER commit your Notion token to version control!**
+**NEVER commit your Notion token to version control.**
 
 ```bash
-# ❌ BAD - Don't do this
+# BAD - Don't do this
 export NOTION_TOKEN=secret_abc123...
 git add .env
 git commit -m "Add config"
 
-# ✅ GOOD - Use environment variables
+# GOOD - Use environment variables
 export NOTION_TOKEN=secret_abc123...  # In shell session only
 # Or add to ~/.bashrc, ~/.zshrc (never commit)
+
+# GOOD - Use the built-in config command
+notion-cli config set-token
+# Stores token in ~/.config/notion-cli/config.json with 0o600 permissions
 ```
 
 **Best Practices:**
 
-1. **Use environment variables** for tokens, never hardcode
+1. **Use environment variables** for tokens, never hardcode them
 2. **Add `.env` to `.gitignore`** if using env files
 3. **Rotate tokens regularly** (every 90 days recommended)
-4. **Use minimal permissions** - only grant integration access to needed databases
+4. **Use minimal permissions** -- only grant integration access to needed databases
 5. **Revoke unused tokens** at https://www.notion.so/my-integrations
 
 ### Integration Permissions
 
 Follow the **principle of least privilege**:
 
-```bash
-# ✅ GOOD - Share only specific databases
-1. Create integration at https://www.notion.so/my-integrations
+1. Create an integration at https://www.notion.so/my-integrations
 2. Share ONLY the databases you need to access
 3. Review permissions regularly
+4. Do not share your entire workspace if you only need a few databases
 
-# ❌ BAD - Sharing entire workspace unnecessarily
-Don't share your entire workspace if you only need a few databases
+### Verifying the Binary
+
+After installing via npm, verify the binary is the expected one:
+
+```bash
+# Check version and build info
+notion-cli --version
+
+# Verify the binary path
+which notion-cli
+
+# Run health check
+notion-cli doctor
 ```
-
-### Secure Usage
-
-1. **Verify package integrity** before installation:
-   ```bash
-   npm install @coastal-programs/notion-cli --dry-run
-   ```
-
-2. **Use specific versions** in production:
-   ```json
-   {
-     "dependencies": {
-       "@coastal-programs/notion-cli": "5.6.0"
-     }
-   }
-   ```
-
-3. **Review audit reports** regularly:
-   ```bash
-   npm audit
-   ```
-
-4. **Keep updated** to latest version:
-   ```bash
-   npm update @coastal-programs/notion-cli
-   ```
 
 ### CI/CD Security
 
 When using in CI/CD pipelines:
 
 ```yaml
-# ✅ GOOD - Use encrypted secrets
+# GOOD - Use encrypted secrets
 env:
   NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
 
-# ❌ BAD - Never expose tokens in logs
+# BAD - Never expose tokens in logs
 - run: echo "Token: $NOTION_TOKEN"  # DON'T DO THIS
 ```
 
@@ -164,49 +159,31 @@ env:
 4. Audit CI/CD logs for accidental token exposure
 5. Rotate tokens if exposed in logs
 
-## Security Audit History
-
-### Recent Audits
-
-| Date       | Tool      | Critical | High | Moderate | Low | Notes |
-|------------|-----------|----------|------|----------|-----|-------|
-| 2025-10-25 | npm audit | 0        | 0    | 2        | 9   | DevDeps only |
-| 2025-10-24 | npm audit | 0        | 0    | 0        | 0   | All production vulns fixed |
-| 2025-10-23 | npm audit | 1        | 3    | 18       | 4   | Pre-v5.5.0 baseline |
-
-### Continuous Monitoring
-
-We continuously monitor for security vulnerabilities using:
-
-- **npm audit** - Automated dependency scanning
-- **Dependabot** - Automated dependency updates
-- **GitHub Security Advisories** - CVE monitoring
-- **Manual code review** - Security-focused code reviews
-
 ## Secure Development
 
 ### For Contributors
 
-If you're contributing code:
+If you are contributing code:
 
-1. **Never commit secrets** - Use environment variables
-2. **Validate all inputs** - Sanitize user input
-3. **Use parameterized queries** - Prevent injection attacks
-4. **Follow least privilege** - Minimize API permissions
-5. **Keep dependencies updated** - Run `npm audit` regularly
-6. **Write security tests** - Test authentication, authorization, input validation
+1. **Never commit secrets** -- Use environment variables
+2. **Validate all inputs** -- Sanitize user input via the resolver and error packages
+3. **Use `context.Context`** for all API calls to support timeouts and cancellation
+4. **Follow least privilege** -- Minimize API permissions in integration code
+5. **Keep dependencies minimal** -- The project intentionally uses only 2 Go dependencies
+6. **Write security tests** -- Test authentication, authorization, and input validation
+7. **Use `internal/errors.NotionCLIError`** -- Never expose raw errors that could leak sensitive information
 
 ### Code Review Checklist
 
 Security considerations for code reviewers:
 
 - [ ] No hardcoded credentials or tokens
-- [ ] Input validation for user-provided data
-- [ ] Error messages don't leak sensitive information
-- [ ] Dependencies are up to date
-- [ ] No SQL/command injection vulnerabilities
-- [ ] Proper authentication/authorization checks
-- [ ] Sensitive data not logged
+- [ ] Input validation for user-provided data (IDs, URLs, JSON)
+- [ ] Error messages do not leak sensitive information
+- [ ] File operations use restrictive permissions (0o600 for files, 0o700 for directories)
+- [ ] No command injection vulnerabilities (no `os/exec` with user input)
+- [ ] Token values are masked in all output paths
+- [ ] Atomic file writes used for persistent data
 
 ## Vulnerability Disclosure Timeline
 
@@ -239,11 +216,11 @@ Security considerations for code reviewers:
 ## Additional Resources
 
 - [Notion Security Best Practices](https://developers.notion.com/docs/security)
-- [npm Security Best Practices](https://docs.npmjs.com/security-best-practices)
+- [Go Security Best Practices](https://go.dev/doc/security/best-practices)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [CVE Database](https://cve.mitre.org/)
 
 ---
 
-**Last Updated:** 2025-10-25
-**Next Review:** 2026-01-25
+**Last Updated:** 2026-03-01
+**Next Review:** 2026-06-01

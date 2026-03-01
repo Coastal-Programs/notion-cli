@@ -131,9 +131,11 @@ notion-cli db query 1fb79d4c71bb8032b722c82305b63a00 --json > results.json
 
 ### Resolution Algorithm
 
-The smart resolution is implemented in `src/utils/notion-resolver.ts`:
+The smart resolution is implemented in `internal/resolver/resolver.go`:
 
-```typescript
+```go
+// Pseudocode - see internal/resolver/resolver.go for actual implementation
+//
 async function trySmartDatabaseResolution(databaseId: string): Promise<string> {
   try {
     // Try direct lookup with data_source_id
@@ -245,7 +247,9 @@ In Notion API v5, databases became "data sources":
 
 ### Type Definitions
 
-```typescript
+```go
+// Pseudocode - see internal/resolver/resolver.go for actual implementation
+//
 // Page parent can reference a database
 interface PageParent {
   type: 'database_id'
