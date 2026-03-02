@@ -43,7 +43,8 @@ jobs:
           build/notion-cli-darwin-amd64 \
           build/notion-cli-linux-amd64 \
           build/notion-cli-linux-arm64 \
-          build/notion-cli-windows-amd64.exe
+          build/notion-cli-windows-amd64.exe \
+          --clobber
 
   publish-npm:
     name: Publish to npm
