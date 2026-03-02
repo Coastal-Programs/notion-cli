@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli-linux-arm64",
-  "version": "6.1.1",
+  "version": "6.1.2",
   "description": "notion-cli binary for Linux ARM64",
   "os": ["linux"],
   "cpu": ["arm64"],

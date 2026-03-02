@@ -168,7 +168,6 @@ func newDBQueryCmd() *cobra.Command {
 	cmd.Flags().String("sort-direction", "", "Sort direction (asc or desc)")
 	cmd.Flags().String("filter", "", "Filter as JSON string")
 	cmd.Flags().String("file-filter", "", "Path to JSON file containing filter")
-	cmd.Flags().String("search", "", "Search text within the database")
 	cmd.Flags().String("select", "", "Comma-separated list of properties to include")
 	addOutputFlags(cmd)
 
@@ -202,12 +201,19 @@ func runDBQuery(cmd *cobra.Command, args []string) error {
 
 	if sp, _ := cmd.Flags().GetString("sort-property"); sp != "" {
 		dir, _ := cmd.Flags().GetString("sort-direction")
-		if dir == "" {
+		switch dir {
+		case "", "asc", "ascending":
 			dir = "ascending"
-		} else if dir == "asc" {
-			dir = "ascending"
-		} else if dir == "desc" {
+		case "desc", "descending":
 			dir = "descending"
+		default:
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: fmt.Sprintf("Invalid --sort-direction %q", dir),
+				Suggestions: []string{
+					"Valid values: asc, desc, ascending, descending",
+				},
+			})
 		}
 		body["sorts"] = []map[string]any{
 			{"property": sp, "direction": dir},
@@ -393,7 +399,9 @@ func runDBSchema(cmd *cobra.Command, args []string) error {
 		for i := range names {
 			names[i] = strings.TrimSpace(names[i])
 		}
-		schema["properties"] = filterSchemaProperties(schema["properties"].([]map[string]any), names)
+		if props, ok := schema["properties"].([]map[string]any); ok {
+			schema["properties"] = filterSchemaProperties(props, names)
+		}
 	}
 
 	// Add examples if requested.

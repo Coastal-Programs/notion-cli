@@ -4,6 +4,7 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -12,10 +13,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
@@ -82,8 +83,9 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 		}
 	}
 
-	// Check that the port is available before starting the server.
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", callbackPort))
+	// Bind to localhost only to prevent other users on shared machines from
+	// intercepting the OAuth callback.
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", callbackPort))
 	if err != nil {
 		return nil, clierrors.OAuthPortInUse(callbackPort)
 	}
@@ -124,9 +126,15 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 	}()
 	defer server.Shutdown(context.Background())
 
-	// Build and open the authorization URL.
-	authURL := fmt.Sprintf("%s?client_id=%s&response_type=code&owner=user&redirect_uri=%s&state=%s",
-		authorizeURL, clientID, redirectURI, state)
+	// Build and open the authorization URL with properly encoded parameters.
+	params := url.Values{
+		"client_id":     {clientID},
+		"response_type": {"code"},
+		"owner":         {"user"},
+		"redirect_uri":  {redirectURI},
+		"state":         {state},
+	}
+	authURL := authorizeURL + "?" + params.Encode()
 
 	if err := openBrowser(authURL); err != nil {
 		// Non-fatal: print the URL so the user can open it manually.
@@ -161,9 +169,17 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 // exchangeCode sends the authorization code to the Notion token endpoint
 // and returns the parsed token response.
 func exchangeCode(ctx context.Context, clientID, clientSecret, code string) (*TokenResponse, error) {
-	body := fmt.Sprintf(`{"grant_type":"authorization_code","code":"%s","redirect_uri":"%s"}`, code, redirectURI)
+	bodyMap := map[string]string{
+		"grant_type":   "authorization_code",
+		"code":         code,
+		"redirect_uri": redirectURI,
+	}
+	bodyBytes, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		return nil, clierrors.OAuthFailed(err.Error())
 	}

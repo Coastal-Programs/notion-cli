@@ -15,6 +15,7 @@ func RegisterWhoamiCommand(root *cobra.Command) {
 		Aliases: []string{"test", "health", "connectivity"},
 		Short:   "Check API connectivity",
 		Long:    "Verify your Notion API token and show bot info, workspace, and API latency.",
+		Args:    cobra.NoArgs,
 		RunE:    runWhoami,
 	}
 	addOutputFlags(cmd)

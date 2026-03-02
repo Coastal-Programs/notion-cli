@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Coastal-Programs/notion-cli/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
 	"github.com/Coastal-Programs/notion-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -82,21 +83,37 @@ func runConfigSetToken(cmd *cobra.Command, args []string) error {
 			token = strings.TrimSpace(scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
-			return handleError(cmd, fmt.Errorf("read stdin: %w", err))
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInternalError,
+				Message: fmt.Sprintf("Failed to read stdin: %s", err),
+			})
 		}
 		if token == "" {
-			return handleError(cmd, fmt.Errorf("no token provided"))
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeMissingRequired,
+				Message: "No token provided",
+				Suggestions: []string{
+					"Pass token as argument: notion-cli config set-token <token>",
+					"Or pipe via stdin: echo $NOTION_TOKEN | notion-cli config set-token",
+				},
+			})
 		}
 	}
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		return handleError(cmd, fmt.Errorf("load config: %w", err))
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: fmt.Sprintf("Failed to load config: %s", err),
+		})
 	}
 
 	cfg.Token = token
 	if err := config.SaveConfig(cfg); err != nil {
-		return handleError(cmd, fmt.Errorf("save config: %w", err))
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: fmt.Sprintf("Failed to save config: %s", err),
+		})
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))
@@ -169,7 +186,10 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		return handleError(cmd, fmt.Errorf("load config: %w", err))
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: fmt.Sprintf("Failed to load config: %s", err),
+		})
 	}
 
 	// Mask token.

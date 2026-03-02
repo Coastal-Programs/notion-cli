@@ -1,9 +1,10 @@
 package output
 
-import "time"
+import (
+	"time"
 
-// Version is the CLI version included in envelope metadata.
-const Version = "6.0.0"
+	"github.com/Coastal-Programs/notion-cli/internal/config"
+)
 
 // SuccessEnvelope wraps successful command output.
 type SuccessEnvelope struct {
@@ -36,7 +37,7 @@ func NewSuccessEnvelope(data any, command string, executionMs int64) *SuccessEnv
 			"timestamp":         time.Now().UTC().Format(time.RFC3339),
 			"command":           command,
 			"execution_time_ms": executionMs,
-			"version":           Version,
+			"version":           config.Version,
 		},
 	}
 }
@@ -54,7 +55,7 @@ func NewErrorEnvelope(code, message string, details any, suggestions []string, c
 		Metadata: map[string]any{
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 			"command":   command,
-			"version":   Version,
+			"version":   config.Version,
 		},
 	}
 }

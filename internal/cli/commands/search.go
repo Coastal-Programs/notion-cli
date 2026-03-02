@@ -101,12 +101,36 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		body["start_cursor"] = sc
 	}
 
+	if ps, _ := cmd.Flags().GetInt("page-size"); ps > 100 {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: fmt.Sprintf("--page-size must be between 1 and 100, got %d", ps),
+		})
+	}
+
 	limit, _ := cmd.Flags().GetInt("limit")
 	dbFilter, _ := cmd.Flags().GetString("database")
 	createdAfter, _ := cmd.Flags().GetString("created-after")
 	createdBefore, _ := cmd.Flags().GetString("created-before")
 	editedAfter, _ := cmd.Flags().GetString("edited-after")
 	editedBefore, _ := cmd.Flags().GetString("edited-before")
+
+	// Validate date filter formats upfront.
+	for _, df := range []struct{ flag, val string }{
+		{"--created-after", createdAfter},
+		{"--created-before", createdBefore},
+		{"--edited-after", editedAfter},
+		{"--edited-before", editedBefore},
+	} {
+		if df.val != "" {
+			if _, err := time.Parse("2006-01-02", df.val); err != nil {
+				return handleError(cmd, &clierrors.NotionCLIError{
+					Code:    clierrors.CodeInvalidRequest,
+					Message: fmt.Sprintf("Invalid date for %s: %q (expected YYYY-MM-DD)", df.flag, df.val),
+				})
+			}
+		}
+	}
 
 	needsClientFilter := dbFilter != "" || createdAfter != "" || createdBefore != "" || editedAfter != "" || editedBefore != ""
 

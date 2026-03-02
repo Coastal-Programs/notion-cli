@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Coastal-Programs/notion-cli/internal/config"
 	"github.com/Coastal-Programs/notion-cli/internal/retry"
 )
 
@@ -22,7 +23,12 @@ const (
 	defaultNotionVersion = "2022-06-28"
 )
 
-var userAgent = "notion-cli/1.0 (Go/" + runtime.Version() + ")"
+// UserAgent is set during init to include the build-time version.
+var userAgent string
+
+func init() {
+	userAgent = "notion-cli/" + config.Version + " (Go/" + runtime.Version() + ")"
+}
 
 // APIError represents an error response from the Notion API.
 type APIError struct {

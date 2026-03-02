@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli-darwin-x64",
-  "version": "6.1.1",
+  "version": "6.1.2",
   "description": "notion-cli binary for macOS x64 (Intel)",
   "os": ["darwin"],
   "cpu": ["x64"],

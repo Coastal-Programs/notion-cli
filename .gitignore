@@ -1,6 +1,6 @@
 # Go build output
 build/
-/notion-cli
+notion-cli
 *.exe
 *.exe~
 *.dll

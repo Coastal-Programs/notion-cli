@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Coastal-Programs/notion-cli/internal/config"
 )
 
 // ─── Envelope Tests ──────────────────────────────────────────────────────────
@@ -23,8 +25,8 @@ func TestNewSuccessEnvelope(t *testing.T) {
 	if env.Metadata["execution_time_ms"] != int64(42) {
 		t.Fatalf("expected execution_time_ms=42, got %v", env.Metadata["execution_time_ms"])
 	}
-	if env.Metadata["version"] != Version {
-		t.Fatalf("expected version=%s, got %v", Version, env.Metadata["version"])
+	if env.Metadata["version"] != config.Version {
+		t.Fatalf("expected version=%s, got %v", config.Version, env.Metadata["version"])
 	}
 	ts, ok := env.Metadata["timestamp"].(string)
 	if !ok || ts == "" {

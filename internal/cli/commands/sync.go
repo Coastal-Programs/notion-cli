@@ -23,6 +23,7 @@ func newSyncCmd() *cobra.Command {
 		Aliases: []string{"db:sync"},
 		Short:   "Sync workspace databases to local cache",
 		Long:    "Search for all databases shared with the integration and cache them locally.",
+		Args:    cobra.NoArgs,
 		RunE:    runSync,
 	}
 

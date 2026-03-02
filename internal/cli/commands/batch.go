@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
 	"github.com/Coastal-Programs/notion-cli/internal/notion"
 	"github.com/Coastal-Programs/notion-cli/pkg/output"
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ import (
 func RegisterBatchCommands(root *cobra.Command) {
 	batchCmd := &cobra.Command{
 		Use:     "batch",
-		Aliases: []string{"b"},
+		Aliases: []string{"ba"},
 		Short:   "Batch operations",
 		Long:    "Execute batch operations on multiple Notion resources.",
 	}
@@ -80,7 +81,15 @@ func runBatchRetrieve(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(ids) == 0 {
-		return handleError(cmd, fmt.Errorf("no IDs provided; pass IDs as arguments, via --ids, or pipe through stdin"))
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeMissingRequired,
+			Message: "No IDs provided",
+			Suggestions: []string{
+				"Pass IDs as arguments: notion-cli batch retrieve <id1> <id2>",
+				"Use --ids flag: notion-cli batch retrieve --ids id1,id2",
+				"Pipe via stdin: echo 'id1' | notion-cli batch retrieve",
+			},
+		})
 	}
 
 	resourceType, _ := cmd.Flags().GetString("type")
@@ -162,7 +171,14 @@ func retrieveResource(cmd *cobra.Command, client *notion.Client, resourceType, i
 	case "database", "databases", "db":
 		return client.DatabaseRetrieve(ctx, id)
 	default:
-		return nil, fmt.Errorf("unsupported resource type: %s (use page, block, or database)", resourceType)
+		return nil, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: fmt.Sprintf("Unsupported resource type: %s", resourceType),
+			Suggestions: []string{
+				"Valid types: page, block, database",
+				"Example: notion-cli batch retrieve --type page <id>",
+			},
+		}
 	}
 }
 

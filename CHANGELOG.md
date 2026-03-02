@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.2] - 2026-03-02
+
+### Fixed
+- **OAuth URL encoding**: Authorization URL now properly URL-encodes redirect_uri parameter
+- **OAuth security**: Callback server binds to `127.0.0.1` instead of `0.0.0.0` (all interfaces)
+- **OAuth security**: Token exchange JSON body built with `json.Marshal` instead of string formatting
+- **Version reporting**: JSON envelope metadata now shows correct version (was hardcoded to `6.0.0`)
+- **User-Agent header**: Now reports actual CLI version (was hardcoded to `1.0`)
+- **db schema**: No longer panics when database has no properties
+- **doctor command**: Now returns error envelope and non-zero exit code when checks fail
+- **search command**: Date filter flags now validate format upfront instead of failing silently
+- **search command**: `--page-size` now validated against Notion's 100 limit
+- **db query**: `--sort-direction` now validates input and gives clear error for invalid values
+- **batch command**: Alias changed from `b` to `ba` to avoid collision with `block` alias
+
+### Changed
+- **Removed hardcoded OAuth client ID from Makefile** — both credentials now sourced exclusively from environment variables via GitHub Secrets
+- **Publish workflow**: Now passes `NOTION_OAUTH_CLIENT_ID` secret to build steps
+- All error messages in `batch` and `config` commands now use structured `NotionCLIError`
+- `whoami`, `sync`, `list`, `doctor` commands now reject unexpected arguments
+- Removed dead `--search` flag from `db query`
+- Rotated OAuth client secret after credential leak in v6.1.1 binary
+
 ## [6.1.1] - 2026-03-02
 
 ### Fixed

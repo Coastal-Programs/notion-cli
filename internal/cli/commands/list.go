@@ -21,6 +21,7 @@ func newListCmd() *cobra.Command {
 		Aliases: []string{"db:list", "ls"},
 		Short:   "List cached databases",
 		Long:    "List all databases from the local workspace cache. Run 'sync' first to populate.",
+		Args:    cobra.NoArgs,
 		RunE:    runList,
 	}
 

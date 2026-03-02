@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Coastal-Programs/notion-cli/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
 	"github.com/Coastal-Programs/notion-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,7 @@ func RegisterDoctorCommand(root *cobra.Command) {
 		Aliases: []string{"diagnose", "healthcheck"},
 		Short:   "Run diagnostics",
 		Long:    "Run comprehensive health checks on your Notion CLI setup.",
+		Args:    cobra.NoArgs,
 		RunE:    runDoctor,
 	}
 	addOutputFlags(cmd)
@@ -239,6 +241,17 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))
+	if failCount > 0 {
+		p.PrintError("DIAGNOSTICS_FAILED",
+			fmt.Sprintf("%d diagnostic check(s) failed", failCount),
+			data,
+			[]string{"Run 'notion-cli doctor' with --verbose for more details"},
+		)
+		return &clierrors.NotionCLIError{
+			Code:    "DIAGNOSTICS_FAILED",
+			Message: fmt.Sprintf("%d diagnostic check(s) failed", failCount),
+		}
+	}
 	p.PrintSuccess(data, "doctor", start)
 	return nil
 }
