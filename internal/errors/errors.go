@@ -46,6 +46,14 @@ const (
 	CodeInvalidEnum         = "INVALID_ENUM"
 	CodeObjectNotFound      = "OBJECT_NOT_FOUND"
 	CodeSizeLimitExceeded   = "SIZE_LIMIT_EXCEEDED"
+
+	// OAuth error codes.
+	CodeOAuthFailed        = "OAUTH_FAILED"
+	CodeOAuthTimeout       = "OAUTH_TIMEOUT"
+	CodeOAuthCancelled     = "OAUTH_CANCELLED"
+	CodeOAuthPortInUse     = "OAUTH_PORT_IN_USE"
+	CodeOAuthStateMismatch = "OAUTH_STATE_MISMATCH"
+	CodeOAuthNotConfigured = "OAUTH_NOT_CONFIGURED"
 )
 
 // NotionCLIError is the canonical error type for the CLI. It carries structured
@@ -90,8 +98,9 @@ func TokenMissing() *NotionCLIError {
 		Code:    CodeTokenMissing,
 		Message: "Notion API token is not configured",
 		Suggestions: []string{
-			"Set the NOTION_TOKEN environment variable",
-			"Run 'notion-cli init' to configure your token",
+			"Run 'notion-cli auth login' to authenticate via OAuth",
+			"Or set the NOTION_TOKEN environment variable",
+			"Or run 'notion-cli config set-token <token>' for manual setup",
 			"Get a token at https://www.notion.so/my-integrations",
 		},
 	}
@@ -364,4 +373,81 @@ func FromNotionAPI(statusCode int, body map[string]any) *NotionCLIError {
 	}
 
 	return e
+}
+
+// ---------------------------------------------------------------------------
+// OAuth error factory functions
+// ---------------------------------------------------------------------------
+
+// OAuthFailed returns an error when the OAuth token exchange fails.
+func OAuthFailed(detail string) *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthFailed,
+		Message: fmt.Sprintf("OAuth token exchange failed: %s", detail),
+		Suggestions: []string{
+			"Try running 'notion-cli auth login' again",
+			"Check your internet connection",
+		},
+	}
+}
+
+// OAuthTimeout returns an error when the OAuth callback is not received in time.
+func OAuthTimeout() *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthTimeout,
+		Message: "OAuth authorization timed out waiting for browser callback",
+		Suggestions: []string{
+			"Complete the authorization in your browser within 2 minutes",
+			"Try running 'notion-cli auth login' again",
+		},
+	}
+}
+
+// OAuthCancelled returns an error when the user denies the authorization.
+func OAuthCancelled() *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthCancelled,
+		Message: "OAuth authorization was denied",
+		Suggestions: []string{
+			"Run 'notion-cli auth login' and click 'Allow access'",
+			"Or set NOTION_TOKEN manually for non-interactive use",
+		},
+	}
+}
+
+// OAuthPortInUse returns an error when the localhost callback port is unavailable.
+func OAuthPortInUse(port int) *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthPortInUse,
+		Message: fmt.Sprintf("Port %d is already in use", port),
+		Suggestions: []string{
+			fmt.Sprintf("Close the application using port %d and try again", port),
+			"Or set NOTION_TOKEN manually as an alternative",
+		},
+	}
+}
+
+// OAuthStateMismatch returns an error when the CSRF state parameter does not match.
+func OAuthStateMismatch() *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthStateMismatch,
+		Message: "OAuth state mismatch (possible CSRF attack)",
+		Suggestions: []string{
+			"Try running 'notion-cli auth login' again",
+			"Ensure you are completing the most recent authorization request",
+		},
+	}
+}
+
+// OAuthNotConfigured returns an error when OAuth credentials are not compiled in.
+func OAuthNotConfigured() *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthNotConfigured,
+		Message: "OAuth is not available in this build",
+		Suggestions: []string{
+			"This binary was built without OAuth credentials",
+			"Set NOTION_TOKEN manually instead",
+			"Or rebuild with OAuth client ID/secret via ldflags",
+		},
+	}
 }

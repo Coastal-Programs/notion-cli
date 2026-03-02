@@ -310,6 +310,177 @@ func TestBuildVarsExist(t *testing.T) {
 	}
 }
 
+func TestOAuthConfigFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	// Clear env vars.
+	for _, k := range []string{"NOTION_TOKEN"} {
+		origVal := os.Getenv(k)
+		os.Unsetenv(k)
+		t.Cleanup(func() {
+			if origVal != "" {
+				os.Setenv(k, origVal)
+			}
+		})
+	}
+
+	cfg := &Config{
+		Token:              "secret_manual",
+		OAuthAccessToken:   "ntn_oauth_token_123",
+		OAuthWorkspaceID:   "ws-123",
+		OAuthWorkspaceName: "Test Workspace",
+		OAuthBotID:         "bot-456",
+	}
+
+	if err := SaveConfig(cfg); err != nil {
+		t.Fatalf("SaveConfig() error: %v", err)
+	}
+
+	loaded, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig() error: %v", err)
+	}
+
+	if loaded.OAuthAccessToken != "ntn_oauth_token_123" {
+		t.Errorf("OAuthAccessToken = %q, want %q", loaded.OAuthAccessToken, "ntn_oauth_token_123")
+	}
+	if loaded.OAuthWorkspaceID != "ws-123" {
+		t.Errorf("OAuthWorkspaceID = %q, want %q", loaded.OAuthWorkspaceID, "ws-123")
+	}
+	if loaded.OAuthWorkspaceName != "Test Workspace" {
+		t.Errorf("OAuthWorkspaceName = %q, want %q", loaded.OAuthWorkspaceName, "Test Workspace")
+	}
+	if loaded.OAuthBotID != "bot-456" {
+		t.Errorf("OAuthBotID = %q, want %q", loaded.OAuthBotID, "bot-456")
+	}
+}
+
+func TestHasOAuthToken(t *testing.T) {
+	cfg := &Config{}
+	if cfg.HasOAuthToken() {
+		t.Error("HasOAuthToken() should be false for empty config")
+	}
+
+	cfg.OAuthAccessToken = "ntn_token"
+	if !cfg.HasOAuthToken() {
+		t.Error("HasOAuthToken() should be true when token is set")
+	}
+}
+
+func TestClearOAuth(t *testing.T) {
+	cfg := &Config{
+		Token:              "secret_keep",
+		OAuthAccessToken:   "ntn_clear",
+		OAuthWorkspaceID:   "ws-clear",
+		OAuthWorkspaceName: "Clear Me",
+		OAuthBotID:         "bot-clear",
+	}
+
+	cfg.ClearOAuth()
+
+	if cfg.OAuthAccessToken != "" {
+		t.Errorf("OAuthAccessToken should be empty after ClearOAuth, got %q", cfg.OAuthAccessToken)
+	}
+	if cfg.OAuthWorkspaceID != "" {
+		t.Errorf("OAuthWorkspaceID should be empty after ClearOAuth, got %q", cfg.OAuthWorkspaceID)
+	}
+	if cfg.OAuthWorkspaceName != "" {
+		t.Errorf("OAuthWorkspaceName should be empty after ClearOAuth, got %q", cfg.OAuthWorkspaceName)
+	}
+	if cfg.OAuthBotID != "" {
+		t.Errorf("OAuthBotID should be empty after ClearOAuth, got %q", cfg.OAuthBotID)
+	}
+	// Token should not be cleared.
+	if cfg.Token != "secret_keep" {
+		t.Errorf("Token should remain after ClearOAuth, got %q", cfg.Token)
+	}
+}
+
+func TestAuthMethod(t *testing.T) {
+	// Save and restore NOTION_TOKEN.
+	origToken := os.Getenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			os.Setenv("NOTION_TOKEN", origToken)
+		} else {
+			os.Unsetenv("NOTION_TOKEN")
+		}
+	})
+
+	t.Run("env takes precedence", func(t *testing.T) {
+		os.Setenv("NOTION_TOKEN", "secret_env")
+		cfg := &Config{OAuthAccessToken: "ntn_oauth", Token: "secret_manual"}
+		if m := cfg.AuthMethod(); m != "env" {
+			t.Errorf("AuthMethod() = %q, want %q", m, "env")
+		}
+	})
+
+	t.Run("oauth when no env", func(t *testing.T) {
+		os.Unsetenv("NOTION_TOKEN")
+		cfg := &Config{OAuthAccessToken: "ntn_oauth", Token: "secret_manual"}
+		if m := cfg.AuthMethod(); m != "oauth" {
+			t.Errorf("AuthMethod() = %q, want %q", m, "oauth")
+		}
+	})
+
+	t.Run("token when no oauth", func(t *testing.T) {
+		os.Unsetenv("NOTION_TOKEN")
+		cfg := &Config{Token: "secret_manual"}
+		if m := cfg.AuthMethod(); m != "token" {
+			t.Errorf("AuthMethod() = %q, want %q", m, "token")
+		}
+	})
+
+	t.Run("none when nothing set", func(t *testing.T) {
+		os.Unsetenv("NOTION_TOKEN")
+		cfg := &Config{}
+		if m := cfg.AuthMethod(); m != "none" {
+			t.Errorf("AuthMethod() = %q, want %q", m, "none")
+		}
+	})
+}
+
+func TestGetConfigValue_OAuthKeys(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	origToken := os.Getenv("NOTION_TOKEN")
+	os.Unsetenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+
+	cfg := &Config{
+		OAuthAccessToken:   "ntn_test",
+		OAuthWorkspaceID:   "ws-test",
+		OAuthWorkspaceName: "Test WS",
+		OAuthBotID:         "bot-test",
+	}
+	if err := SaveConfig(cfg); err != nil {
+		t.Fatalf("SaveConfig() error: %v", err)
+	}
+
+	tests := map[string]string{
+		"oauth_access_token":   "ntn_test",
+		"oauth_workspace_id":   "ws-test",
+		"oauth_workspace_name": "Test WS",
+		"oauth_bot_id":         "bot-test",
+		"auth_method":          "oauth",
+	}
+	for key, want := range tests {
+		if got := GetConfigValue(key); got != want {
+			t.Errorf("GetConfigValue(%q) = %q, want %q", key, got, want)
+		}
+	}
+}
+
 func TestLoadConfig_FileWithPartialValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")

@@ -13,9 +13,11 @@ import (
 
 // Build-time variables set via ldflags.
 var (
-	Version = "dev"
-	Commit  = "none"
-	Date    = "unknown"
+	Version         = "dev"
+	Commit          = "none"
+	Date            = "unknown"
+	OAuthClientID   = ""
+	OAuthClientSecret = ""
 )
 
 // Config holds all CLI configuration values.
@@ -30,6 +32,40 @@ type Config struct {
 	DiskCacheEnabled bool   `json:"disk_cache_enabled"`
 	HTTPKeepAlive    bool   `json:"http_keep_alive"`
 	Verbose          bool   `json:"verbose,omitempty"`
+
+	// OAuth fields (populated by 'auth login').
+	OAuthAccessToken   string `json:"oauth_access_token,omitempty"`
+	OAuthWorkspaceID   string `json:"oauth_workspace_id,omitempty"`
+	OAuthWorkspaceName string `json:"oauth_workspace_name,omitempty"`
+	OAuthBotID         string `json:"oauth_bot_id,omitempty"`
+}
+
+// HasOAuthToken reports whether an OAuth access token is configured.
+func (c *Config) HasOAuthToken() bool {
+	return c.OAuthAccessToken != ""
+}
+
+// ClearOAuth removes all OAuth-related fields from the config.
+func (c *Config) ClearOAuth() {
+	c.OAuthAccessToken = ""
+	c.OAuthWorkspaceID = ""
+	c.OAuthWorkspaceName = ""
+	c.OAuthBotID = ""
+}
+
+// AuthMethod returns "oauth", "token", or "none" describing how the CLI
+// is currently authenticated.
+func (c *Config) AuthMethod() string {
+	if os.Getenv("NOTION_TOKEN") != "" {
+		return "env"
+	}
+	if c.OAuthAccessToken != "" {
+		return "oauth"
+	}
+	if c.Token != "" {
+		return "token"
+	}
+	return "none"
 }
 
 // defaults returns a Config with default values.
@@ -109,6 +145,18 @@ func loadFromFile(cfg *Config) error {
 	}
 	if fileCfg.BaseURL != "" {
 		cfg.BaseURL = fileCfg.BaseURL
+	}
+	if fileCfg.OAuthAccessToken != "" {
+		cfg.OAuthAccessToken = fileCfg.OAuthAccessToken
+	}
+	if fileCfg.OAuthWorkspaceID != "" {
+		cfg.OAuthWorkspaceID = fileCfg.OAuthWorkspaceID
+	}
+	if fileCfg.OAuthWorkspaceName != "" {
+		cfg.OAuthWorkspaceName = fileCfg.OAuthWorkspaceName
+	}
+	if fileCfg.OAuthBotID != "" {
+		cfg.OAuthBotID = fileCfg.OAuthBotID
 	}
 	// Use a raw map to detect explicitly set fields, including zero values.
 	var raw map[string]json.RawMessage
@@ -243,6 +291,16 @@ func GetConfigValue(key string) string {
 		return strconv.FormatBool(cfg.HTTPKeepAlive)
 	case "verbose":
 		return strconv.FormatBool(cfg.Verbose)
+	case "oauth_access_token":
+		return cfg.OAuthAccessToken
+	case "oauth_workspace_id":
+		return cfg.OAuthWorkspaceID
+	case "oauth_workspace_name":
+		return cfg.OAuthWorkspaceName
+	case "oauth_bot_id":
+		return cfg.OAuthBotID
+	case "auth_method":
+		return cfg.AuthMethod()
 	default:
 		return ""
 	}

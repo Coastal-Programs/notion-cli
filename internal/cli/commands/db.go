@@ -16,26 +16,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newClient creates a Notion API client from the NOTION_TOKEN env var,
-// falling back to the config file token if the env var is not set.
+// newClient creates a Notion API client using the following precedence:
+//  1. NOTION_TOKEN environment variable (CI/automation)
+//  2. OAuth access token from config (interactive login)
+//  3. Manual token from config file (fallback)
 func newClient() (*notion.Client, error) {
+	// 1. Environment variable (highest priority).
 	token := os.Getenv("NOTION_TOKEN")
+
+	// 2. Config file: OAuth token, then manual token.
 	if token == "" {
-		// Fallback to config file.
 		cfg, err := config.LoadConfig()
-		if err == nil && cfg.Token != "" {
-			token = cfg.Token
+		if err == nil {
+			if cfg.OAuthAccessToken != "" {
+				token = cfg.OAuthAccessToken
+			} else if cfg.Token != "" {
+				token = cfg.Token
+			}
 		}
 	}
+
 	if token == "" {
-		return nil, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeTokenMissing,
-			Message: "NOTION_TOKEN environment variable is not set",
-			Suggestions: []string{
-				"Export your token: export NOTION_TOKEN=secret_...",
-				"Or run: notion-cli config set-token <your_token>",
-			},
-		}
+		return nil, clierrors.TokenMissing()
 	}
 	return notion.NewClient(token), nil
 }

@@ -67,6 +67,7 @@ func init() {
 	commands.RegisterDoctorCommand(rootCmd)
 	commands.RegisterConfigCommands(rootCmd)
 	commands.RegisterCacheCommands(rootCmd)
+	commands.RegisterAuthCommands(rootCmd)
 }
 
 // ExitCode returns the appropriate exit code for an error.

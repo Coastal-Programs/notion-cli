@@ -44,11 +44,17 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		Message: goVer,
 	})
 
-	// Check 2: Token configured.
+	// Check 2: Token configured + auth method.
+	cfg, cfgErr := config.LoadConfig()
 	token := os.Getenv("NOTION_TOKEN")
-	if token == "" {
-		cfg, err := config.LoadConfig()
-		if err == nil && cfg.Token != "" {
+	authMethod := "none"
+	if cfgErr == nil {
+		authMethod = cfg.AuthMethod()
+	}
+	if token == "" && cfgErr == nil {
+		if cfg.OAuthAccessToken != "" {
+			token = cfg.OAuthAccessToken
+		} else if cfg.Token != "" {
 			token = cfg.Token
 		}
 	}
@@ -56,7 +62,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		checks = append(checks, checkResult{
 			Name:    "API Token",
 			Status:  "fail",
-			Message: "NOTION_TOKEN not set. Run 'notion-cli config set-token <token>' or set NOTION_TOKEN env var.",
+			Message: "No token configured. Run 'notion-cli auth login' or set NOTION_TOKEN env var.",
 		})
 	} else {
 		// Mask token for display.
@@ -68,6 +74,42 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			Name:    "API Token",
 			Status:  "pass",
 			Message: fmt.Sprintf("Configured (%s)", masked),
+		})
+	}
+
+	// Auth method check.
+	switch authMethod {
+	case "oauth":
+		workspaceName := ""
+		if cfgErr == nil {
+			workspaceName = cfg.OAuthWorkspaceName
+		}
+		msg := "OAuth"
+		if workspaceName != "" {
+			msg = fmt.Sprintf("OAuth (workspace: %s)", workspaceName)
+		}
+		checks = append(checks, checkResult{
+			Name:    "Auth Method",
+			Status:  "pass",
+			Message: msg,
+		})
+	case "env":
+		checks = append(checks, checkResult{
+			Name:    "Auth Method",
+			Status:  "pass",
+			Message: "NOTION_TOKEN environment variable",
+		})
+	case "token":
+		checks = append(checks, checkResult{
+			Name:    "Auth Method",
+			Status:  "pass",
+			Message: "Manual token (config file)",
+		})
+	default:
+		checks = append(checks, checkResult{
+			Name:    "Auth Method",
+			Status:  "fail",
+			Message: "Not authenticated. Run 'notion-cli auth login' or set NOTION_TOKEN.",
 		})
 	}
 

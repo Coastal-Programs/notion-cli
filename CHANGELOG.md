@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **OAuth authentication** - `auth login`, `auth logout`, `auth status` commands
+  - Browser-based OAuth flow: run `notion-cli auth login`, authorize in Notion, start using the CLI
+  - No manual token management needed for interactive use
+  - Token precedence: `NOTION_TOKEN` env var > OAuth token > manual config token
+  - CSRF protection via cryptographic state parameter
+  - OAuth tokens stored in config file with 0600 permissions
+  - 6 new OAuth-specific error codes with actionable suggestions
+  - `doctor` command now shows auth method (oauth/env/token/none) with workspace info
+  - Build-time OAuth client ID/secret injection via Makefile ldflags
+
 ## [6.0.0] - 2026-03-01
 
 ### Changed - **Complete Rewrite from TypeScript to Go**
