@@ -52,7 +52,17 @@ func resolveID(raw string) (string, error) {
 }
 
 // outputFormat returns the output.Format from command flags.
+// The --output string flag takes precedence over the boolean shorthand flags.
 func outputFormat(cmd *cobra.Command) output.Format {
+	// Check --output string flag first (takes precedence).
+	if outStr, _ := cmd.Flags().GetString("output"); outStr != "" {
+		f, err := output.ParseFormat(outStr)
+		if err == nil {
+			return f
+		}
+		// Invalid value — fall through to boolean flags.
+	}
+
 	if v, _ := cmd.Flags().GetBool("json"); v {
 		return output.FormatJSON
 	}
@@ -72,6 +82,26 @@ func outputFormat(cmd *cobra.Command) output.Format {
 		return output.FormatPretty
 	}
 	return output.FormatTable
+}
+
+// validateOutputFlag checks the --output flag value upfront and returns an error
+// for invalid values. Call this at the start of RunE handlers.
+func validateOutputFlag(cmd *cobra.Command) error {
+	outStr, _ := cmd.Flags().GetString("output")
+	if outStr == "" {
+		return nil
+	}
+	_, err := output.ParseFormat(outStr)
+	if err != nil {
+		return &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: fmt.Sprintf("Invalid --output format %q", outStr),
+			Suggestions: []string{
+				fmt.Sprintf("Valid formats: %s", strings.Join(output.ValidFormats, ", ")),
+			},
+		}
+	}
+	return nil
 }
 
 // handleError prints an error using the output printer and returns it for
@@ -106,7 +136,11 @@ func handleError(cmd *cobra.Command, err error) error {
 }
 
 // addOutputFlags adds the shared output format flags to a command.
+// Both --output <format> and boolean shorthand flags (--json, --csv, …) are
+// supported. The --output flag takes precedence when both are provided.
+// A PreRunE hook is chained to validate the --output value early.
 func addOutputFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("output", "o", "", "Output format: json, compact-json, csv, markdown, table, raw, pretty")
 	cmd.Flags().Bool("json", false, "Output as JSON envelope")
 	cmd.Flags().Bool("compact-json", false, "Output as compact JSON (single line)")
 	cmd.Flags().Bool("raw", false, "Output raw API response without envelope")
@@ -114,6 +148,26 @@ func addOutputFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("markdown", false, "Output as markdown table")
 	cmd.Flags().Bool("pretty", false, "Output as pretty-printed JSON")
 	cmd.MarkFlagsMutuallyExclusive("json", "compact-json", "csv", "markdown", "raw", "pretty")
+
+	// Chain a PreRunE that validates the --output value upfront.
+	prev := cmd.PreRunE
+	cmd.PreRunE = func(c *cobra.Command, args []string) error {
+		if prev != nil {
+			if err := prev(c, args); err != nil {
+				return err
+			}
+		}
+		if err := validateOutputFlag(c); err != nil {
+			// Print the structured error envelope before returning,
+			// since SilenceErrors is set on the root command.
+			p := output.NewPrinter(output.FormatTable)
+			if cliErr, ok := err.(*clierrors.NotionCLIError); ok {
+				p.PrintError(cliErr.Code, cliErr.Message, cliErr.Details, cliErr.Suggestions)
+			}
+			return err
+		}
+		return nil
+	}
 }
 
 // maxPaginationPages is the safety limit for pagination loops.

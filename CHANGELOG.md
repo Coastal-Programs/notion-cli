@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-03-02
+
+### Added
+- **`--output` / `-o` flag**: All commands now accept `--output <format>` (or `-o <format>`) as an alternative to boolean flags like `--json`, `--csv`, etc. Valid formats: `json`, `compact-json`, `csv`, `markdown`, `table`, `raw`, `pretty`. Invalid values return a structured error with suggestions.
+- **Platform binary packages on npm**: First publish of all 5 platform-specific packages (`@coastal-programs/notion-cli-darwin-arm64`, `-darwin-x64`, `-linux-x64`, `-linux-arm64`, `-win32-x64`). Users on supported platforms now get a native binary via npm's optional dependency resolution instead of relying on the postinstall GitHub Release fallback.
+
+### Fixed
+- **Publish workflow**: Platform package publish failures are no longer silently ignored (`|| true` removed). The workflow now reports explicit errors with guidance when platform packages fail to publish.
+
 ## [6.1.2] - 2026-03-02
 
 ### Fixed

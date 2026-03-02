@@ -549,3 +549,53 @@ func TestDefaultFormatFallback(t *testing.T) {
 		t.Fatalf("unknown format should fall back to table, got:\n%s", out)
 	}
 }
+
+// ─── ParseFormat Tests ──────────────────────────────────────────────────────
+
+func TestParseFormat(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected Format
+	}{
+		{"json", FormatJSON},
+		{"JSON", FormatJSON},
+		{"  json  ", FormatJSON},
+		{"compact-json", FormatCompactJSON},
+		{"Compact-JSON", FormatCompactJSON},
+		{"raw", FormatRaw},
+		{"table", FormatTable},
+		{"csv", FormatCSV},
+		{"CSV", FormatCSV},
+		{"markdown", FormatMarkdown},
+		{"pretty", FormatPretty},
+	}
+	for _, tc := range tests {
+		got, err := ParseFormat(tc.input)
+		if err != nil {
+			t.Errorf("ParseFormat(%q) returned unexpected error: %v", tc.input, err)
+			continue
+		}
+		if got != tc.expected {
+			t.Errorf("ParseFormat(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
+	}
+}
+
+func TestParseFormatInvalid(t *testing.T) {
+	invalids := []string{"", "jsonn", "yaml", "xml", "tsv"}
+	for _, input := range invalids {
+		_, err := ParseFormat(input)
+		if err == nil {
+			t.Errorf("ParseFormat(%q) expected error, got nil", input)
+		}
+	}
+}
+
+func TestValidFormatsCompleteness(t *testing.T) {
+	// Every entry in ValidFormats should be parseable.
+	for _, f := range ValidFormats {
+		if _, err := ParseFormat(f); err != nil {
+			t.Errorf("ValidFormats contains %q but ParseFormat rejects it: %v", f, err)
+		}
+	}
+}

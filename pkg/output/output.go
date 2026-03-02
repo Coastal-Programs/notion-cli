@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -21,6 +22,31 @@ const (
 	FormatMarkdown    Format = "markdown"
 	FormatPretty      Format = "pretty"
 )
+
+// ValidFormats lists all accepted values for the --output flag.
+var ValidFormats = []string{"json", "compact-json", "raw", "table", "csv", "markdown", "pretty"}
+
+// ParseFormat converts a string to a Format, returning an error for unknown values.
+func ParseFormat(s string) (Format, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "json":
+		return FormatJSON, nil
+	case "compact-json":
+		return FormatCompactJSON, nil
+	case "raw":
+		return FormatRaw, nil
+	case "table":
+		return FormatTable, nil
+	case "csv":
+		return FormatCSV, nil
+	case "markdown":
+		return FormatMarkdown, nil
+	case "pretty":
+		return FormatPretty, nil
+	default:
+		return "", fmt.Errorf("unknown output format %q (valid: %s)", s, strings.Join(ValidFormats, ", "))
+	}
+}
 
 // Printer handles formatted output for CLI commands.
 type Printer struct {

@@ -107,12 +107,20 @@ jobs:
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       run: |
+        FAILED=0
         for pkg in npm/notion-cli-*/; do
           echo "Publishing $pkg..."
           cd "$pkg"
-          npm publish --access public || true
+          if ! npm publish --access public; then
+            echo "::warning::Failed to publish $pkg"
+            FAILED=1
+          fi
           cd ../..
         done
+        if [ "$FAILED" -eq 1 ]; then
+          echo "::error::One or more platform packages failed to publish. Check that the NPM_TOKEN has write access to the @coastal-programs scope and that the token owner is an org member with publish permissions."
+          exit 1
+        fi
 
     - name: Publish main wrapper package
       if: steps.check-version.outputs.version_exists == 'false'

@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli-darwin-arm64",
-  "version": "6.1.2",
+  "version": "6.2.0",
   "description": "notion-cli binary for macOS ARM64 (Apple Silicon)",
   "os": ["darwin"],
   "cpu": ["arm64"],
