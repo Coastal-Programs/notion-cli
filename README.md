@@ -36,6 +36,7 @@ A powerful command-line interface for the Notion API, optimized for AI coding as
 
 **Key Features:**
 - **Single binary**: ~8MB, zero runtime dependencies, instant startup
+- **OAuth login**: `notion-cli auth login` -- authenticate in your browser, no token management
 - **AI-first design**: JSON envelope output, structured errors, exit codes
 - **Non-interactive**: Perfect for scripts and automation
 - **Flexible output**: JSON, CSV, table, or raw API responses
@@ -59,10 +60,12 @@ All 26 commands have been ported with identical syntax -- existing scripts work 
 - Cross-compilation: one build produces 5 platform binaries
 - Near-zero supply chain risk: 2 Go dependencies vs hundreds of npm packages
 
+**v6.1.0: OAuth Authentication** -- `notion-cli auth login` opens your browser, you authorize, done. No more copying tokens manually.
+
 **Technical details:**
-- 33 Go source files, ~8,900 lines of code
-- 183 tests across 8 test suites, all passing
-- 7.9MB binary (stripped, darwin/arm64)
+- 36 Go source files, ~9,800 lines of code
+- 196 tests across 9 test suites, all passing
+- ~8MB binary (stripped, darwin/arm64)
 
 **Deferred to Phase 2:** Disk cache, request deduplication, circuit breaker, simple properties (`-S` flag), recursive page retrieval, markdown output from page content, interactive init wizard, update notifications.
 
@@ -94,20 +97,32 @@ make build
 # Binary is at build/notion-cli
 ```
 
-### Configuration
+### Setup
 
+**Option A: OAuth login (recommended)**
 ```bash
-# Set your Notion API token (required for all API calls)
-export NOTION_TOKEN="secret_your_token_here"
+# Authenticate via your browser -- no token needed
+notion-cli auth login
 
 # Verify connectivity
 notion-cli whoami
+```
 
+**Option B: Manual token (CI/automation)**
+```bash
+# Set your Notion API token
+export NOTION_TOKEN="secret_your_token_here"
+
+# Or save it to the config file
+notion-cli config set-token <YOUR_TOKEN>
+```
+
+**Get a manual token:** https://developers.notion.com/docs/create-a-notion-integration
+
+```bash
 # Sync your workspace for local database lookups
 notion-cli sync
 ```
-
-**Get your API token:** https://developers.notion.com/docs/create-a-notion-integration
 
 ### Common Commands
 
@@ -133,6 +148,19 @@ All commands support `--output json` for machine-readable responses.
 
 ## Commands
 
+### Authentication
+
+```bash
+# Log in via OAuth (opens browser)
+notion-cli auth login
+
+# Check current auth status
+notion-cli auth status
+
+# Log out (clear stored OAuth tokens)
+notion-cli auth logout
+```
+
 ### Setup and Diagnostics
 
 ```bash
@@ -142,7 +170,7 @@ notion-cli whoami
 # Health check and diagnostics
 notion-cli doctor
 
-# Configure token
+# Configure token manually (for CI/scripts)
 notion-cli config set-token <TOKEN>
 
 # Get config value
@@ -409,12 +437,25 @@ notion-cli cache info --output json
 - Users: 1 hour
 - Blocks: 30 seconds
 
-## Environment Variables
+## Authentication
 
-### Authentication (required)
+The CLI supports three authentication methods, checked in this order:
+
+| Priority | Method | Use case |
+|----------|--------|----------|
+| 1 | `NOTION_TOKEN` env var | CI/CD, scripts, automation |
+| 2 | OAuth token (from `auth login`) | Interactive / daily use |
+| 3 | Manual token (from `config set-token`) | Fallback |
 
 ```bash
-NOTION_TOKEN=secret_your_token_here
+# Recommended: OAuth login
+notion-cli auth login
+
+# For CI/automation: environment variable
+export NOTION_TOKEN=secret_your_token_here
+
+# Check which method is active
+notion-cli auth status
 ```
 
 ### Configuration
@@ -500,14 +541,17 @@ The CLI handles this automatically with exponential backoff and jitter. Retry be
 ### Authentication Errors
 
 ```bash
-# Verify your token is set
+# Check auth status
+notion-cli auth status
+
+# Re-authenticate via OAuth
+notion-cli auth login
+
+# Or verify your token env var is set
 echo $NOTION_TOKEN
 
 # Test connectivity
 notion-cli whoami
-
-# Reconfigure token
-notion-cli config set-token <YOUR_TOKEN>
 
 # Ensure integration has access to the pages/databases you need:
 # https://www.notion.so/my-integrations
@@ -605,8 +649,11 @@ notion-cli/
 │   │       ├── batch.go         # batch retrieve
 │   │       ├── whoami.go        # connectivity check
 │   │       ├── doctor.go        # health checks
+│   │       ├── auth.go           # auth login, logout, status (OAuth)
 │   │       ├── config.go        # config get/set/path
 │   │       └── cache_cmd.go     # cache info/stats
+│   ├── oauth/
+│   │   └── oauth.go             # OAuth flow (localhost server, token exchange)
 │   ├── notion/
 │   │   └── client.go            # HTTP client, auth, request/response
 │   ├── cache/
@@ -654,7 +701,7 @@ go test ./internal/cache/... -v
 go test ./internal/cache/... -v -run TestCacheExpiry
 ```
 
-183 tests across 8 test suites.
+196 tests across 9 test suites.
 
 ### Contributing
 
