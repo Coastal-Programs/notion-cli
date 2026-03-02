@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.1.1] - 2026-03-02
+
+### Fixed
+- Publish workflow: added `contents: write` permission for binary uploads
+- Publish workflow: create `bin/` directories before copying platform binaries
+- Publish workflow: pass `NOTION_OAUTH_SECRET` to build steps so OAuth works in published binaries
+- Publish workflow: bumped Go version to 1.25 to match go.mod
+
+### Changed
+- README: OAuth login is now the recommended setup method
+- README: added Authentication section with token precedence table
+- README: added auth commands to Commands section
+- README: updated project structure, test counts, troubleshooting
+
+## [6.1.0] - 2026-03-02
+
 ### Added
 - **OAuth authentication** - `auth login`, `auth logout`, `auth status` commands
   - Browser-based OAuth flow: run `notion-cli auth login`, authorize in Notion, start using the CLI

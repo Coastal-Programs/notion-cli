@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "description": "Unofficial Notion CLI optimized for automation and AI agents. Single-binary Go implementation with intelligent caching, retry logic, structured error handling.",
   "author": "Jake Schepis <jake@coastalprograms.com>",
   "bin": {
@@ -24,11 +24,11 @@
     "release": "make release"
   },
   "optionalDependencies": {
-    "@coastal-programs/notion-cli-darwin-arm64": "6.1.0",
-    "@coastal-programs/notion-cli-darwin-x64": "6.1.0",
-    "@coastal-programs/notion-cli-linux-x64": "6.1.0",
-    "@coastal-programs/notion-cli-linux-arm64": "6.1.0",
-    "@coastal-programs/notion-cli-win32-x64": "6.1.0"
+    "@coastal-programs/notion-cli-darwin-arm64": "6.1.1",
+    "@coastal-programs/notion-cli-darwin-x64": "6.1.1",
+    "@coastal-programs/notion-cli-linux-x64": "6.1.1",
+    "@coastal-programs/notion-cli-linux-arm64": "6.1.1",
+    "@coastal-programs/notion-cli-win32-x64": "6.1.1"
   },
   "engines": {
     "node": ">=18.0.0"
