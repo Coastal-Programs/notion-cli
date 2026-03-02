@@ -71,6 +71,11 @@ jobs:
 
     - name: Copy binaries to platform packages
       run: |
+        mkdir -p npm/notion-cli-darwin-arm64/bin
+        mkdir -p npm/notion-cli-darwin-x64/bin
+        mkdir -p npm/notion-cli-linux-x64/bin
+        mkdir -p npm/notion-cli-linux-arm64/bin
+        mkdir -p npm/notion-cli-win32-x64/bin
         cp build/notion-cli-darwin-arm64 npm/notion-cli-darwin-arm64/bin/notion-cli
         cp build/notion-cli-darwin-amd64 npm/notion-cli-darwin-x64/bin/notion-cli
         cp build/notion-cli-linux-amd64 npm/notion-cli-linux-x64/bin/notion-cli
