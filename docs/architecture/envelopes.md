@@ -14,7 +14,7 @@
                           │
                           ▼
         ┌─────────────────────────────────────┐
-        │         BaseCommand (oclif)          │
+        │         Command Handler (Cobra)          │
         │  - Parses flags                      │
         │  - Creates EnvelopeFormatter         │
         │  - Routes to command logic           │
@@ -62,19 +62,19 @@
 **Components:**
 - CLI invocation (`notion-cli [command] [args] [flags]`)
 - Flag parsing (`--json`, `--compact-json`, `--raw`)
-- Command routing (oclif framework)
+- Command routing (Cobra framework)
 
 **Responsibilities:**
 - Parse command-line arguments
 - Validate required arguments
 - Route to appropriate command handler
 
-### Layer 2: Command Layer (BaseCommand)
+### Layer 2: Command Layer
 
-**File:** `src/base-command.ts`
+**File:** `internal/cli/commands/*.go` (command handler functions)
 
 **Responsibilities:**
-- Extend oclif `Command` class
+- Cobra command handler functions
 - Initialize `EnvelopeFormatter` with command name and version
 - Provide `outputSuccess()` and `outputError()` convenience methods
 - Determine envelope usage based on flags
@@ -82,7 +82,10 @@
 
 **Key Methods:**
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 class BaseCommand extends Command {
   envelope: EnvelopeFormatter
 
@@ -106,13 +109,16 @@ class BaseCommand extends Command {
 
 ### Layer 3: Envelope System
 
-**File:** `src/envelope.ts`
+**File:** `pkg/output/envelope.go`
 
 **Components:**
 
 #### EnvelopeFormatter Class
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 class EnvelopeFormatter {
   private startTime: number
   private commandName: string
@@ -150,7 +156,10 @@ class EnvelopeFormatter {
 
 #### Type Definitions
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 interface SuccessEnvelope<T> {
   success: true
   data: T
@@ -187,11 +196,14 @@ enum ExitCode {
 
 ### Layer 4: Error System
 
-**File:** `src/errors.ts` (existing, enhanced)
+**File:** `internal/errors/errors.go`
 
 **Components:**
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 enum ErrorCode {
   RATE_LIMITED = 'RATE_LIMITED'
   NOT_FOUND = 'NOT_FOUND'
@@ -292,7 +304,10 @@ function wrapNotionError(error: any): NotionCLIError
 
 ### With Notion API Wrapper
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // src/notion.ts
 export const retrievePage = async (params: GetPageParameters) => {
   return cachedFetch(
@@ -308,7 +323,10 @@ export const retrievePage = async (params: GetPageParameters) => {
 
 ### With Cache System
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // Cache operates transparently
 // Envelope metadata includes cache time
 // Cache diagnostics go to stderr
@@ -321,7 +339,10 @@ cachedFetch('page', pageId, fetcher)
 
 ### With Retry System
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // Retry operates before envelope wrapping
 // Retry diagnostics go to stderr
 
@@ -606,7 +627,10 @@ Lifecycle:
 
 ### Adding New Error Codes
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // 1. Add to ErrorCode enum (src/errors.ts)
 export enum ErrorCode {
   // ... existing codes ...
@@ -628,7 +652,10 @@ function generateSuggestions(errorCode: ErrorCode) {
 
 ### Adding Custom Metadata
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // In command
 this.outputSuccess(results, flags, {
   // Standard pagination
@@ -644,7 +671,10 @@ this.outputSuccess(results, flags, {
 
 ### Adding New Output Formats
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // In EnvelopeFormatter.outputEnvelope()
 if (flags.yaml) {
   // Convert envelope to YAML
@@ -663,7 +693,10 @@ if (flags.xml) {
 
 ### Sensitive Data
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // DON'T: Leak tokens in error details
 error.details = {
   token: process.env.NOTION_TOKEN // ❌
@@ -677,7 +710,10 @@ error.details = {
 
 ### Stack Traces
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // Production: No stack traces
 if (process.env.NODE_ENV !== 'production') {
   errorDetails.details.stack = error.stack
@@ -760,7 +796,10 @@ Migration path: Users can use both flags in parallel
 
 ### Streaming Envelopes
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // For long-running operations
 {
   "success": "pending",
@@ -772,7 +811,10 @@ Migration path: Users can use both flags in parallel
 
 ### Envelope Versioning
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 {
   "envelope_version": "1.0.0",
   "success": true,
@@ -782,7 +824,10 @@ Migration path: Users can use both flags in parallel
 
 ### Custom Error Codes per Command
 
-```typescript
+```go
+// Note: Pseudocode showing the conceptual structure.
+// See the actual Go implementation in the referenced source files.
+//
 // Allow commands to register custom error codes
 ErrorRegistry.register('page', {
   PAGE_LOCKED: { message: '...', suggestions: [...] }
@@ -794,10 +839,12 @@ ErrorRegistry.register('page', {
 The envelope system provides a clean, layered architecture that:
 
 1. **Separates concerns:** Command logic, envelope formatting, error handling
-2. **Maintains type safety:** Generic types, type guards, TypeScript interfaces
+2. **Maintains type safety:** Go structs and interfaces
 3. **Enables observability:** Metadata, execution time, version tracking
 4. **Supports automation:** Consistent structure, exit codes, suggestions
 5. **Scales efficiently:** O(1) overhead, minimal memory, concurrent-safe
 6. **Extends easily:** New error codes, custom metadata, output formats
 
-All while maintaining backward compatibility and following SOLID principles.
+All while maintaining backward compatibility.
+
+> **Note:** This architecture document was originally written for the TypeScript/oclif implementation (v5.x). The Go/Cobra rewrite (v6.0.0) implements the same envelope concepts in `pkg/output/envelope.go` and `internal/errors/errors.go`. The pseudocode examples above show the conceptual structure; refer to the actual Go source files for implementation details.

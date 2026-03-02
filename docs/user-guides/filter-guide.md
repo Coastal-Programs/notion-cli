@@ -373,7 +373,7 @@ notion-cli db query DS_ID --filter '{"property": "Status", "select": {"equals": 
 notion-cli db query DS_ID --file-filter ./filter.json
 ```
 
-The old flags (`--rawFilter`, `--fileFilter`) will continue to work but will show deprecation warnings. They will be removed in v6.0.0.
+As of v6.0.0, only the new flag names (`--filter`, `--file-filter`) are supported. The old camelCase flags have been removed.
 
 ## Troubleshooting
 

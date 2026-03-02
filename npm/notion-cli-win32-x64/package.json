@@ -1,0 +1,12 @@
+{
+  "name": "@coastal-programs/notion-cli-win32-x64",
+  "version": "6.0.0",
+  "description": "notion-cli binary for Windows x64",
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Coastal-Programs/notion-cli.git"
+  }
+}

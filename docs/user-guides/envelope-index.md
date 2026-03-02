@@ -1,12 +1,14 @@
 # JSON Envelope System - Complete Documentation Index
 
+> **Note:** This documentation was originally written for the TypeScript v5.x implementation. The envelope system is now implemented in Go (v6.0.0) in `pkg/output/envelope.go`. Source file references below have been updated where possible.
+
 ## Overview
 
 This index provides a complete guide to the JSON envelope standardization system for the Notion CLI. All documentation, code, and tests are organized here for easy reference.
 
 **System Version:** 1.0.0
-**CLI Version:** 5.4.0+
-**Status:** Ready for Implementation
+**CLI Version:** 6.0.0+
+**Status:** Implemented in Go
 **Created:** 2025-10-23
 
 ## Quick Start
@@ -200,7 +202,7 @@ This index provides a complete guide to the JSON envelope standardization system
 
 #### 1. Envelope System
 
-**File:** [`src/envelope.ts`](../src/envelope.ts)
+**File:** `pkg/output/envelope.go`
 **Lines:** ~350
 **Purpose:** Core envelope formatter and types
 
@@ -226,9 +228,9 @@ This index provides a complete guide to the JSON envelope standardization system
 
 ---
 
-#### 2. Base Command
+#### 2. Command Handlers
 
-**File:** [`src/base-command.ts`](../src/base-command.ts)
+**File:** `internal/cli/commands/*.go`
 **Lines:** ~120
 **Purpose:** Base command class with envelope support
 
@@ -245,9 +247,9 @@ This index provides a complete guide to the JSON envelope standardization system
 
 ---
 
-#### 3. Error System (Enhanced)
+#### 3. Error System
 
-**File:** [`src/errors.ts`](../src/errors.ts)
+**File:** `internal/errors/errors.go`
 **Lines:** ~86
 **Purpose:** Error types and codes (existing, works with envelope)
 
@@ -495,9 +497,9 @@ fi
 
 ### Source Code
 
-- [`src/envelope.ts`](../src/envelope.ts) - Core system
-- [`src/base-command.ts`](../src/base-command.ts) - Base command
-- [`src/errors.ts`](../src/errors.ts) - Error system
+- `pkg/output/envelope.go` - Core envelope system
+- `internal/cli/commands/*.go` - Command handlers
+- `internal/errors/errors.go` - Error system
 
 ### Tests
 
@@ -511,9 +513,9 @@ fi
 
 ### External Resources
 
-- [oclif Documentation](https://oclif.io/)
+- [Cobra Documentation](https://cobra.dev/)
 - [Notion API Reference](https://developers.notion.com/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
+- [Go Documentation](https://go.dev/doc/)
 
 ## Getting Started
 

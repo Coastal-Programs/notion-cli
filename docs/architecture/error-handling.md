@@ -1,5 +1,7 @@
 # AI-Friendly Error Handling Architecture
 
+> **Note:** This document was originally designed for the TypeScript v5.x implementation. The concepts and error codes are implemented in Go (v6.0.0) in `internal/errors/errors.go`. Code examples below are pseudocode showing the conceptual structure.
+
 **Version**: 1.0.0
 **Status**: Design Complete - Ready for Implementation
 **Last Updated**: 2025-10-22
@@ -89,19 +91,17 @@ Error: object_not_found
 ### File Structure
 
 ```
-src/
+internal/
 ├── errors/
-│   ├── enhanced-errors.ts      # Main error system (NEW)
-│   └── index.ts                # Re-export for clean imports (NEW)
-├── errors.ts                   # Legacy error system (DEPRECATED)
-├── commands/                   # Command implementations
-│   ├── db/
-│   │   ├── query.ts           # Update to use enhanced errors
-│   │   ├── retrieve.ts        # Update to use enhanced errors
-│   │   └── ...
-│   └── ...
-└── utils/
-    └── notion-resolver.ts     # Already uses error system
+│   └── errors.go              # Error system with codes and suggestions
+├── cli/
+│   └── commands/
+│       ├── db.go              # Database commands with error handling
+│       ├── page.go            # Page commands with error handling
+│       ├── block.go           # Block commands with error handling
+│       └── ...
+└── resolver/
+    └── resolver.go            # URL/ID/name resolution with error context
 ```
 
 ### Component Diagram
@@ -154,7 +154,9 @@ src/
 
 ### Complete Error Code Taxonomy
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 export enum NotionCLIErrorCode {
   // Authentication & Authorization (AUTH_*)
   UNAUTHORIZED = 'UNAUTHORIZED',
@@ -228,7 +230,9 @@ export enum NotionCLIErrorCode {
 
 ### Core Interfaces
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 /**
  * Suggested fix with optional command example
  */
@@ -254,7 +258,9 @@ export interface ErrorContext {
 
 ### Main Error Class
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 export class NotionCLIError extends Error {
   public readonly code: NotionCLIErrorCode
   public readonly userMessage: string
@@ -284,7 +290,9 @@ export class NotionCLIError extends Error {
 
 Factory functions encapsulate common error scenarios:
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 export class NotionCLIErrorFactory {
   static tokenMissing(): NotionCLIError
   static tokenInvalid(): NotionCLIError
@@ -315,7 +323,9 @@ export class NotionCLIErrorFactory {
 **Scenario:** User tries to access a database but hasn't shared it with the integration.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 // Notion API returns 403 or 'restricted_resource'
 if (error.code === 'restricted_resource' || error.status === 403) {
   throw NotionCLIErrorFactory.integrationNotShared('database', databaseId)
@@ -377,7 +387,9 @@ if (error.code === 'restricted_resource' || error.status === 403) {
 **Scenario:** Notion API v5 changed `database_id` to `data_source_id`, causing confusion.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 // CLI handles both, but we can provide helpful context
 if (parameterName === 'database_id' && apiVersion === '5.x') {
   // Just a warning, not an error - CLI handles conversion
@@ -400,7 +412,9 @@ if (parameterName === 'database_id' && apiVersion === '5.x') {
 **Scenario:** User provides a malformed Notion ID.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 function isValidNotionId(input: string): boolean {
   const cleaned = input.replace(/-/g, '')
   return /^[a-f0-9]{32}$/i.test(cleaned)
@@ -437,7 +451,9 @@ if (!isValidNotionId(userInput)) {
 **Scenario:** User tries to reference database by name before running `sync`.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 const cache = await loadCache()
 if (!cache || cache.databases.length === 0) {
   throw NotionCLIErrorFactory.workspaceNotSynced(databaseName)
@@ -469,7 +485,9 @@ if (!cache || cache.databases.length === 0) {
 **Scenario:** User hasn't set NOTION_TOKEN environment variable.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 if (!process.env.NOTION_TOKEN) {
   throw NotionCLIErrorFactory.tokenMissing()
 }
@@ -501,7 +519,9 @@ if (!process.env.NOTION_TOKEN) {
 **Scenario:** Too many API requests in short time.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 if (error.status === 429 || error.code === 'rate_limited') {
   const retryAfter = parseInt(error.headers?.['retry-after'] || '60', 10)
   throw NotionCLIErrorFactory.rateLimited(retryAfter)
@@ -532,7 +552,9 @@ if (error.status === 429 || error.code === 'rate_limited') {
 **Scenario:** User provides malformed JSON in filter parameter.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 try {
   const filter = JSON.parse(flags.rawFilter)
 } catch (parseError) {
@@ -565,7 +587,9 @@ try {
 **Scenario:** User references a property that doesn't exist in the database.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 const schema = await getDbSchema(databaseId)
 if (!schema.properties[propertyName]) {
   throw NotionCLIErrorFactory.invalidProperty(propertyName, databaseId)
@@ -596,7 +620,9 @@ if (!schema.properties[propertyName]) {
 **Scenario:** Connection to Notion API fails.
 
 **Detection:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 if (['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(error.code)) {
   throw NotionCLIErrorFactory.networkError(error)
 }
@@ -713,7 +739,9 @@ if (['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'].includes(error.code)) {
 ### Step 1: Update Existing Commands
 
 **Before:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 export default class DbQuery extends Command {
   async run() {
     try {
@@ -732,7 +760,9 @@ export default class DbQuery extends Command {
 ```
 
 **After:**
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 import { handleCliError, ErrorContext } from '../errors/enhanced-errors'
 
 export default class DbQuery extends Command {
@@ -761,7 +791,9 @@ export default class DbQuery extends Command {
 
 **Update:** `src/utils/notion-resolver.ts`
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 import { NotionCLIErrorFactory, ErrorContext } from '../errors/enhanced-errors'
 
 export async function resolveNotionId(
@@ -786,7 +818,9 @@ export async function resolveNotionId(
 
 **Example:** JSON filter parsing
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 try {
   const filter = JSON.parse(flags.rawFilter)
   queryParams.filter = filter
@@ -804,7 +838,9 @@ try {
 
 **Example:** Database query with property check
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 if (flags.sortProperty) {
   // Get database schema
   const db = await retrieveDb(databaseId)
@@ -831,7 +867,9 @@ if (flags.sortProperty) {
 
 **Update:** `src/notion.ts` (wrap API calls)
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 import { wrapNotionError, ErrorContext } from './errors/enhanced-errors'
 
 export const retrieveDb = async (databaseId: string) => {
@@ -860,7 +898,9 @@ export const retrieveDb = async (databaseId: string) => {
 
 **Test File:** `test/errors/enhanced-errors.test.ts`
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 import { describe, it, expect } from 'mocha'
 import {
   NotionCLIErrorFactory,
@@ -961,7 +1001,9 @@ describe('Enhanced Error System', () => {
 
 **Test File:** `test/integration/error-handling.test.ts`
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 import { describe, it, expect } from 'mocha'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -1012,7 +1054,9 @@ describe('CLI Error Handling Integration', () => {
 
 ### Example 1: Complete Command Error Handling
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 import { Args, Command, Flags } from '@oclif/core'
 import { handleCliError, NotionCLIErrorFactory, ErrorContext } from '../errors/enhanced-errors'
 import * as notion from '../notion'
@@ -1070,7 +1114,9 @@ export default class DbRetrieve extends Command {
 
 ### Example 2: Validation with Schema Check
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 async validatePropertyName(
   databaseId: string,
   propertyName: string
@@ -1087,7 +1133,9 @@ async validatePropertyName(
 
 ### Example 3: Graceful Degradation
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go for actual Go implementation
+//
 async resolveNotionId(input: string): Promise<string> {
   // Try URL extraction
   if (isNotionUrl(input)) {
@@ -1204,4 +1252,4 @@ This enhanced error handling system transforms the Notion CLI from a basic tool 
 **Document Version:** 1.0.0
 **Authors:** Claude Code (Backend Architect)
 **Last Updated:** 2025-10-22
-**Status:** Ready for Implementation
+**Status:** Implemented in Go (v6.0.0)

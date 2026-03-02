@@ -1,5 +1,7 @@
 # Error Handling Integration Examples
 
+> **Note:** This document was originally written for the TypeScript v5.x implementation. The error handling concepts are now implemented in Go (v6.0.0) in `internal/errors/errors.go`. Code examples below show the conceptual patterns; refer to `internal/cli/commands/*.go` for the actual Go implementations.
+
 **Version**: 1.0.0
 **Last Updated**: 2025-10-22
 
@@ -23,7 +25,9 @@ Real-world examples of integrating the enhanced error handling system into Notio
 
 ### Minimal Example
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { Args, Command, Flags } from '@oclif/core'
 import { handleCliError, ErrorContext } from '../errors'
 import * as notion from '../notion'
@@ -75,7 +79,9 @@ export default class DbRetrieve extends Command {
 
 ### Complete Example with Validation
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { Args, Command, Flags, ux } from '@oclif/core'
 import {
   handleCliError,
@@ -294,7 +300,9 @@ export default class DbQuery extends Command {
 
 ### Example with Property Validation
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { Args, Command, Flags } from '@oclif/core'
 import {
   handleCliError,
@@ -420,7 +428,9 @@ export default class PageCreate extends Command {
 
 ### Example with Nested Resource Handling
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { Args, Command, Flags } from '@oclif/core'
 import {
   handleCliError,
@@ -544,7 +554,9 @@ export default class BlockUpdate extends Command {
 
 ### Reusable Validation Utilities
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import {
   NotionCLIError,
   NotionCLIErrorFactory,
@@ -719,7 +731,9 @@ export class ValidationUtils {
 
 ### Usage in Commands
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { ValidationUtils } from '../utils/validation'
 
 export default class MyCommand extends Command {
@@ -753,7 +767,9 @@ export default class MyCommand extends Command {
 
 ### Combining Retry with Enhanced Errors
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { fetchWithRetry } from '../retry'
 import { wrapNotionError, ErrorContext } from '../errors'
 
@@ -800,7 +816,9 @@ export async function queryDatabaseWithRetry(
 
 ### Unit Test Template
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { describe, it, expect } from 'mocha'
 import {
   NotionCLIError,
@@ -867,7 +885,9 @@ describe('Error Handling - DbQuery Command', () => {
 
 ### Integration Test Template
 
-```typescript
+```go
+// Pseudocode - see internal/errors/errors.go and internal/cli/commands/*.go
+//
 import { describe, it, expect, before, after } from 'mocha'
 import { exec } from 'child_process'
 import { promisify } from 'util'

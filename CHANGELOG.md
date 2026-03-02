@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **OAuth authentication** - `auth login`, `auth logout`, `auth status` commands
+  - Browser-based OAuth flow: run `notion-cli auth login`, authorize in Notion, start using the CLI
+  - No manual token management needed for interactive use
+  - Token precedence: `NOTION_TOKEN` env var > OAuth token > manual config token
+  - CSRF protection via cryptographic state parameter
+  - OAuth tokens stored in config file with 0600 permissions
+  - 6 new OAuth-specific error codes with actionable suggestions
+  - `doctor` command now shows auth method (oauth/env/token/none) with workspace info
+  - Build-time OAuth client ID/secret injection via Makefile ldflags
+
+## [6.0.0] - 2026-03-01
+
+### Changed - **Complete Rewrite from TypeScript to Go**
+
+This release is a complete rewrite of notion-cli from TypeScript/oclif to Go/Cobra.
+
+**Why Go?**
+- **Single binary distribution**: ~8MB binary vs 573 npm dependencies
+- **Instant startup**: No Node.js runtime overhead
+- **Cross-compilation**: One build produces darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64
+- **Near-zero supply chain risk**: 2 Go dependencies (cobra, pflag) vs hundreds of npm packages
+
+### Architecture
+
+- **CLI framework**: Cobra (replacing oclif v4)
+- **API client**: Raw HTTP (replacing @notionhq/client SDK)
+- **Output**: JSON envelope, ASCII table, CSV, markdown (same formats as v5.x)
+- **Caching**: In-memory TTL cache with per-resource-type TTLs
+- **Retry**: Exponential backoff with jitter for 408/429/5xx
+- **Config**: Environment variables + JSON config file (~/.config/notion-cli/config.json)
+- **Errors**: 40+ error codes with suggestions (matching v5.x error system)
+- **npm distribution**: Platform-specific binary packages (esbuild pattern)
+
+### All 26 Commands Ported
+
+**Database**: `db query`, `db retrieve`, `db create`, `db update`, `db schema`
+**Page**: `page create`, `page retrieve`, `page update`, `page property-item`
+**Block**: `block append`, `block retrieve`, `block children`, `block update`, `block delete`
+**User**: `user list`, `user retrieve`, `user bot`
+**Other**: `search`, `batch retrieve`, `sync`, `list`, `whoami`, `doctor`, `config set-token`, `config get`, `config path`, `cache info`
+
+### Technical Details
+
+- **33 Go source files** totaling ~8,900 lines
+- **183 tests** across 8 test suites, all passing
+- **7.9MB binary** (stripped, darwin/arm64)
+- **5 platform binaries** built via `make release`
+- **Zero new runtime dependencies** beyond Go stdlib + cobra
+
+### Breaking Changes
+
+- **v6.0.0**: Major version bump indicates this is a rewrite
+- Command syntax is identical to v5.x - existing scripts should work unchanged
+- JSON envelope format is identical: `{success, data, metadata}`
+- Same environment variable: `NOTION_TOKEN`
+
+### Phase 2 (Future)
+
+The following v5.x features are deferred to a future release:
+- Disk cache and request deduplication
+- Circuit breaker
+- Simple properties (`-S` flag) with property expansion
+- Recursive page retrieval
+- Markdown output from page content
+- Interactive init wizard
+- Update notifications
+
 ## [5.9.0] - 2026-02-05
 
 ### Added

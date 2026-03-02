@@ -1,5 +1,7 @@
 # Name Resolver Implementation Summary
 
+> **Note:** This document was originally written for the TypeScript v5.x implementation. The resolver is now implemented in Go (v6.0.0) in `internal/resolver/resolver.go`. The concepts and behavior remain the same.
+
 ## Overview
 
 This document summarizes the implementation of the hybrid name resolver system for notion-cli. The resolver provides a unified interface for accepting database/page identifiers in multiple formats: URLs, direct IDs, and natural language names.
@@ -10,9 +12,9 @@ This document summarizes the implementation of the hybrid name resolver system f
 
 The full resolver infrastructure has been implemented with cache search and API fallback capabilities, and integrated across all commands.
 
-## Files Created
+## Core Implementation
 
-### 1. Core Resolver (`src/utils/notion-resolver.ts`)
+### 1. Core Resolver (`internal/resolver/resolver.go`)
 
 **Purpose**: Unified resolution of Notion identifiers (URLs, IDs, names)
 
@@ -24,7 +26,9 @@ The full resolver infrastructure has been implemented with cache search and API 
   - Stage 4: API search fallback (IMPLEMENTED - uses Notion search API)
 
 **Cache Search Implementation**:
-```typescript
+```go
+// Pseudocode - see internal/resolver/resolver.go for actual Go implementation
+//
 async function searchCache(query: string, type: 'database' | 'page'): Promise<string | null> {
   const cache = await loadCache()
   if (!cache) return null
@@ -57,7 +61,9 @@ async function searchCache(query: string, type: 'database' | 'page'): Promise<st
 ```
 
 **API Search Implementation**:
-```typescript
+```go
+// Pseudocode - see internal/resolver/resolver.go for actual Go implementation
+//
 async function searchNotionApi(query: string, type: 'database' | 'page'): Promise<string | null> {
   try {
     const response = await search({
@@ -88,7 +94,9 @@ async function searchNotionApi(query: string, type: 'database' | 'page'): Promis
 - Gracefully handles cache misses and API failures
 
 **Example Usage**:
-```typescript
+```go
+// Pseudocode - see internal/resolver/resolver.go for actual Go implementation
+//
 // URL
 await resolveNotionId('https://notion.so/1fb79d4c71bb8032b722c82305b63a00', 'database')
 // Returns: '1fb79d4c71bb8032b722c82305b63a00'
@@ -110,66 +118,66 @@ await resolveNotionId('task', 'database')
 // Returns: '1fb79d4c71bb8032b722c82305b63a00' (if "task" is substring of title)
 ```
 
-## Files Updated
+## Commands Updated
 
-### Database Commands (5 files)
+### Database Commands
 
-All database commands now use `resolveNotionId()` with full name resolution support:
+All database commands now use the resolver with full name resolution support:
 
-1. **`src/commands/db/retrieve.ts`**
+1. **`internal/cli/commands/db.go` (retrieve)**
    - Updated to resolve database ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Wrapped resolution in try-catch for proper error handling
 
-2. **`src/commands/db/update.ts`**
+2. **`internal/cli/commands/db.go` (update)**
    - Updated to resolve database ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Consistent error handling with other commands
 
-3. **`src/commands/db/create.ts`**
+3. **`internal/cli/commands/db.go` (create)**
    - Updated to resolve parent page ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Proper resolution of page_id parameter
 
-4. **`src/commands/db/schema.ts`**
+4. **`internal/cli/commands/db.go` (schema)**
    - Updated to resolve data source ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Maintains existing schema extraction functionality
 
-5. **`src/commands/db/query.ts`**
+5. **`internal/cli/commands/db.go` (query)**
    - Updated to resolve database ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Works with all existing filter and sort options
 
-### Page Commands (3 files)
+### Page Commands
 
-All page commands now use `resolveNotionId()`:
+All page commands now use the resolver:
 
-1. **`src/commands/page/retrieve.ts`**
+1. **`internal/cli/commands/page.go` (retrieve)**
    - Updated to resolve page ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Works with both metadata and markdown output modes
 
-2. **`src/commands/page/update.ts`**
+2. **`internal/cli/commands/page.go` (update)**
    - Updated to resolve page ID from URL, direct ID, or name
    - Added URL example to command documentation
    - Maintains archive/unarchive functionality
 
-3. **`src/commands/page/create.ts`**
+3. **`internal/cli/commands/page.go` (create)**
    - Updated to resolve both parent_page_id and parent_data_source_id
    - Added URL examples to command documentation
    - Works with markdown file input
 
-### Block Commands (2 files)
+### Block Commands
 
 Block commands updated for consistency:
 
-1. **`src/commands/block/append.ts`**
+1. **`internal/cli/commands/block.go` (append)**
    - Updated to resolve block_id from URL or direct ID
    - Updated to resolve optional after block ID
    - Added URL examples to command documentation
 
-2. **`src/commands/block/update.ts`**
+2. **`internal/cli/commands/block.go` (update)**
    - Updated to resolve block_id from URL or direct ID
    - Added URL examples to command documentation
    - Maintains all update functionality (archive, content, color)
@@ -251,12 +259,12 @@ Test each command with different input formats:
   - [ ] Invalid ID format
   - [ ] Name not found (helpful error message)
 
-### Compilation Test
+### Build Test
 
 ```bash
-npm run build
+make build
 ```
-Status: **PASSED** ✓
+Status: **PASSED**
 
 ## Next Steps (Phase 2)
 
@@ -307,26 +315,13 @@ The resolver integrates seamlessly with the existing caching infrastructure.
 
 ### Code Patterns
 
-**Before**:
-```typescript
-import { extractNotionId } from '../../utils/notion-url-parser'
+In the Go implementation (`internal/resolver/resolver.go`), the `ExtractID()` function handles URL/ID/name resolution. All commands call this function to resolve user input to a clean Notion ID.
 
-const dataSourceId = extractNotionId(args.database_id)
-```
-
-**After**:
-```typescript
-import { resolveNotionId } from '../../utils/notion-resolver'
-
-const dataSourceId = await resolveNotionId(args.database_id, 'database')
-```
-
-**Key Differences**:
-1. Function is now async (returns Promise)
-2. Takes a `type` parameter ('database' or 'page')
-3. More intelligent error handling
-4. Cache and API search integration
-5. Support for multiple input formats
+**Key features**:
+1. Accepts URLs, direct IDs, and database names
+2. Integrates with workspace cache for name resolution
+3. Falls back to API search when cache misses
+4. Provides helpful error messages with suggestions
 
 ## Performance Impact
 
