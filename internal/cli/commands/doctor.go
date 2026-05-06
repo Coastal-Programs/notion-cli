@@ -141,7 +141,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			Message: fmt.Sprintf("Cannot reach api.notion.com:443: %s", err),
 		})
 	} else {
-		conn.Close()
+		_ = conn.Close()
 		checks = append(checks, checkResult{
 			Name:    "Network",
 			Status:  "pass",

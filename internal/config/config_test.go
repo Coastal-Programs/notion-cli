@@ -55,23 +55,23 @@ func TestLoadConfig_EnvVarsOverrideDefaults(t *testing.T) {
 	t.Cleanup(func() {
 		for _, k := range envVars {
 			if saved[k] == "" {
-				os.Unsetenv(k)
+				_ = os.Unsetenv(k)
 			} else {
-				os.Setenv(k, saved[k])
+				_ = os.Setenv(k, saved[k])
 			}
 		}
 	})
 
-	os.Setenv("NOTION_TOKEN", "secret_test123")
-	os.Setenv("NOTION_CLI_BASE_URL", "https://custom.api.com")
-	os.Setenv("NOTION_CLI_MAX_RETRIES", "5")
-	os.Setenv("NOTION_CLI_BASE_DELAY", "2000")
-	os.Setenv("NOTION_CLI_MAX_DELAY", "60000")
-	os.Setenv("NOTION_CLI_CACHE_ENABLED", "false")
-	os.Setenv("NOTION_CLI_CACHE_MAX_SIZE", "500")
-	os.Setenv("NOTION_CLI_DISK_CACHE_ENABLED", "0")
-	os.Setenv("NOTION_CLI_HTTP_KEEP_ALIVE", "no")
-	os.Setenv("NOTION_CLI_VERBOSE", "1")
+	_ = os.Setenv("NOTION_TOKEN", "secret_test123")
+	_ = os.Setenv("NOTION_CLI_BASE_URL", "https://custom.api.com")
+	_ = os.Setenv("NOTION_CLI_MAX_RETRIES", "5")
+	_ = os.Setenv("NOTION_CLI_BASE_DELAY", "2000")
+	_ = os.Setenv("NOTION_CLI_MAX_DELAY", "60000")
+	_ = os.Setenv("NOTION_CLI_CACHE_ENABLED", "false")
+	_ = os.Setenv("NOTION_CLI_CACHE_MAX_SIZE", "500")
+	_ = os.Setenv("NOTION_CLI_DISK_CACHE_ENABLED", "0")
+	_ = os.Setenv("NOTION_CLI_HTTP_KEEP_ALIVE", "no")
+	_ = os.Setenv("NOTION_CLI_VERBOSE", "1")
 
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -149,8 +149,8 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 	// Override GetConfigPath by setting HOME.
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
 
 	// Clear env vars that would override file values.
 	for _, k := range []string{
@@ -161,10 +161,10 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		"NOTION_CLI_VERBOSE",
 	} {
 		origVal := os.Getenv(k)
-		os.Unsetenv(k)
+		_ = os.Unsetenv(k)
 		t.Cleanup(func() {
 			if origVal != "" {
-				os.Setenv(k, origVal)
+				_ = os.Setenv(k, origVal)
 			}
 		})
 	}
@@ -248,12 +248,12 @@ func TestGetDataDir(t *testing.T) {
 
 func TestGetConfigValue(t *testing.T) {
 	origToken := os.Getenv("NOTION_TOKEN")
-	os.Setenv("NOTION_TOKEN", "secret_getval")
+	_ = os.Setenv("NOTION_TOKEN", "secret_getval")
 	t.Cleanup(func() {
 		if origToken == "" {
-			os.Unsetenv("NOTION_TOKEN")
+			_ = os.Unsetenv("NOTION_TOKEN")
 		} else {
-			os.Setenv("NOTION_TOKEN", origToken)
+			_ = os.Setenv("NOTION_TOKEN", origToken)
 		}
 	})
 
@@ -283,13 +283,13 @@ func TestGetConfigValue(t *testing.T) {
 func TestLoadConfig_InvalidConfigFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
 
 	// Write invalid JSON to config path.
 	cfgDir := filepath.Join(tmpDir, ".config", "notion-cli")
-	os.MkdirAll(cfgDir, 0o755)
-	os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte("{invalid json"), 0o600)
+	_ = os.MkdirAll(cfgDir, 0o755)
+	_ = os.WriteFile(filepath.Join(cfgDir, "config.json"), []byte("{invalid json"), 0o600)
 
 	_, err := LoadConfig()
 	if err == nil {
@@ -313,16 +313,16 @@ func TestBuildVarsExist(t *testing.T) {
 func TestOAuthConfigFields(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
 
 	// Clear env vars.
 	for _, k := range []string{"NOTION_TOKEN"} {
 		origVal := os.Getenv(k)
-		os.Unsetenv(k)
+		_ = os.Unsetenv(k)
 		t.Cleanup(func() {
 			if origVal != "" {
-				os.Setenv(k, origVal)
+				_ = os.Setenv(k, origVal)
 			}
 		})
 	}
@@ -404,14 +404,14 @@ func TestAuthMethod(t *testing.T) {
 	origToken := os.Getenv("NOTION_TOKEN")
 	t.Cleanup(func() {
 		if origToken != "" {
-			os.Setenv("NOTION_TOKEN", origToken)
+			_ = os.Setenv("NOTION_TOKEN", origToken)
 		} else {
-			os.Unsetenv("NOTION_TOKEN")
+			_ = os.Unsetenv("NOTION_TOKEN")
 		}
 	})
 
 	t.Run("env takes precedence", func(t *testing.T) {
-		os.Setenv("NOTION_TOKEN", "secret_env")
+		_ = os.Setenv("NOTION_TOKEN", "secret_env")
 		cfg := &Config{OAuthAccessToken: "ntn_oauth", Token: "secret_manual"}
 		if m := cfg.AuthMethod(); m != "env" {
 			t.Errorf("AuthMethod() = %q, want %q", m, "env")
@@ -419,7 +419,7 @@ func TestAuthMethod(t *testing.T) {
 	})
 
 	t.Run("oauth when no env", func(t *testing.T) {
-		os.Unsetenv("NOTION_TOKEN")
+		_ = os.Unsetenv("NOTION_TOKEN")
 		cfg := &Config{OAuthAccessToken: "ntn_oauth", Token: "secret_manual"}
 		if m := cfg.AuthMethod(); m != "oauth" {
 			t.Errorf("AuthMethod() = %q, want %q", m, "oauth")
@@ -427,7 +427,7 @@ func TestAuthMethod(t *testing.T) {
 	})
 
 	t.Run("token when no oauth", func(t *testing.T) {
-		os.Unsetenv("NOTION_TOKEN")
+		_ = os.Unsetenv("NOTION_TOKEN")
 		cfg := &Config{Token: "secret_manual"}
 		if m := cfg.AuthMethod(); m != "token" {
 			t.Errorf("AuthMethod() = %q, want %q", m, "token")
@@ -435,7 +435,7 @@ func TestAuthMethod(t *testing.T) {
 	})
 
 	t.Run("none when nothing set", func(t *testing.T) {
-		os.Unsetenv("NOTION_TOKEN")
+		_ = os.Unsetenv("NOTION_TOKEN")
 		cfg := &Config{}
 		if m := cfg.AuthMethod(); m != "none" {
 			t.Errorf("AuthMethod() = %q, want %q", m, "none")
@@ -446,14 +446,14 @@ func TestAuthMethod(t *testing.T) {
 func TestGetConfigValue_OAuthKeys(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
 
 	origToken := os.Getenv("NOTION_TOKEN")
-	os.Unsetenv("NOTION_TOKEN")
+	_ = os.Unsetenv("NOTION_TOKEN")
 	t.Cleanup(func() {
 		if origToken != "" {
-			os.Setenv("NOTION_TOKEN", origToken)
+			_ = os.Setenv("NOTION_TOKEN", origToken)
 		}
 	})
 
@@ -484,24 +484,24 @@ func TestGetConfigValue_OAuthKeys(t *testing.T) {
 func TestLoadConfig_FileWithPartialValues(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
 
 	// Clear env vars.
 	for _, k := range []string{"NOTION_TOKEN", "NOTION_CLI_MAX_RETRIES"} {
 		origVal := os.Getenv(k)
-		os.Unsetenv(k)
+		_ = os.Unsetenv(k)
 		t.Cleanup(func() {
 			if origVal != "" {
-				os.Setenv(k, origVal)
+				_ = os.Setenv(k, origVal)
 			}
 		})
 	}
 
 	// Write config with only token set.
 	cfgDir := filepath.Join(tmpDir, ".config", "notion-cli")
-	os.MkdirAll(cfgDir, 0o755)
-	os.WriteFile(filepath.Join(cfgDir, "config.json"),
+	_ = os.MkdirAll(cfgDir, 0o755)
+	_ = os.WriteFile(filepath.Join(cfgDir, "config.json"),
 		[]byte(`{"token": "secret_partial"}`), 0o600)
 
 	cfg, err := LoadConfig()

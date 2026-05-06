@@ -280,7 +280,7 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 			}
 			return fmt.Errorf("execute request: %w", err)
 		}
-		defer resp.Body.Close()
+		defer resp.Body.Close() //nolint:errcheck
 
 		// Handle gzip-encoded responses.
 		var reader io.Reader = resp.Body
@@ -289,7 +289,7 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 			if err != nil {
 				return fmt.Errorf("create gzip reader: %w", err)
 			}
-			defer gr.Close()
+			defer gr.Close() //nolint:errcheck
 			reader = gr
 		}
 

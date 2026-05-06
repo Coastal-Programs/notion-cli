@@ -591,7 +591,7 @@ func TestAPIError_RateLimited(t *testing.T) {
 func TestAPIError_NonJSON(t *testing.T) {
 	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)
-		w.Write([]byte("internal server error"))
+		_, _ = w.Write([]byte("internal server error"))
 	})
 
 	_, err := c.UsersMe(context.Background())
@@ -629,8 +629,8 @@ func TestGzipResponse(t *testing.T) {
 		w.WriteHeader(200)
 
 		gw := gzip.NewWriter(w)
-		defer gw.Close()
-		json.NewEncoder(gw).Encode(map[string]any{"id": "gzipped", "object": "page"})
+		defer gw.Close() //nolint:errcheck
+		_ = json.NewEncoder(gw).Encode(map[string]any{"id": "gzipped", "object": "page"})
 	})
 
 	result, err := c.PageRetrieve(context.Background(), "gzipped")

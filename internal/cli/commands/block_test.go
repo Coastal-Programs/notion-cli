@@ -20,33 +20,16 @@ func testBlockServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, 
 	srv := httptest.NewServer(handler)
 
 	origToken := os.Getenv("NOTION_TOKEN")
-	os.Setenv("NOTION_TOKEN", "secret_test_token")
+	_ = os.Setenv("NOTION_TOKEN", "secret_test_token")
 
 	return srv, func() {
 		srv.Close()
 		if origToken == "" {
-			os.Unsetenv("NOTION_TOKEN")
+			_ = os.Unsetenv("NOTION_TOKEN")
 		} else {
-			os.Setenv("NOTION_TOKEN", origToken)
+			_ = os.Setenv("NOTION_TOKEN", origToken)
 		}
 	}
-}
-
-// executeBlockCmd creates a root command with block subcommands and executes it.
-func executeBlockCmd(args []string, serverURL string) (string, string, error) {
-	root := &cobra.Command{Use: "notion-cli"}
-	RegisterBlockCommands(root)
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	root.SetOut(stdout)
-	root.SetErr(stderr)
-	root.SetArgs(args)
-
-	// We need to override the client creation. Since newClient reads env
-	// vars directly, we override at the HTTP transport level.
-	err := root.Execute()
-	return stdout.String(), stderr.String(), err
 }
 
 func TestRegisterBlockCommands(t *testing.T) {
@@ -139,7 +122,7 @@ func TestBuildChildren_RawJSON(t *testing.T) {
 	root.Flags().String("quote", "", "")
 	root.Flags().String("callout", "", "")
 
-	root.Flags().Set("children", `[{"type":"paragraph"}]`)
+	_ = root.Flags().Set("children", `[{"type":"paragraph"}]`)
 
 	children, err := buildChildren(root)
 	if err != nil {
@@ -166,7 +149,7 @@ func TestBuildChildren_InvalidJSON(t *testing.T) {
 	root.Flags().String("quote", "", "")
 	root.Flags().String("callout", "", "")
 
-	root.Flags().Set("children", "not json")
+	_ = root.Flags().Set("children", "not json")
 
 	_, err := buildChildren(root)
 	if err == nil {
@@ -190,9 +173,9 @@ func TestBuildChildren_Shorthand(t *testing.T) {
 	root.Flags().String("quote", "", "")
 	root.Flags().String("callout", "", "")
 
-	root.Flags().Set("text", "Hello")
-	root.Flags().Set("bullet", "Item 1")
-	root.Flags().Set("code", "x = 1")
+	_ = root.Flags().Set("text", "Hello")
+	_ = root.Flags().Set("bullet", "Item 1")
+	_ = root.Flags().Set("code", "x = 1")
 
 	children, err := buildChildren(root)
 	if err != nil {
@@ -247,7 +230,7 @@ func TestBuildUpdateBody_Archived(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("archived", "true")
+	_ = root.Flags().Set("archived", "true")
 
 	body, err := buildUpdateBody(root)
 	if err != nil {
@@ -276,7 +259,7 @@ func TestBuildUpdateBody_ContentJSON(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("content", `{"paragraph": {"rich_text": []}}`)
+	_ = root.Flags().Set("content", `{"paragraph": {"rich_text": []}}`)
 
 	body, err := buildUpdateBody(root)
 	if err != nil {
@@ -305,7 +288,7 @@ func TestBuildUpdateBody_InvalidContentJSON(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("content", "not json")
+	_ = root.Flags().Set("content", "not json")
 
 	_, err := buildUpdateBody(root)
 	if err == nil {
@@ -331,7 +314,7 @@ func TestBuildUpdateBody_TextShorthand(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("text", "Updated paragraph")
+	_ = root.Flags().Set("text", "Updated paragraph")
 
 	body, err := buildUpdateBody(root)
 	if err != nil {
@@ -360,8 +343,8 @@ func TestBuildUpdateBody_CodeShorthand(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("code", "x = 1")
-	root.Flags().Set("language", "python")
+	_ = root.Flags().Set("code", "x = 1")
+	_ = root.Flags().Set("language", "python")
 
 	body, err := buildUpdateBody(root)
 	if err != nil {
@@ -394,8 +377,8 @@ func TestBuildUpdateBody_InvalidColor(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("text", "Hello")
-	root.Flags().Set("color", "neon_green")
+	_ = root.Flags().Set("text", "Hello")
+	_ = root.Flags().Set("color", "neon_green")
 
 	_, err := buildUpdateBody(root)
 	if err == nil {
@@ -421,8 +404,8 @@ func TestBuildUpdateBody_ValidColor(t *testing.T) {
 	root.Flags().String("callout", "", "")
 	root.Flags().String("color", "", "")
 
-	root.Flags().Set("text", "Hello")
-	root.Flags().Set("color", "blue")
+	_ = root.Flags().Set("text", "Hello")
+	_ = root.Flags().Set("color", "blue")
 
 	body, err := buildUpdateBody(root)
 	if err != nil {
@@ -544,7 +527,7 @@ func TestBlockRetrieve_Integration(t *testing.T) {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"object": "block",
 			"id":     "test-block-id",
 			"type":   "paragraph",
@@ -672,7 +655,7 @@ func TestAllShorthandBlockTypes(t *testing.T) {
 			root.Flags().String("quote", "", "")
 			root.Flags().String("callout", "", "")
 
-			root.Flags().Set(tt.flag, fmt.Sprintf("Test %s content", tt.flag))
+			_ = root.Flags().Set(tt.flag, fmt.Sprintf("Test %s content", tt.flag))
 
 			children, err := buildChildren(root)
 			if err != nil {

@@ -51,7 +51,7 @@ func newPageCreateCmd() *cobra.Command {
 	cmd.Flags().StringP("title-property", "t", "Name", "Title property name")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
 	cmd.Flags().BoolP("simple-properties", "S", false, "Use simple flat properties format (phase 2)")
-	cmd.Flags().MarkHidden("simple-properties")
+	_ = cmd.Flags().MarkHidden("simple-properties")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -164,8 +164,8 @@ func newPageRetrieveCmd() *cobra.Command {
 	cmd.Flags().Bool("map", false, "Output property map (phase 2)")
 	cmd.Flags().BoolP("recursive", "R", false, "Recursively retrieve child blocks (phase 2)")
 	cmd.Flags().Int("max-depth", 3, "Maximum recursion depth (1-10)")
-	cmd.Flags().MarkHidden("map")
-	cmd.Flags().MarkHidden("recursive")
+	_ = cmd.Flags().MarkHidden("map")
+	_ = cmd.Flags().MarkHidden("recursive")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -210,7 +210,7 @@ func newPageUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolP("unarchive", "u", false, "Unarchive the page")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
 	cmd.Flags().BoolP("simple-properties", "S", false, "Use simple flat properties format (phase 2)")
-	cmd.Flags().MarkHidden("simple-properties")
+	_ = cmd.Flags().MarkHidden("simple-properties")
 	cmd.MarkFlagsMutuallyExclusive("archived", "unarchive")
 	addOutputFlags(cmd)
 
@@ -331,7 +331,7 @@ func markdownFileToBlocks(path string) ([]map[string]any, error) {
 			Message: fmt.Sprintf("Cannot read file: %s", err),
 		}
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	var blocks []map[string]any
 	scanner := bufio.NewScanner(f)
