@@ -669,7 +669,7 @@ func newDBCreateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String("title", "", "Database title (required)")
-	cmd.MarkFlagRequired("title")
+	_ = cmd.MarkFlagRequired("title")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -728,7 +728,7 @@ func newDBUpdateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String("title", "", "New database title (required)")
-	cmd.MarkFlagRequired("title")
+	_ = cmd.MarkFlagRequired("title")
 	addOutputFlags(cmd)
 
 	return cmd

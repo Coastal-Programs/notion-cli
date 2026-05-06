@@ -45,7 +45,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if wc.IsStale() {
-		fmt.Fprintln(cmd.ErrOrStderr(), "Warning: Cache is stale (>24h old). Run 'notion-cli sync' to refresh.")
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Warning: Cache is stale (>24h old). Run 'notion-cli sync' to refresh.")
 	}
 
 	dbs := wc.GetDatabases()

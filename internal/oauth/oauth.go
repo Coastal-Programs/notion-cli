@@ -99,7 +99,7 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 		if errParam := q.Get("error"); errParam != "" {
 			resultCh <- callbackResult{err: errParam}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			fmt.Fprint(w, callbackHTML("Authorization Denied", "You denied the authorization request. You can close this tab."))
+			_, _ = fmt.Fprint(w, callbackHTML("Authorization Denied", "You denied the authorization request. You can close this tab."))
 			return
 		}
 
@@ -109,7 +109,7 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprint(w, callbackHTML("Authorization Successful", "You can close this tab and return to your terminal."))
+		_, _ = fmt.Fprint(w, callbackHTML("Authorization Successful", "You can close this tab and return to your terminal."))
 	})
 
 	server := &http.Server{
@@ -124,7 +124,7 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 			resultCh <- callbackResult{err: sErr.Error()}
 		}
 	}()
-	defer server.Shutdown(context.Background())
+	defer server.Shutdown(context.Background()) //nolint:errcheck
 
 	// Build and open the authorization URL with properly encoded parameters.
 	params := url.Values{
@@ -191,7 +191,7 @@ func exchangeCode(ctx context.Context, clientID, clientSecret, code string) (*To
 	if err != nil {
 		return nil, clierrors.OAuthFailed(err.Error())
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
 	if err != nil {

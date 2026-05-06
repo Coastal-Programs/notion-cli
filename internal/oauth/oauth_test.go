@@ -61,7 +61,7 @@ func TestExchangeCode_Success(t *testing.T) {
 			WorkspaceName: "Test Workspace",
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
@@ -89,7 +89,7 @@ func TestExchangeCode_Success(t *testing.T) {
 func TestExchangeCode_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
 	}))
 	defer server.Close()
 
@@ -113,7 +113,7 @@ func TestExchangeCode_HTTPError(t *testing.T) {
 
 func TestExchangeCode_EmptyAccessToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]string{"access_token": ""})
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": ""})
 	}))
 	defer server.Close()
 
@@ -130,7 +130,7 @@ func TestExchangeCode_EmptyAccessToken(t *testing.T) {
 func TestExchangeCode_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, "not json")
+		_, _ = fmt.Fprint(w, "not json")
 	}))
 	defer server.Close()
 
@@ -185,7 +185,7 @@ func TestExchangeCode_ContextCancelled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Delay longer than the context timeout.
 		time.Sleep(500 * time.Millisecond)
-		json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": "tok"})
 	}))
 	defer server.Close()
 

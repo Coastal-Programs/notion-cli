@@ -70,13 +70,13 @@ func runConfigSetToken(cmd *cobra.Command, args []string) error {
 	var token string
 	if len(args) == 1 {
 		token = args[0]
-		fmt.Fprintln(cmd.ErrOrStderr(), "Warning: passing tokens as arguments exposes them in process listings. Consider piping via stdin instead.")
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Warning: passing tokens as arguments exposes them in process listings. Consider piping via stdin instead.")
 	} else {
 		// Read token from stdin.
 		// If stdin is a terminal, prompt the user.
 		info, err := os.Stdin.Stat()
 		if err == nil && (info.Mode()&os.ModeCharDevice) != 0 {
-			fmt.Fprint(cmd.ErrOrStderr(), "Enter token: ")
+			_, _ = fmt.Fprint(cmd.ErrOrStderr(), "Enter token: ")
 		}
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
@@ -149,7 +149,7 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), value)
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), value)
 	return nil
 }
 
@@ -164,7 +164,7 @@ func newConfigPathCmd() *cobra.Command {
 }
 
 func runConfigPath(cmd *cobra.Command, args []string) error {
-	fmt.Fprintln(cmd.OutOrStdout(), config.GetConfigPath())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), config.GetConfigPath())
 	return nil
 }
 
