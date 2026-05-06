@@ -1,9 +1,13 @@
 {
   "name": "@coastal-programs/notion-cli-linux-x64",
-  "version": "6.2.0",
+  "version": "6.2.1",
   "description": "notion-cli binary for Linux x64",
-  "os": ["linux"],
-  "cpu": ["x64"],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
