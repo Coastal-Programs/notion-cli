@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.2.1] - 2026-05-06
+
+### Changed
+- Bumped Go toolchain from 1.25 to 1.26
+- Updated `github.com/spf13/pflag` from v1.0.9 to v1.0.10
+- Updated CI publish workflow to use Go 1.26
+
+### Fixed
+- Migrated golangci-lint config to v2 format (added `version: "2"`, removed `gosimple` linter merged into `staticcheck`)
+- Resolved all pre-existing errcheck, staticcheck QF1012, and unused lint errors across the codebase
+
 ## [6.2.0] - 2026-03-02
 
 ### Added
