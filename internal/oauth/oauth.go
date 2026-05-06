@@ -4,6 +4,7 @@
 package oauth
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -17,25 +18,46 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
 )
 
+// CallbackPorts is the ordered list of localhost ports the CLI will attempt
+// to bind for the OAuth callback. Each must be registered as a redirect URI
+// in the Notion integration's "OAuth Domain & URIs" settings exactly as
+// http://localhost:PORT/callback. The CLI tries them in order and uses the
+// first one it can bind. This avoids the most common failure mode of
+// localhost OAuth flows: another process already holding the default port.
+var CallbackPorts = []int{8080, 8081, 8089}
 
 const (
-	// callbackPort is the port for the localhost OAuth callback server.
-	callbackPort = 8080
-
-	// redirectURI must match the one registered with Notion.
-	redirectURI = "http://localhost:8080/callback"
-
 	// authorizeURL is the Notion OAuth authorization endpoint.
 	authorizeURL = "https://api.notion.com/v1/oauth/authorize"
 
 	// maxResponseBody limits the token exchange response to 1 MB.
 	maxResponseBody = 1 << 20
 )
+
+// redirectURIFor returns the canonical redirect URI for the given port. It
+// must match what is registered in the Notion integration settings.
+func redirectURIFor(port int) string {
+	return fmt.Sprintf("http://localhost:%d/callback", port)
+}
+
+// bindCallbackListener tries each port in CallbackPorts and returns the
+// first listener it can open along with the bound port. If none are
+// available it returns an OAuthPortInUse error listing all attempted ports.
+func bindCallbackListener() (net.Listener, int, error) {
+	for _, port := range CallbackPorts {
+		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+		if err == nil {
+			return ln, port, nil
+		}
+	}
+	return nil, 0, clierrors.OAuthPortInUse(CallbackPorts)
+}
 
 // tokenURL is the Notion OAuth token exchange endpoint. It is a var so tests
 // can override it with an httptest server URL.
@@ -84,11 +106,13 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 	}
 
 	// Bind to localhost only to prevent other users on shared machines from
-	// intercepting the OAuth callback.
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", callbackPort))
+	// intercepting the OAuth callback. Try each registered port in order so a
+	// busy 8080 (Jenkins, Tomcat, dev server) doesn't break the flow.
+	ln, port, err := bindCallbackListener()
 	if err != nil {
-		return nil, clierrors.OAuthPortInUse(callbackPort)
+		return nil, err
 	}
+	redirectURI := redirectURIFor(port)
 
 	resultCh := make(chan callbackResult, 1)
 
@@ -97,19 +121,25 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 		q := r.URL.Query()
 
 		if errParam := q.Get("error"); errParam != "" {
-			resultCh <- callbackResult{err: errParam}
+			select {
+			case resultCh <- callbackResult{err: errParam}:
+			default:
+			}
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = fmt.Fprint(w, callbackHTML("Authorization Denied", "You denied the authorization request. You can close this tab."))
+			_, _ = fmt.Fprint(w, callbackHTML(false, "Authorization denied", "You denied the authorization request. You can safely close this tab."))
 			return
 		}
 
-		resultCh <- callbackResult{
+		select {
+		case resultCh <- callbackResult{
 			code:  q.Get("code"),
 			state: q.Get("state"),
+		}:
+		default:
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = fmt.Fprint(w, callbackHTML("Authorization Successful", "You can close this tab and return to your terminal."))
+		_, _ = fmt.Fprint(w, callbackHTML(true, "You're all set", "Authorization complete. Return to your terminal — notion-cli is ready to use."))
 	})
 
 	server := &http.Server{
@@ -121,20 +151,18 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 	// Start server on the already-bound listener.
 	go func() {
 		if sErr := server.Serve(ln); sErr != nil && sErr != http.ErrServerClosed {
-			resultCh <- callbackResult{err: sErr.Error()}
+			select {
+			case resultCh <- callbackResult{err: sErr.Error()}:
+			default:
+			}
 		}
 	}()
-	defer server.Shutdown(context.Background()) //nolint:errcheck
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	defer server.Shutdown(shutdownCtx) //nolint:errcheck
 
 	// Build and open the authorization URL with properly encoded parameters.
-	params := url.Values{
-		"client_id":     {clientID},
-		"response_type": {"code"},
-		"owner":         {"user"},
-		"redirect_uri":  {redirectURI},
-		"state":         {state},
-	}
-	authURL := authorizeURL + "?" + params.Encode()
+	authURL := buildAuthorizeURL(clientID, redirectURI, state)
 
 	if err := openBrowser(authURL); err != nil {
 		// Non-fatal: print the URL so the user can open it manually.
@@ -162,13 +190,112 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 		}
 
 		// Exchange code for token.
-		return exchangeCode(ctx, clientID, clientSecret, result.code)
+		return exchangeCode(ctx, clientID, clientSecret, redirectURI, result.code)
 	}
 }
 
+// LoginManual performs the OAuth flow without binding a localhost callback
+// server. It prints the authorize URL, the user opens it manually (useful
+// over SSH, in containers, or behind firewalls), authorizes in their
+// browser, then pastes the full redirected URL (or just the code) back into
+// the terminal. The redirect URI is chosen from CallbackPorts[0] to keep
+// it inside the integration's whitelist.
+func LoginManual(ctx context.Context, clientID, clientSecret string, in io.Reader, out io.Writer) (*TokenResponse, error) {
+	if clientID == "" || clientSecret == "" {
+		return nil, clierrors.OAuthNotConfigured()
+	}
+
+	state, err := randomState()
+	if err != nil {
+		return nil, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: "Failed to generate random state",
+			Err:     err,
+		}
+	}
+
+	redirectURI := redirectURIFor(CallbackPorts[0])
+	authURL := buildAuthorizeURL(clientID, redirectURI, state)
+
+	_, _ = fmt.Fprintln(out, "Manual OAuth flow:")
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, "  1. Open this URL in any browser:")
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintf(out, "     %s\n", authURL)
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, "  2. Authorize the integration. Your browser will be redirected")
+	_, _ = fmt.Fprintf(out, "     to %s (which will fail to load \u2014 that is expected).\n", redirectURI)
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, "  3. Copy the FULL URL from your browser's address bar and paste")
+	_, _ = fmt.Fprintln(out, "     it below, then press Enter.")
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprint(out, "Paste redirected URL: ")
+
+	reader := bufio.NewReader(in)
+	line, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return nil, clierrors.OAuthFailed(fmt.Sprintf("failed to read input: %s", err))
+	}
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil, clierrors.OAuthFailed("no input received")
+	}
+
+	code, gotState, err := parseCallbackInput(line)
+	if err != nil {
+		return nil, err
+	}
+	if gotState != "" && gotState != state {
+		return nil, clierrors.OAuthStateMismatch()
+	}
+
+	return exchangeCode(ctx, clientID, clientSecret, redirectURI, code)
+}
+
+// parseCallbackInput accepts either a full redirected URL containing
+// ?code=...&state=... or a bare authorization code, and returns (code,
+// state). State is empty when the user pasted only a code.
+func parseCallbackInput(input string) (string, string, error) {
+	input = strings.TrimSpace(input)
+	if strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "https://") {
+		u, err := url.Parse(input)
+		if err != nil {
+			return "", "", clierrors.OAuthFailed(fmt.Sprintf("invalid URL: %s", err))
+		}
+		q := u.Query()
+		if errParam := q.Get("error"); errParam != "" {
+			if errParam == "access_denied" {
+				return "", "", clierrors.OAuthCancelled()
+			}
+			return "", "", clierrors.OAuthFailed(errParam)
+		}
+		code := q.Get("code")
+		if code == "" {
+			return "", "", clierrors.OAuthFailed("no authorization code in URL")
+		}
+		return code, q.Get("state"), nil
+	}
+	// Treat as bare code.
+	return input, "", nil
+}
+
+// buildAuthorizeURL constructs the Notion authorization URL with all
+// required query parameters.
+func buildAuthorizeURL(clientID, redirectURI, state string) string {
+	params := url.Values{
+		"client_id":     {clientID},
+		"response_type": {"code"},
+		"owner":         {"user"},
+		"redirect_uri":  {redirectURI},
+		"state":         {state},
+	}
+	return authorizeURL + "?" + params.Encode()
+}
+
 // exchangeCode sends the authorization code to the Notion token endpoint
-// and returns the parsed token response.
-func exchangeCode(ctx context.Context, clientID, clientSecret, code string) (*TokenResponse, error) {
+// and returns the parsed token response. redirectURI must match the value
+// used at the /authorize step (Notion validates the pair).
+func exchangeCode(ctx context.Context, clientID, clientSecret, redirectURI, code string) (*TokenResponse, error) {
 	bodyMap := map[string]string{
 		"grant_type":   "authorization_code",
 		"code":         code,
@@ -245,13 +372,75 @@ func openBrowser(url string) error {
 	return cmd.Start()
 }
 
+// callbackHTML renders the OAuth callback page shown to the user in their
+// browser after Notion redirects back to localhost. The page is intentionally
+// self-contained (no external assets) so it works offline and instantly.
+func callbackHTML(success bool, title, message string) string {
+	accent := "#16a34a" // green for success
+	icon := `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+	if !success {
+		accent = "#dc2626" // red for failure
+		icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
+	}
 
-// callbackHTML returns a simple HTML page for the OAuth callback.
-func callbackHTML(title, message string) string {
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html><head><title>%s</title>
-<style>body{font-family:system-ui,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#fafafa}
-.card{text-align:center;padding:2rem;border-radius:8px;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
-h1{font-size:1.5rem;margin-bottom:0.5rem}p{color:#666}</style>
-</head><body><div class="card"><h1>%s</h1><p>%s</p></div></body></html>`, title, title, message)
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%[2]s · notion-cli</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0;height:100%%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Inter",Roboto,sans-serif;
+    display:flex;align-items:center;justify-content:center;
+    min-height:100vh;padding:1.5rem;
+    background:#fafaf9;color:#0f0f0f;
+    -webkit-font-smoothing:antialiased;
+  }
+  .card{
+    width:100%%;max-width:440px;
+    background:#fff;border:1px solid rgba(0,0,0,0.06);
+    border-radius:14px;padding:2.5rem 2rem;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04),0 8px 24px rgba(0,0,0,0.06);
+    text-align:center;
+  }
+  .icon{
+    width:56px;height:56px;margin:0 auto 1.25rem;
+    border-radius:50%%;display:flex;align-items:center;justify-content:center;
+    background:%[1]s14;color:%[1]s;
+  }
+  .icon svg{width:30px;height:30px}
+  h1{font-size:1.375rem;font-weight:600;margin:0 0 .5rem;letter-spacing:-0.01em}
+  p{font-size:.95rem;line-height:1.55;color:#525252;margin:0 0 1.5rem}
+  .terminal{
+    font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    font-size:.8rem;color:#737373;
+    background:#f5f5f4;border:1px solid rgba(0,0,0,0.05);
+    border-radius:8px;padding:.6rem .75rem;
+    display:inline-block;
+  }
+  .footer{margin-top:1.5rem;font-size:.75rem;color:#a3a3a3;letter-spacing:.02em}
+  .footer a{color:#737373;text-decoration:none;border-bottom:1px solid rgba(0,0,0,0.1)}
+  @media (prefers-color-scheme: dark){
+    body{background:#0a0a0a;color:#fafafa}
+    .card{background:#171717;border-color:rgba(255,255,255,0.06);box-shadow:0 1px 2px rgba(0,0,0,0.4),0 8px 24px rgba(0,0,0,0.5)}
+    p{color:#a3a3a3}
+    .terminal{background:#0a0a0a;border-color:rgba(255,255,255,0.08);color:#a3a3a3}
+    .footer{color:#525252}
+    .footer a{color:#a3a3a3;border-bottom-color:rgba(255,255,255,0.15)}
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">%[4]s</div>
+    <h1>%[2]s</h1>
+    <p>%[3]s</p>
+    <div class="terminal">$ notion-cli auth status</div>
+    <div class="footer">notion-cli · <a href="https://github.com/Coastal-Programs/notion-cli">github.com/Coastal-Programs/notion-cli</a></div>
+  </div>
+</body>
+</html>`, accent, title, message, icon)
 }

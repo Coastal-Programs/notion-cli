@@ -4,7 +4,11 @@
 // suggestions for resolution.
 package errors
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Coastal-Programs/notion-cli/internal/config"
+)
 
 // Exit codes returned by the CLI process.
 const (
@@ -415,13 +419,22 @@ func OAuthCancelled() *NotionCLIError {
 	}
 }
 
-// OAuthPortInUse returns an error when the localhost callback port is unavailable.
-func OAuthPortInUse(port int) *NotionCLIError {
+// OAuthPortInUse returns an error when no localhost callback port is available.
+// Ports is the list of ports the CLI tried; all were occupied.
+func OAuthPortInUse(ports []int) *NotionCLIError {
+	if len(ports) == 0 {
+		ports = []int{8080}
+	}
+	portStr := fmt.Sprintf("%d", ports[0])
+	if len(ports) > 1 {
+		portStr = fmt.Sprintf("%d\u2013%d", ports[0], ports[len(ports)-1])
+	}
 	return &NotionCLIError{
 		Code:    CodeOAuthPortInUse,
-		Message: fmt.Sprintf("Port %d is already in use", port),
+		Message: fmt.Sprintf("All OAuth callback ports (%s) are in use", portStr),
 		Suggestions: []string{
-			fmt.Sprintf("Close the application using port %d and try again", port),
+			fmt.Sprintf("Close the applications using ports %s and try again", portStr),
+			"Run with --manual to skip the local callback server and paste the redirect URL by hand",
 			"Or set NOTION_TOKEN manually as an alternative",
 		},
 	}
@@ -443,11 +456,12 @@ func OAuthStateMismatch() *NotionCLIError {
 func OAuthNotConfigured() *NotionCLIError {
 	return &NotionCLIError{
 		Code:    CodeOAuthNotConfigured,
-		Message: "OAuth is not available in this build",
+		Message: fmt.Sprintf("OAuth is not available in this build (notion-cli %s)", config.Version),
 		Suggestions: []string{
-			"This binary was built without OAuth credentials",
-			"Set NOTION_TOKEN manually instead",
-			"Or rebuild with OAuth client ID/secret via ldflags",
+			"This binary was built without embedded OAuth client credentials",
+			"If you installed via npm: upgrade to >=6.1.2 with `npm i -g @coastal-programs/notion-cli@latest`",
+			"If you built from source: set NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET, then re-run `make build`",
+			"As a fallback, set NOTION_TOKEN to use a manually issued integration token instead",
 		},
 	}
 }

@@ -337,7 +337,7 @@ func runDBQuery(cmd *cobra.Command, args []string) error {
 	}
 
 	data := map[string]any{
-		"results":     allResults,
+		"results":      allResults,
 		"result_count": len(allResults),
 	}
 

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-05-06
+
+### Added
+- **Multi-port OAuth callback** (`internal/oauth`): `auth login` now tries ports 8080, 8081, 8089 in order and uses the first one it can bind. Removes the most common production failure (something else holding port 8080).
+- **`auth login --manual`**: skips the local callback server, prints the authorize URL, and accepts a pasted redirect URL or bare code. Auto-enabled when `$SSH_TTY` is set so remote sessions work without forwarding.
+- **Polished OAuth callback page**: redesigned success/error HTML with dark-mode support, branded icon, and clear "return to terminal" guidance.
+- **`doctor` OAuth checks**: now probes that at least one callback port is bindable and that Notion's authorize endpoint accepts the embedded `client_id` (catches deleted/internalized integrations).
+- `page create` and `page update` now accept `--icon-emoji`, `--icon-url`, and `--cover-url` flags to set page icons and covers (#74). On `page update`, pass `none` to clear an existing icon or cover.
+- `doctor` output includes `oauth_credentials_embedded` so users can verify whether their binary was built with OAuth client credentials (#73).
+
+### Changed
+- `auth login` timeout bumped from 2 minutes to 5 minutes to accommodate 2FA, account switching, and slow networks.
+- `OAuthPortInUse` error now lists every attempted port and recommends `--manual` as a fallback.
+- `OAuthNotConfigured` error now reports the binary version and lists concrete remediation steps for both npm-installed and source-built binaries (#73).
+
+### CI/Build
+- `make release` now fails fast when `NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET` are unset, preventing silent OAuth-less release artifacts (#73).
+- `.github/workflows/publish.yml` verifies OAuth secrets are present before building or publishing.
+
+### Operations
+- Notion integration now requires three registered redirect URIs: `http://localhost:8080/callback`, `http://localhost:8081/callback`, `http://localhost:8089/callback`.
+- Rotated `NOTION_OAUTH_SECRET` (GitHub Actions secret + `.env.local`).
+
 ## [6.2.1] - 2026-05-06
 
 ### Changed

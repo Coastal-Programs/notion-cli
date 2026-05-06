@@ -249,5 +249,3 @@ func clientSideFilter(results []any, dbFilter, createdAfter, createdBefore, edit
 	}
 	return filtered
 }
-
-

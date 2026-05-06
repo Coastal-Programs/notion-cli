@@ -3,6 +3,8 @@ package commands
 import (
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/Coastal-Programs/notion-cli/internal/config"
 	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/internal/oauth"
 	"github.com/Coastal-Programs/notion-cli/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +29,13 @@ func RegisterDoctorCommand(root *cobra.Command) {
 	}
 	addOutputFlags(cmd)
 	root.AddCommand(cmd)
+}
+
+// oauthCredentialsEmbedded reports whether the build embedded the OAuth
+// client ID and secret via ldflags. False indicates this binary cannot
+// perform the `auth login` browser-based flow.
+func oauthCredentialsEmbedded() bool {
+	return config.OAuthClientID != "" && config.OAuthClientSecret != ""
 }
 
 type checkResult struct {
@@ -172,6 +182,101 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Check 6a: At least one OAuth callback port is bindable. Real users hit
+	// this when something else (Jenkins, Tomcat, dev server) is holding the
+	// default port. We try every port in oauth.CallbackPorts.
+	var freePorts, busyPorts []int
+	for _, port := range oauth.CallbackPorts {
+		addr := fmt.Sprintf("127.0.0.1:%d", port)
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			busyPorts = append(busyPorts, port)
+			continue
+		}
+		_ = ln.Close()
+		freePorts = append(freePorts, port)
+	}
+	switch {
+	case len(freePorts) == len(oauth.CallbackPorts):
+		checks = append(checks, checkResult{
+			Name:    "OAuth Callback Ports",
+			Status:  "pass",
+			Message: fmt.Sprintf("All ports available: %v", oauth.CallbackPorts),
+		})
+	case len(freePorts) > 0:
+		checks = append(checks, checkResult{
+			Name:    "OAuth Callback Ports",
+			Status:  "pass",
+			Message: fmt.Sprintf("%d of %d ports available (free: %v, busy: %v)", len(freePorts), len(oauth.CallbackPorts), freePorts, busyPorts),
+		})
+	default:
+		checks = append(checks, checkResult{
+			Name:    "OAuth Callback Ports",
+			Status:  "warn",
+			Message: fmt.Sprintf("All ports busy: %v. Use 'auth login --manual' or free a port.", busyPorts),
+		})
+	}
+
+	// Check 6b: Notion authorize endpoint accepts our client_id. A 302 to
+	// www.notion.so/install-integration means the integration record exists.
+	// Anything else (404, 400, etc.) means the integration was deleted or
+	// disabled in Notion's developer settings.
+	if config.OAuthClientID != "" {
+		probeURL := fmt.Sprintf("%s?%s", "https://api.notion.com/v1/oauth/authorize", url.Values{
+			"client_id":     {config.OAuthClientID},
+			"response_type": {"code"},
+			"owner":         {"user"},
+			"redirect_uri":  {fmt.Sprintf("http://localhost:%d/callback", oauth.CallbackPorts[0])},
+			"state":         {"doctor-probe"},
+		}.Encode())
+		probeClient := &http.Client{
+			Timeout: 5 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		}
+		resp, err := probeClient.Get(probeURL)
+		switch {
+		case err != nil:
+			checks = append(checks, checkResult{
+				Name:    "OAuth Integration",
+				Status:  "warn",
+				Message: fmt.Sprintf("Could not probe authorize endpoint: %s", err),
+			})
+		case resp.StatusCode == http.StatusFound:
+			_ = resp.Body.Close()
+			checks = append(checks, checkResult{
+				Name:    "OAuth Integration",
+				Status:  "pass",
+				Message: "Notion accepts the embedded client_id",
+			})
+		default:
+			_ = resp.Body.Close()
+			checks = append(checks, checkResult{
+				Name:    "OAuth Integration",
+				Status:  "fail",
+				Message: fmt.Sprintf("Notion returned HTTP %d for the authorize URL. The integration may have been deleted, made internal, or had its redirect URIs changed. Check https://www.notion.so/profile/integrations", resp.StatusCode),
+			})
+		}
+	}
+
+	// Check 6c: OAuth credentials embedded at build time.
+	oauthEmbedded := oauthCredentialsEmbedded()
+	if oauthEmbedded {
+		checks = append(checks, checkResult{
+			Name:    "OAuth Build Credentials",
+			Status:  "pass",
+			Message: "OAuth client credentials are embedded in this binary",
+		})
+	} else {
+		checks = append(checks, checkResult{
+			Name:   "OAuth Build Credentials",
+			Status: "warn",
+			Message: "OAuth credentials not embedded. Upgrade via `npm i -g @coastal-programs/notion-cli@latest` (>=6.1.2) " +
+				"or rebuild from source with NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET set.",
+		})
+	}
+
 	// Check 6: Config directory.
 	dataDir := config.GetDataDir()
 	if dataDir != "" {
@@ -236,8 +341,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	data := map[string]any{
-		"checks":  checks,
-		"summary": fmt.Sprintf("%d passed, %d warnings, %d failed", passCount, warnCount, failCount),
+		"checks":                     checks,
+		"summary":                    fmt.Sprintf("%d passed, %d warnings, %d failed", passCount, warnCount, failCount),
+		"oauth_credentials_embedded": oauthEmbedded,
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))

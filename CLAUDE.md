@@ -104,3 +104,48 @@ NOTION_TOKEN=secret_...  # Required for all API calls
 - @CONTRIBUTING.md - contribution guidelines
 - @CHANGELOG.md - release history
 - @docs/ - command docs and user guides
+
+## Eyes
+
+Perception probes live in `.gg/eyes/`. All headless. Artifacts → `.gg/eyes/out/` (gitignored). Invoke probes yourself; don't ask the user to verify what you can verify.
+
+### Available probes
+
+| Need | Run | Then |
+|---|---|---|
+| Hit any HTTP endpoint (Notion API, local server, webhook URL) and capture status + body | `.gg/eyes/http.sh <url> [METHOD] [body-or-@file] [-H "K: V"]` | Read the `body` path from the JSON result; status + size + time_ms tell you fast whether to drill in. Auth/cookie headers are auto-redacted. |
+| Tail a log file or process output (CLI run, build, server) | `.gg/eyes/logs.sh <file-or-cmd>` | Grep the captured artifact under `.gg/eyes/out/` for the error/event you expect. |
+
+### When to use these eyes (automatically, without being asked)
+
+Reach for probes ON YOUR OWN INITIATIVE when any of these apply:
+
+- **After changing anything in `internal/notion/client.go` or any `cmd` that calls the Notion API** (`internal/cli/commands/db.go`, `page.go`, `block.go`, `user.go`, `search.go`): build with `make build`, then exercise the affected command and pipe its output to `.gg/eyes/logs.sh` to confirm the request shape and response handling. Do not assume — verify against the live API with `NOTION_TOKEN` set.
+- **When debugging a Notion API error** (4xx/5xx, malformed response, unexpected envelope): hit the endpoint directly with `.gg/eyes/http.sh "https://api.notion.com/v1/<path>" GET '' -H "Authorization: Bearer $NOTION_TOKEN" -H "Notion-Version: 2022-06-28"` to isolate whether the bug is in our client or upstream.
+- **After editing `internal/retry/retry.go`, `internal/cache/*.go`, or `pkg/output/*.go`**: run `make test` and tail the output via `.gg/eyes/logs.sh` — these are cross-cutting and silent failures here corrupt every command.
+- **After editing `internal/resolver/resolver.go`**: run the affected command against a real Notion URL/ID/name and capture stdout with `.gg/eyes/logs.sh` to confirm the resolution path.
+- **When a `make build` or `make test` fails and the output is long**: redirect into `.gg/eyes/logs.sh` so you can grep the artifact instead of re-running.
+
+If a probe fails or returns unexpected results, investigate the artifact directly under `.gg/eyes/out/` before assuming the probe itself is broken.
+
+### When NOT to use
+
+- Docs-only changes (README, CHANGELOG, `docs/`), comments, formatting, `go fmt`.
+- Pure refactors fully covered by `make test`.
+- `NOTION_TOKEN` isn't set AND the task doesn't need live API verification — say so, don't fake it.
+- Same probe already ran this turn against the same URL/file — reuse the artifact path.
+
+### When to escalate a capability gap (the self-improvement loop)
+
+If you're about to **guess**, **skip verification**, or **hand-wave** about something a better probe would show you — STOP and surface the tradeoff inline. Phrasing like:
+
+> "I need to inspect a multipart upload request body but `http.sh` only does simple bodies — and there's no `request_capture` probe. Two paths: (a) ~3 min to add one, then I can diagnose properly. (b) Workaround: I'd reason from the curl `-v` output. Your call?"
+
+Wait for the user's choice. **Don't escalate more than once per request** — if the user picked the workaround, don't re-ask in the same turn.
+
+For minor friction (worked around it but wished it were better), don't interrupt — log it for later review:
+- `ggcoder eyes log rough "<reason>" [--probe <name>]` — minor friction, you handled it
+- `ggcoder eyes log wish "<gap>"` — capability you wished existed
+- `ggcoder eyes log blocked "<reason>"` — call this AFTER the user approves an inline-escalation fix, for the audit trail
+
+These accumulate quietly. The user reviews them periodically. Open signals will appear in your context on future turns until they're acked.

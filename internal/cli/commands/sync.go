@@ -152,9 +152,9 @@ func runSync(cmd *cobra.Command, _ []string) error {
 
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(map[string]any{
-		"databases":    len(allDatabases),
-		"last_sync":    time.Now().Format(time.RFC3339),
-		"elapsed_ms":   elapsed.Milliseconds(),
+		"databases":  len(allDatabases),
+		"last_sync":  time.Now().Format(time.RFC3339),
+		"elapsed_ms": elapsed.Milliseconds(),
 	}, "sync", start)
 	return nil
 }

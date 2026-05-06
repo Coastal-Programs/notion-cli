@@ -13,10 +13,10 @@ import (
 
 // Build-time variables set via ldflags.
 var (
-	Version         = "dev"
-	Commit          = "none"
-	Date            = "unknown"
-	OAuthClientID   = ""
+	Version           = "dev"
+	Commit            = "none"
+	Date              = "unknown"
+	OAuthClientID     = ""
 	OAuthClientSecret = ""
 )
 

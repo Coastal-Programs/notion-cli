@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,113 @@ import (
 
 	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
 )
+
+func TestParseCallbackInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantCode  string
+		wantState string
+		wantErr   bool
+	}{
+		{"full URL with code+state", "http://localhost:8080/callback?code=abc&state=xyz", "abc", "xyz", false},
+		{"URL with code only", "http://localhost:8081/callback?code=abc", "abc", "", false},
+		{"https URL", "https://localhost:8080/callback?code=def&state=foo", "def", "foo", false},
+		{"bare code", "raw-auth-code-123", "raw-auth-code-123", "", false},
+		{"URL with whitespace", "  http://localhost:8080/callback?code=trim  \n", "trim", "", false},
+		{"URL with error param", "http://localhost:8080/callback?error=invalid_request", "", "", true},
+		{"URL with no code", "http://localhost:8080/callback?state=xyz", "", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, state, err := parseCallbackInput(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if code != tt.wantCode {
+				t.Errorf("code = %q, want %q", code, tt.wantCode)
+			}
+			if state != tt.wantState {
+				t.Errorf("state = %q, want %q", state, tt.wantState)
+			}
+		})
+	}
+}
+
+func TestBindCallbackListener_FallsBackWhenFirstPortBusy(t *testing.T) {
+	orig := CallbackPorts
+	defer func() { CallbackPorts = orig }()
+
+	// Pick two free ports, then occupy the first to force fallback.
+	probe1, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("probe1 listen: %v", err)
+	}
+	port1 := probe1.Addr().(*net.TCPAddr).Port
+
+	probe2, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		_ = probe1.Close()
+		t.Fatalf("probe2 listen: %v", err)
+	}
+	port2 := probe2.Addr().(*net.TCPAddr).Port
+	_ = probe2.Close() // free port2 so bindCallbackListener can take it
+
+	CallbackPorts = []int{port1, port2}
+
+	ln, gotPort, err := bindCallbackListener()
+	if err != nil {
+		_ = probe1.Close()
+		t.Fatalf("bindCallbackListener err: %v", err)
+	}
+	defer ln.Close() //nolint:errcheck
+	_ = probe1.Close()
+
+	if gotPort != port2 {
+		t.Errorf("got port %d, want %d (the fallback)", gotPort, port2)
+	}
+}
+
+func TestBindCallbackListener_AllBusy(t *testing.T) {
+	orig := CallbackPorts
+	defer func() { CallbackPorts = orig }()
+
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("probe listen: %v", err)
+	}
+	defer probe.Close() //nolint:errcheck
+	port := probe.Addr().(*net.TCPAddr).Port
+
+	CallbackPorts = []int{port}
+
+	_, _, err = bindCallbackListener()
+	if err == nil {
+		t.Fatal("expected error when all ports busy")
+	}
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok {
+		t.Fatalf("want NotionCLIError, got %T", err)
+	}
+	if cliErr.Code != clierrors.CodeOAuthPortInUse {
+		t.Errorf("code = %q, want %q", cliErr.Code, clierrors.CodeOAuthPortInUse)
+	}
+}
+
+func TestBuildAuthorizeURL(t *testing.T) {
+	u := buildAuthorizeURL("client-1", "http://localhost:8081/callback", "state-x")
+	for _, want := range []string{
+		"client_id=client-1",
+		"redirect_uri=http%3A%2F%2Flocalhost%3A8081%2Fcallback",
+		"state=state-x",
+		"response_type=code",
+		"owner=user",
+	} {
+		if !contains(u, want) {
+			t.Errorf("authorize URL missing %q\ngot: %s", want, u)
+		}
+	}
+}
 
 func TestRandomState(t *testing.T) {
 	s1, err := randomState()
@@ -31,13 +139,27 @@ func TestRandomState(t *testing.T) {
 }
 
 func TestCallbackHTML(t *testing.T) {
-	html := callbackHTML("Test Title", "Test message")
-	if html == "" {
-		t.Error("callbackHTML() returned empty string")
+	for _, success := range []bool{true, false} {
+		html := callbackHTML(success, "Test Title", "Test message")
+		if html == "" {
+			t.Errorf("callbackHTML(success=%v) returned empty string", success)
+		}
+		if len(html) < 200 {
+			t.Errorf("callbackHTML(success=%v) returned unexpectedly short HTML", success)
+		}
+		if !contains(html, "Test Title") || !contains(html, "Test message") {
+			t.Errorf("callbackHTML(success=%v) missing title or message", success)
+		}
 	}
-	if len(html) < 50 {
-		t.Error("callbackHTML() returned unexpectedly short HTML")
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
 	}
+	return false
 }
 
 func TestExchangeCode_Success(t *testing.T) {
@@ -70,7 +192,7 @@ func TestExchangeCode_Success(t *testing.T) {
 	tokenURL = server.URL
 	defer func() { tokenURL = origURL }()
 
-	token, err := exchangeCode(context.Background(), "test-client-id", "test-client-secret", "auth-code-123")
+	token, err := exchangeCode(context.Background(), "test-client-id", "test-client-secret", "http://localhost:8080/callback", "auth-code-123")
 	if err != nil {
 		t.Fatalf("exchangeCode() error: %v", err)
 	}
@@ -97,7 +219,7 @@ func TestExchangeCode_HTTPError(t *testing.T) {
 	tokenURL = server.URL
 	defer func() { tokenURL = origURL }()
 
-	_, err := exchangeCode(context.Background(), "id", "secret", "bad-code")
+	_, err := exchangeCode(context.Background(), "id", "secret", "http://localhost:8080/callback", "bad-code")
 	if err == nil {
 		t.Fatal("exchangeCode() should return error for HTTP 400")
 	}
@@ -121,7 +243,7 @@ func TestExchangeCode_EmptyAccessToken(t *testing.T) {
 	tokenURL = server.URL
 	defer func() { tokenURL = origURL }()
 
-	_, err := exchangeCode(context.Background(), "id", "secret", "code")
+	_, err := exchangeCode(context.Background(), "id", "secret", "http://localhost:8080/callback", "code")
 	if err == nil {
 		t.Fatal("exchangeCode() should return error for empty access token")
 	}
@@ -138,7 +260,7 @@ func TestExchangeCode_InvalidJSON(t *testing.T) {
 	tokenURL = server.URL
 	defer func() { tokenURL = origURL }()
 
-	_, err := exchangeCode(context.Background(), "id", "secret", "code")
+	_, err := exchangeCode(context.Background(), "id", "secret", "http://localhost:8080/callback", "code")
 	if err == nil {
 		t.Fatal("exchangeCode() should return error for invalid JSON")
 	}
@@ -196,7 +318,7 @@ func TestExchangeCode_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	_, err := exchangeCode(ctx, "id", "secret", "code")
+	_, err := exchangeCode(ctx, "id", "secret", "http://localhost:8080/callback", "code")
 	if err == nil {
 		t.Fatal("exchangeCode() should return error when context is cancelled")
 	}

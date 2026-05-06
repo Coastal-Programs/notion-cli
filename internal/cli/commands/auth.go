@@ -36,9 +36,12 @@ func newAuthLoginCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login",
 		Short: "Log in via Notion OAuth",
-		Long:  "Authenticate with Notion by opening your browser and completing the OAuth flow.",
-		RunE:  runAuthLogin,
+		Long: "Authenticate with Notion by opening your browser and completing the OAuth flow.\n\n" +
+			"Use --manual when running over SSH, in a container, or behind a firewall " +
+			"where the local callback server cannot be reached by your browser.",
+		RunE: runAuthLogin,
 	}
+	cmd.Flags().Bool("manual", false, "Skip the local callback server and paste the redirected URL by hand")
 	addOutputFlags(cmd)
 	return cmd
 }
@@ -53,14 +56,30 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, clierrors.OAuthNotConfigured())
 	}
 
-	fmt.Fprintln(os.Stderr, "Opening your browser to authorize with Notion...")
-	fmt.Fprintln(os.Stderr, "Waiting for authorization (timeout: 2 minutes)...")
+	manual, _ := cmd.Flags().GetBool("manual")
+	// Auto-enable manual mode when running over SSH; the user's browser
+	// almost certainly cannot reach our local callback server.
+	if !manual && os.Getenv("SSH_TTY") != "" {
+		fmt.Fprintln(os.Stderr, "SSH session detected \u2014 falling back to manual flow.")
+		manual = true
+	}
 
-	// 2-minute timeout for the full OAuth flow.
-	ctx, cancel := context.WithTimeout(cmd.Context(), 2*time.Minute)
+	// 5-minute timeout for the full OAuth flow. Generous to accommodate 2FA,
+	// account switching, workspace selection, and slow networks.
+	ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
 	defer cancel()
 
-	token, err := oauth.Login(ctx, clientID, clientSecret)
+	var (
+		token *oauth.TokenResponse
+		err   error
+	)
+	if manual {
+		token, err = oauth.LoginManual(ctx, clientID, clientSecret, os.Stdin, os.Stderr)
+	} else {
+		fmt.Fprintln(os.Stderr, "Opening your browser to authorize with Notion...")
+		fmt.Fprintln(os.Stderr, "Waiting for authorization (timeout: 5 minutes)...")
+		token, err = oauth.Login(ctx, clientID, clientSecret)
+	}
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -211,4 +230,3 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 	p.PrintSuccess(data, "auth status", start)
 	return nil
 }
-

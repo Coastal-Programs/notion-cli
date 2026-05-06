@@ -52,3 +52,17 @@ Thumbs.db
 
 # Build artifacts
 dist/
+
+# Agent scratch / docs
+.gg/
+John.md
+
+# ggcoder-eyes
+.gg/eyes/out/
+.gg/eyes/state/
+.gg/eyes/bin/
+.gg/eyes/recordings/
+.gg/eyes/auth/
+.gg/eyes/remote.json
+.gg/eyes/_lib.sh
+.gg/eyes/_redact.sh
