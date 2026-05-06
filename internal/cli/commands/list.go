@@ -45,7 +45,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	if wc.IsStale() {
-		fmt.Fprintln(cmd.ErrOrStderr(), "Warning: Cache is stale (>24h old). Run 'notion-cli sync' to refresh.")
+		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "Warning: Cache is stale (>24h old). Run 'notion-cli sync' to refresh.")
 	}
 
 	dbs := wc.GetDatabases()
@@ -59,10 +59,10 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	data := map[string]any{
-		"databases":    rows,
-		"count":        len(rows),
-		"last_sync":    wc.LastSyncTime().Format(time.RFC3339),
-		"cache_stale":  wc.IsStale(),
+		"databases":   rows,
+		"count":       len(rows),
+		"last_sync":   wc.LastSyncTime().Format(time.RFC3339),
+		"cache_stale": wc.IsStale(),
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))

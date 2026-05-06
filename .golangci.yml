@@ -1,7 +1,8 @@
+version: "2"
+
 linters:
   enable:
     - errcheck
-    - gosimple
     - govet
     - ineffassign
     - staticcheck
@@ -10,12 +11,50 @@ linters:
 linters-settings:
   errcheck:
     check-blank: false
+    exclude-functions:
+      - fmt.Fprint
+      - fmt.Fprintln
+      - fmt.Fprintf
 
 issues:
   exclude-dirs:
     - vendor
     - node_modules
     - npm
+  exclude-rules:
+    # Ignore unchecked errors on deferred Close calls
+    - linters: [errcheck]
+      text: 'Error return value of `.*\.Close` is not checked'
+    # Ignore unchecked errors on MarkFlagRequired / MarkHidden (cobra pattern)
+    - linters: [errcheck]
+      text: 'Error return value of `.*MarkFlagRequired` is not checked'
+    - linters: [errcheck]
+      text: 'Error return value of `.*MarkHidden` is not checked'
+    # Ignore unchecked os.Setenv / os.Unsetenv / os.MkdirAll / os.WriteFile in tests
+    - linters: [errcheck]
+      source: 'os\.(Setenv|Unsetenv|MkdirAll|WriteFile)'
+      path: '_test\.go'
+    # Ignore flag Set in tests
+    - linters: [errcheck]
+      text: 'Error return value of `\(\*github\.com/spf13/pflag\.FlagSet\)\.Set` is not checked'
+      path: '_test\.go'
+    # Ignore json Encode in tests
+    - linters: [errcheck]
+      text: 'Error return value of `\(\*encoding/json\.Encoder\)\.Encode` is not checked'
+      path: '_test\.go'
+    # Ignore w.Write in test http handlers
+    - linters: [errcheck]
+      text: 'Error return value of `.*\.Write` is not checked'
+      path: '_test\.go'
+    # Ignore server.Shutdown unchecked
+    - linters: [errcheck]
+      text: 'Error return value of `.*\.Shutdown` is not checked'
+    # Ignore unused test helpers
+    - linters: [unused]
+      path: '_test\.go'
+    # Ignore staticcheck QF1012 (cosmetic WriteString+Sprintf)
+    - linters: [staticcheck]
+      text: 'QF1012'
 
 run:
   timeout: 5m

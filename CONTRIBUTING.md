@@ -73,6 +73,27 @@ export NOTION_TOKEN="secret_your_token_here"
 
 Get your token from: https://www.notion.so/my-integrations
 
+### OAuth Credentials (maintainers only)
+
+The `auth login` command uses Notion's OAuth flow, which requires a public Client ID and Client Secret embedded into the binary at build time via `-ldflags -X`. CI release builds get these from GitHub Actions secrets (`NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET`); local dev builds without them simply return `OAuthNotConfigured` if you try `auth login` (everything else still works with `NOTION_TOKEN`).
+
+If you are a maintainer and want OAuth in a local `make build`, create a gitignored `.env.local` at the repo root — the Makefile auto-loads it:
+
+```bash
+# .env.local (NEVER commit this; it is in .gitignore)
+NOTION_OAUTH_CLIENT_ID=<from Notion integration settings>
+NOTION_OAUTH_SECRET=<from Notion integration settings>
+```
+
+Then `make build` and verify with `./build/notion-cli doctor --json | grep oauth_credentials_embedded` — it should report `true`.
+
+Security rules:
+
+- **Never** commit `.env.local`, paste it in issues, or share it in screenshots / screen recordings.
+- Treat the "secret" as a soft secret — anyone with a release binary can extract it via `strings` (this is accepted in OAuth native-app distribution; PKCE mitigates the risk).
+- If a credential leaks, rotate it in the Notion integration settings and cut a patch release.
+- CI logs auto-redact GitHub Actions secrets; locally, `make build` is silenced so the ldflags don't echo to your terminal.
+
 ## Code Style Guidelines
 
 ### Go Conventions

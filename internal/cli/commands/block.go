@@ -56,7 +56,7 @@ func newBlockAppendCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("block-id", "b", "", "Parent block ID (required)")
-	cmd.MarkFlagRequired("block-id")
+	_ = cmd.MarkFlagRequired("block-id")
 
 	// Raw children JSON.
 	cmd.Flags().StringP("children", "c", "", "Block children as JSON array")

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,7 +52,11 @@ func newPageCreateCmd() *cobra.Command {
 	cmd.Flags().StringP("title-property", "t", "Name", "Title property name")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
 	cmd.Flags().BoolP("simple-properties", "S", false, "Use simple flat properties format (phase 2)")
-	cmd.Flags().MarkHidden("simple-properties")
+	_ = cmd.Flags().MarkHidden("simple-properties")
+	cmd.Flags().String("icon-emoji", "", "Page icon as emoji (e.g. 💰)")
+	cmd.Flags().String("icon-url", "", "Page icon as external image URL (https://...)")
+	cmd.Flags().String("cover-url", "", "Page cover as external image URL (https://...)")
+	cmd.MarkFlagsMutuallyExclusive("icon-emoji", "icon-url")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -139,6 +144,18 @@ func runPageCreate(cmd *cobra.Command, _ []string) error {
 		body["properties"] = map[string]any{}
 	}
 
+	// Icon / cover.
+	icon, cover, hasIcon, hasCover, err := buildIconCover(cmd, false)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	if hasIcon {
+		body["icon"] = icon
+	}
+	if hasCover {
+		body["cover"] = cover
+	}
+
 	result, err := client.PageCreate(cmd.Context(), body)
 	if err != nil {
 		return handleError(cmd, err)
@@ -164,8 +181,8 @@ func newPageRetrieveCmd() *cobra.Command {
 	cmd.Flags().Bool("map", false, "Output property map (phase 2)")
 	cmd.Flags().BoolP("recursive", "R", false, "Recursively retrieve child blocks (phase 2)")
 	cmd.Flags().Int("max-depth", 3, "Maximum recursion depth (1-10)")
-	cmd.Flags().MarkHidden("map")
-	cmd.Flags().MarkHidden("recursive")
+	_ = cmd.Flags().MarkHidden("map")
+	_ = cmd.Flags().MarkHidden("recursive")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -210,8 +227,12 @@ func newPageUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolP("unarchive", "u", false, "Unarchive the page")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
 	cmd.Flags().BoolP("simple-properties", "S", false, "Use simple flat properties format (phase 2)")
-	cmd.Flags().MarkHidden("simple-properties")
+	_ = cmd.Flags().MarkHidden("simple-properties")
+	cmd.Flags().String("icon-emoji", "", "Page icon as emoji, or 'none' to clear")
+	cmd.Flags().String("icon-url", "", "Page icon as external image URL, or 'none' to clear")
+	cmd.Flags().String("cover-url", "", "Page cover as external image URL, or 'none' to clear")
 	cmd.MarkFlagsMutuallyExclusive("archived", "unarchive")
+	cmd.MarkFlagsMutuallyExclusive("icon-emoji", "icon-url")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -250,6 +271,18 @@ func runPageUpdate(cmd *cobra.Command, args []string) error {
 		body["properties"] = props
 	}
 
+	// Icon / cover (allow 'none' to clear).
+	icon, cover, hasIcon, hasCover, err := buildIconCover(cmd, true)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	if hasIcon {
+		body["icon"] = icon
+	}
+	if hasCover {
+		body["cover"] = cover
+	}
+
 	if len(body) == 0 {
 		return handleError(cmd, &clierrors.NotionCLIError{
 			Code:    clierrors.CodeMissingRequired,
@@ -258,6 +291,7 @@ func runPageUpdate(cmd *cobra.Command, args []string) error {
 				"Use --properties to update page properties",
 				"Use --archived to archive the page",
 				"Use --unarchive to unarchive the page",
+				"Use --icon-emoji, --icon-url, or --cover-url to set/clear icon/cover",
 			},
 		})
 	}
@@ -320,6 +354,74 @@ func runPagePropertyItem(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// buildIconCover reads the --icon-emoji, --icon-url, and --cover-url flags and
+// returns the corresponding Notion API values. When allowClear is true the
+// literal value "none" produces a JSON null payload (used by `page update` to
+// clear a previously set icon or cover). The hasIcon/hasCover return values
+// indicate whether the caller should set the field on the request body at all.
+func buildIconCover(cmd *cobra.Command, allowClear bool) (icon, cover any, hasIcon, hasCover bool, err error) {
+	emoji, _ := cmd.Flags().GetString("icon-emoji")
+	iconURL, _ := cmd.Flags().GetString("icon-url")
+	coverURL, _ := cmd.Flags().GetString("cover-url")
+
+	if emoji != "" {
+		hasIcon = true
+		if allowClear && emoji == "none" {
+			icon = nil
+		} else {
+			icon = map[string]any{"type": "emoji", "emoji": emoji}
+		}
+	} else if iconURL != "" {
+		hasIcon = true
+		if allowClear && iconURL == "none" {
+			icon = nil
+		} else {
+			if vErr := validateExternalURL(iconURL, "--icon-url"); vErr != nil {
+				return nil, nil, false, false, vErr
+			}
+			icon = map[string]any{
+				"type":     "external",
+				"external": map[string]any{"url": iconURL},
+			}
+		}
+	}
+
+	if coverURL != "" {
+		hasCover = true
+		if allowClear && coverURL == "none" {
+			cover = nil
+		} else {
+			if vErr := validateExternalURL(coverURL, "--cover-url"); vErr != nil {
+				return nil, nil, false, false, vErr
+			}
+			cover = map[string]any{
+				"type":     "external",
+				"external": map[string]any{"url": coverURL},
+			}
+		}
+	}
+
+	return icon, cover, hasIcon, hasCover, nil
+}
+
+// validateExternalURL ensures the value is a parseable http(s) URL.
+func validateExternalURL(raw, flag string) error {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: fmt.Sprintf("%s must be a valid http(s) URL", flag),
+		}
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: fmt.Sprintf("%s scheme must be http or https (got %q)", flag, u.Scheme),
+		}
+	}
+	return nil
+}
+
 // --- Markdown to blocks converter ---
 
 // markdownFileToBlocks reads a markdown file and converts it to Notion blocks.
@@ -331,7 +433,7 @@ func markdownFileToBlocks(path string) ([]map[string]any, error) {
 			Message: fmt.Sprintf("Cannot read file: %s", err),
 		}
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	var blocks []map[string]any
 	scanner := bufio.NewScanner(f)
@@ -390,7 +492,7 @@ func markdownFileToBlocks(path string) ([]map[string]any, error) {
 			blocks = append(blocks, map[string]any{
 				"type": "paragraph",
 				"paragraph": map[string]any{
-					"rich_text": richText(strings.TrimLeft(line, "# ")),
+					"rich_text": richText(strings.TrimPrefix(line, "#### ")),
 				},
 			})
 			continue

@@ -60,7 +60,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	fmt.Fprintln(cmd.OutOrStderr(), "Syncing workspace databases...")
+	_, _ = fmt.Fprintln(cmd.OutOrStderr(), "Syncing workspace databases...")
 
 	var allDatabases []cache.DatabaseEntry
 	var startCursor string
@@ -129,7 +129,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 			allDatabases = append(allDatabases, entry)
 		}
 
-		fmt.Fprintf(cmd.OutOrStderr(), "  Found %d databases so far...\n", len(allDatabases))
+		_, _ = fmt.Fprintf(cmd.OutOrStderr(), "  Found %d databases so far...\n", len(allDatabases))
 
 		hasMore, _ := result["has_more"].(bool)
 		next, _ := result["next_cursor"].(string)
@@ -148,13 +148,13 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	}
 
 	elapsed := time.Since(start)
-	fmt.Fprintf(cmd.OutOrStderr(), "Synced %d databases in %s\n", len(allDatabases), elapsed.Round(time.Millisecond))
+	_, _ = fmt.Fprintf(cmd.OutOrStderr(), "Synced %d databases in %s\n", len(allDatabases), elapsed.Round(time.Millisecond))
 
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(map[string]any{
-		"databases":    len(allDatabases),
-		"last_sync":    time.Now().Format(time.RFC3339),
-		"elapsed_ms":   elapsed.Milliseconds(),
+		"databases":  len(allDatabases),
+		"last_sync":  time.Now().Format(time.RFC3339),
+		"elapsed_ms": elapsed.Milliseconds(),
 	}, "sync", start)
 	return nil
 }

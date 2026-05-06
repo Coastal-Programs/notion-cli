@@ -38,6 +38,9 @@ FLAGS
       --no-truncate                    Do not truncate output to fit screen
       --page-size=<value>              [default: 100] Items per page (1-100, default: 100 for automation)
       --properties=<value>             Page properties as JSON string
+      --icon-emoji=<value>             Page icon as emoji (e.g. 💰); mutually exclusive with --icon-url
+      --icon-url=<value>               Page icon as external image URL (https://...)
+      --cover-url=<value>              Page cover as external image URL (https://...)
       --retry                          Auto-retry on rate limit (respects Retry-After header)
       --sort=<value>                   Property to sort by (prepend with - for descending)
       --timeout=<value>                [default: 30000] Request timeout in milliseconds
@@ -76,6 +79,14 @@ EXAMPLES
   Create a page with a specific source markdown file and output raw json with parent_page_id
 
     $ notion-cli page create -f ./path/to/source.md -p PARENT_PAGE_ID -r
+
+  Create a page with an emoji icon
+
+    $ notion-cli page create -d DATA_SOURCE_ID --icon-emoji 💰 --properties '{"Name": {"title": [{"text": {"content": "Budget"}}]}}'
+
+  Create a page with an external icon and cover image
+
+    $ notion-cli page create -p PARENT_PAGE_ID --icon-url https://example.com/i.png --cover-url https://example.com/c.jpg
 
   Create a page and output JSON for automation
 
@@ -237,6 +248,9 @@ FLAGS
       --no-truncate         Do not truncate output to fit screen
       --page-size=<value>   [default: 100] Items per page (1-100, default: 100 for automation)
       --properties=<value>  Page properties to update as JSON string
+      --icon-emoji=<value>  Page icon as emoji, or 'none' to clear (mutually exclusive with --icon-url)
+      --icon-url=<value>    Page icon as external image URL, or 'none' to clear
+      --cover-url=<value>   Page cover as external image URL, or 'none' to clear
       --retry               Auto-retry on rate limit (respects Retry-After header)
       --sort=<value>        Property to sort by (prepend with - for descending)
       --timeout=<value>     [default: 30000] Request timeout in milliseconds
@@ -271,6 +285,14 @@ EXAMPLES
   Update a page and unarchive
 
     $ notion-cli page update PAGE_ID -u
+
+  Set or change a page's emoji icon
+
+    $ notion-cli page update PAGE_ID --icon-emoji 🎮
+
+  Clear a previously set icon and cover
+
+    $ notion-cli page update PAGE_ID --icon-emoji none --cover-url none
 
   Update a page and archive and output raw json
 

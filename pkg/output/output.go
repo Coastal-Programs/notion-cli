@@ -79,7 +79,7 @@ func (p *Printer) PrintSuccess(data any, command string, startTime time.Time) {
 			fmt.Fprintf(os.Stderr, "Error: failed to marshal output: %v\n", err)
 			return
 		}
-		fmt.Fprintln(p.Writer, string(b))
+		_, _ = fmt.Fprintln(p.Writer, string(b))
 
 	case FormatCompactJSON:
 		env := NewSuccessEnvelope(data, command, elapsed)
@@ -88,22 +88,22 @@ func (p *Printer) PrintSuccess(data any, command string, startTime time.Time) {
 			fmt.Fprintf(os.Stderr, "Error: failed to marshal output: %v\n", err)
 			return
 		}
-		fmt.Fprintln(p.Writer, string(b))
+		_, _ = fmt.Fprintln(p.Writer, string(b))
 
 	case FormatRaw:
 		p.PrintRaw(data)
 
 	case FormatCSV:
 		headers, rows := ExtractTableData(data)
-		fmt.Fprint(p.Writer, RenderCSV(headers, rows))
+		_, _ = fmt.Fprint(p.Writer, RenderCSV(headers, rows))
 
 	case FormatMarkdown:
 		headers, rows := ExtractTableData(data)
-		fmt.Fprint(p.Writer, RenderMarkdown(headers, rows))
+		_, _ = fmt.Fprint(p.Writer, RenderMarkdown(headers, rows))
 
 	default: // FormatTable and anything else
 		headers, rows := ExtractTableData(data)
-		fmt.Fprint(p.Writer, RenderTable(headers, rows))
+		_, _ = fmt.Fprint(p.Writer, RenderTable(headers, rows))
 	}
 }
 
@@ -115,7 +115,7 @@ func (p *Printer) PrintError(code, message string, details any, suggestions []st
 		fmt.Fprintf(os.Stderr, "Error: failed to marshal output: %v\n", err)
 		return
 	}
-	fmt.Fprintln(p.ErrWriter, string(b))
+	_, _ = fmt.Fprintln(p.ErrWriter, string(b))
 }
 
 // PrintRaw outputs data as JSON without an envelope wrapper.
@@ -125,12 +125,12 @@ func (p *Printer) PrintRaw(data any) {
 		fmt.Fprintf(os.Stderr, "Error: failed to marshal output: %v\n", err)
 		return
 	}
-	fmt.Fprintln(p.Writer, string(b))
+	_, _ = fmt.Fprintln(p.Writer, string(b))
 }
 
 // PrintTable is a convenience method that formats and prints a table.
 func (p *Printer) PrintTable(headers []string, rows [][]string) {
-	fmt.Fprint(p.Writer, RenderTable(headers, rows))
+	_, _ = fmt.Fprint(p.Writer, RenderTable(headers, rows))
 }
 
 // ExtractTableData does best-effort extraction of tabular data from

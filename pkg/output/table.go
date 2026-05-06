@@ -49,7 +49,7 @@ func RenderTable(headers []string, rows [][]string) string {
 				cell = cells[i]
 			}
 			pad := widths[i] - utf8.RuneCountInString(cell)
-			b.WriteString(fmt.Sprintf(" %s%s |", cell, strings.Repeat(" ", pad)))
+			fmt.Fprintf(&b, " %s%s |", cell, strings.Repeat(" ", pad))
 		}
 		b.WriteByte('\n')
 	}
@@ -139,7 +139,7 @@ func RenderMarkdown(headers []string, rows [][]string) string {
 				cell = cells[i]
 			}
 			pad := widths[i] - utf8.RuneCountInString(cell)
-			b.WriteString(fmt.Sprintf(" %s%s |", cell, strings.Repeat(" ", pad)))
+			fmt.Fprintf(&b, " %s%s |", cell, strings.Repeat(" ", pad))
 		}
 		b.WriteByte('\n')
 	}
@@ -148,7 +148,7 @@ func RenderMarkdown(headers []string, rows [][]string) string {
 	// Separator row
 	b.WriteByte('|')
 	for _, w := range widths {
-		b.WriteString(fmt.Sprintf(" %s |", strings.Repeat("-", w)))
+		fmt.Fprintf(&b, " %s |", strings.Repeat("-", w))
 	}
 	b.WriteByte('\n')
 

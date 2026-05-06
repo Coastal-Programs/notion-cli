@@ -146,9 +146,9 @@ func runBatchRetrieve(cmd *cobra.Command, args []string) error {
 	}
 
 	data := map[string]any{
-		"results":       successResults,
-		"result_count":  len(successResults),
-		"error_count":   len(errors),
+		"results":         successResults,
+		"result_count":    len(successResults),
+		"error_count":     len(errors),
 		"total_requested": len(resolvedIDs),
 	}
 	if len(errors) > 0 {

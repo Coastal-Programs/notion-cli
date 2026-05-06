@@ -24,6 +24,14 @@ jobs:
       with:
         go-version: '1.26'
 
+    - name: Verify OAuth secrets
+      env:
+        NOTION_OAUTH_CLIENT_ID: ${{ secrets.NOTION_OAUTH_CLIENT_ID }}
+        NOTION_OAUTH_SECRET: ${{ secrets.NOTION_OAUTH_SECRET }}
+      run: |
+        test -n "$NOTION_OAUTH_CLIENT_ID" || { echo "::error::NOTION_OAUTH_CLIENT_ID secret is missing"; exit 1; }
+        test -n "$NOTION_OAUTH_SECRET"    || { echo "::error::NOTION_OAUTH_SECRET secret is missing";    exit 1; }
+
     - name: Run tests
       run: go test ./... -race -count=1
 
@@ -69,6 +77,14 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: '1.26'
+
+    - name: Verify OAuth secrets
+      env:
+        NOTION_OAUTH_CLIENT_ID: ${{ secrets.NOTION_OAUTH_CLIENT_ID }}
+        NOTION_OAUTH_SECRET: ${{ secrets.NOTION_OAUTH_SECRET }}
+      run: |
+        test -n "$NOTION_OAUTH_CLIENT_ID" || { echo "::error::NOTION_OAUTH_CLIENT_ID secret is missing"; exit 1; }
+        test -n "$NOTION_OAUTH_SECRET"    || { echo "::error::NOTION_OAUTH_SECRET secret is missing";    exit 1; }
 
     - name: Build platform binaries
       env:
