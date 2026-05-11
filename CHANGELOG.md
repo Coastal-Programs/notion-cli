@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.1] - 2026-05-11
+
 ### Breaking
 - **Go module path is now `github.com/Coastal-Programs/notion-cli/v6`.** Per Go's [major-version-suffix rule](https://go.dev/ref/mod#major-version-suffixes), modules at v2+ must carry a `/vN` suffix. Without it, `go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@latest` resolved to `v5.9.0+incompatible` and failed because that older tag did not contain `cmd/notion-cli`. Update any `go install` command and any `import` of `pkg/output` to use the `/v6` prefix (e.g. `go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@latest`). Fixes #86.
 
