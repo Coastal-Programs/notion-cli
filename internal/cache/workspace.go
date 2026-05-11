@@ -18,10 +18,20 @@ type DatabaseEntry struct {
 	LastEdited   time.Time `json:"last_edited"`
 }
 
+// DataSourceEntry represents a cached Notion data source.
+type DataSourceEntry struct {
+	ID         string    `json:"id"`
+	DatabaseID string    `json:"database_id"`
+	Title      string    `json:"title"`
+	URL        string    `json:"url"`
+	LastEdited time.Time `json:"last_edited"`
+}
+
 // WorkspaceData holds the full workspace cache data.
 type WorkspaceData struct {
-	Databases []DatabaseEntry `json:"databases"`
-	LastSync  time.Time       `json:"last_sync"`
+	Databases   []DatabaseEntry   `json:"databases"`
+	DataSources []DataSourceEntry `json:"data_sources,omitempty"`
+	LastSync    time.Time         `json:"last_sync"`
 }
 
 // WorkspaceCache manages persistent workspace database caching.
@@ -149,4 +159,47 @@ func (w *WorkspaceCache) Count() int {
 		return 0
 	}
 	return len(w.data.Databases)
+}
+
+// GetDataSources returns all cached data source entries.
+func (w *WorkspaceCache) GetDataSources() []DataSourceEntry {
+	if w.data == nil {
+		return nil
+	}
+	return w.data.DataSources
+}
+
+// SetDataSources replaces the cached data sources.
+func (w *WorkspaceCache) SetDataSources(entries []DataSourceEntry) {
+	w.data.DataSources = entries
+}
+
+// FindDataSourceByID returns the data source with the given ID, or nil if not found.
+func (w *WorkspaceCache) FindDataSourceByID(id string) *DataSourceEntry {
+	for i := range w.data.DataSources {
+		if w.data.DataSources[i].ID == id {
+			return &w.data.DataSources[i]
+		}
+	}
+	return nil
+}
+
+// FindDataSourceByName returns the first data source whose title contains name
+// (case-insensitive substring match), or nil if not found.
+func (w *WorkspaceCache) FindDataSourceByName(name string) *DataSourceEntry {
+	lower := strings.ToLower(name)
+	for i := range w.data.DataSources {
+		if strings.Contains(strings.ToLower(w.data.DataSources[i].Title), lower) {
+			return &w.data.DataSources[i]
+		}
+	}
+	return nil
+}
+
+// DataSourceCount returns the number of cached data sources.
+func (w *WorkspaceCache) DataSourceCount() int {
+	if w.data == nil {
+		return 0
+	}
+	return len(w.data.DataSources)
 }

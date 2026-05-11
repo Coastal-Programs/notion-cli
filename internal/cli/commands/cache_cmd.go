@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -69,17 +69,24 @@ func runCacheInfo(cmd *cobra.Command, args []string) error {
 		// Check disk cache directory.
 		diskCacheDir := filepath.Join(dataDir, "cache")
 		if info, err := os.Stat(diskCacheDir); err == nil && info.IsDir() {
-			entries, _ := os.ReadDir(diskCacheDir)
-			var totalSize int64
-			for _, e := range entries {
-				if fi, err := e.Info(); err == nil {
-					totalSize += fi.Size()
+			entries, readErr := os.ReadDir(diskCacheDir)
+			if readErr != nil {
+				data["disk_cache"] = map[string]any{
+					"path":  diskCacheDir,
+					"error": fmt.Sprintf("failed to read disk cache directory: %v", readErr),
 				}
-			}
-			data["disk_cache"] = map[string]any{
-				"path":       diskCacheDir,
-				"entries":    len(entries),
-				"total_size": totalSize,
+			} else {
+				var totalSize int64
+				for _, e := range entries {
+					if fi, err := e.Info(); err == nil {
+						totalSize += fi.Size()
+					}
+				}
+				data["disk_cache"] = map[string]any{
+					"path":       diskCacheDir,
+					"entries":    len(entries),
+					"total_size": totalSize,
+				}
 			}
 		} else {
 			data["disk_cache"] = map[string]any{

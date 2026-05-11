@@ -3,7 +3,7 @@ package output
 import (
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
 )
 
 // SuccessEnvelope wraps successful command output.

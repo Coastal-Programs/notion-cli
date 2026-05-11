@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/internal/notion"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -74,10 +74,51 @@ func newBlockAppendCmd() *cobra.Command {
 	cmd.Flags().String("language", "plain text", "Language for code block")
 	cmd.Flags().String("quote", "", "Append a quote block")
 	cmd.Flags().String("callout", "", "Append a callout block")
-	cmd.Flags().StringP("after", "a", "", "Insert after this block ID")
+
+	// Position flags (Notion API 2026-03-11).
+	cmd.Flags().String("position", "end", "Insert position: end, start, or after")
+	cmd.Flags().String("after-block", "", "Block ID to insert after (required when --position=after)")
+
+	// Deprecated: --after is replaced by --position=after --after-block <id>.
+	cmd.Flags().String("after", "", "[DEPRECATED] Insert after this block ID. Use --position=after --after-block <id>.")
+	_ = cmd.Flags().MarkDeprecated("after", "use --position=after --after-block <id>")
+
+	cmd.PreRunE = validateBlockAppendFlags
 
 	addOutputFlags(cmd)
 	return cmd
+}
+
+// validateBlockAppendFlags ensures --position has a valid value and that
+// --after-block is supplied when --position=after.
+func validateBlockAppendFlags(cmd *cobra.Command, _ []string) error {
+	position, _ := cmd.Flags().GetString("position")
+	switch position {
+	case "end", "start", "after":
+	default:
+		return &clierrors.NotionCLIError{
+			Code:        clierrors.CodeInvalidEnum,
+			Message:     fmt.Sprintf("Invalid --position value: %s", position),
+			Suggestions: []string{"Valid values: end, start, after"},
+		}
+	}
+
+	afterBlock, _ := cmd.Flags().GetString("after-block")
+	if position == "after" && afterBlock == "" {
+		return &clierrors.NotionCLIError{
+			Code:        clierrors.CodeMissingRequired,
+			Message:     "--after-block is required when --position=after",
+			Suggestions: []string{"Provide --after-block <block_id>"},
+		}
+	}
+	if afterBlock != "" && position != "after" {
+		return &clierrors.NotionCLIError{
+			Code:        clierrors.CodeInvalidEnum,
+			Message:     "--after-block requires --position=after",
+			Suggestions: []string{"Set --position=after when supplying --after-block"},
+		}
+	}
+	return nil
 }
 
 func runBlockAppend(cmd *cobra.Command, _ []string) error {
@@ -114,12 +155,12 @@ func runBlockAppend(cmd *cobra.Command, _ []string) error {
 		"children": children,
 	}
 
-	if after, _ := cmd.Flags().GetString("after"); after != "" {
-		afterID, err := resolveID(after)
-		if err != nil {
-			return handleError(cmd, err)
-		}
-		body["after"] = afterID
+	position, err := buildPosition(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	if position != nil {
+		body["position"] = position
 	}
 
 	result, err := client.BlockChildrenAppend(cmd.Context(), blockID, body)
@@ -130,6 +171,50 @@ func runBlockAppend(cmd *cobra.Command, _ []string) error {
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(result, "block append", start)
 	return nil
+}
+
+// buildPosition returns the Notion API "position" object based on --position,
+// --after-block, and the deprecated --after flag. Returns nil when the position
+// is the default ("end") and no flags were supplied.
+func buildPosition(cmd *cobra.Command) (map[string]any, error) {
+	legacyAfter, _ := cmd.Flags().GetString("after")
+	position, _ := cmd.Flags().GetString("position")
+	afterBlock, _ := cmd.Flags().GetString("after-block")
+
+	// Legacy --after: translate to position.after_block.
+	if legacyAfter != "" {
+		fmt.Fprintln(os.Stderr, "Warning: --after is deprecated. Use --position=after --after-block <id>.")
+		if !cmd.Flags().Changed("position") && afterBlock == "" {
+			id, err := resolveID(legacyAfter)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{
+				"type":        "after_block",
+				"after_block": map[string]any{"id": id},
+			}, nil
+		}
+	}
+
+	switch position {
+	case "start":
+		return map[string]any{"type": "start"}, nil
+	case "after":
+		id, err := resolveID(afterBlock)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"type":        "after_block",
+			"after_block": map[string]any{"id": id},
+		}, nil
+	case "end":
+		if cmd.Flags().Changed("position") {
+			return map[string]any{"type": "end"}, nil
+		}
+		return nil, nil
+	}
+	return nil, nil
 }
 
 // buildChildren constructs the children array from either --children JSON or
@@ -427,10 +512,10 @@ func runBlockUpdate(cmd *cobra.Command, args []string) error {
 func buildUpdateBody(cmd *cobra.Command) (map[string]any, error) {
 	body := map[string]any{}
 
-	// --archived flag.
+	// --archived flag. Notion API 2026-03-11 renamed `archived` -> `in_trash`.
 	if cmd.Flags().Changed("archived") {
 		archived, _ := cmd.Flags().GetBool("archived")
-		body["archived"] = archived
+		body["in_trash"] = archived
 	}
 
 	// --content raw JSON.

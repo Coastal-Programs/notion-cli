@@ -1,7 +1,15 @@
 package resolver
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	cliErrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/retry"
 )
 
 func TestExtractID(t *testing.T) {
@@ -220,5 +228,162 @@ func TestExtractID_MixedCaseUUID(t *testing.T) {
 	want := "8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f"
 	if id != want {
 		t.Errorf("got %q, want %q", id, want)
+	}
+}
+
+// newTestClient returns a notion.Client pointed at the given test server URL.
+func newTestClient(srvURL string) *notion.Client {
+	return notion.NewClient("test-token",
+		notion.WithBaseURL(srvURL),
+		notion.WithRetryConfig(retry.RetryConfig{MaxRetries: 0}),
+	)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func TestPrimaryDataSourceID_Success(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"object": "database",
+			"id":     "db-abc",
+			"data_sources": []any{
+				map[string]any{"id": "ds-abc"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	id, err := PrimaryDataSourceID(context.Background(), c, "db-abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id != "ds-abc" {
+		t.Errorf("id = %q, want %q", id, "ds-abc")
+	}
+}
+
+func TestPrimaryDataSourceID_APIError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 404, map[string]any{"code": "object_not_found", "message": "not found"})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	_, err := PrimaryDataSourceID(context.Background(), c, "db-missing")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestPrimaryDataSourceID_NoDataSources(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"object":       "database",
+			"id":           "db-empty",
+			"data_sources": []any{},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	_, err := PrimaryDataSourceID(context.Background(), c, "db-empty")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var cliErr *cliErrors.NotionCLIError
+	if !isNotionCLIError(err, &cliErr) || cliErr.Code != cliErrors.CodeDataSourceNotFound {
+		t.Errorf("expected CodeDataSourceNotFound, got %v", err)
+	}
+}
+
+func TestPrimaryDataSourceID_MalformedEntry(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"object":       "database",
+			"id":           "db-bad",
+			"data_sources": []any{42},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	_, err := PrimaryDataSourceID(context.Background(), c, "db-bad")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var cliErr *cliErrors.NotionCLIError
+	if !isNotionCLIError(err, &cliErr) || cliErr.Code != cliErrors.CodeDataSourceNotFound {
+		t.Errorf("expected CodeDataSourceNotFound, got %v", err)
+	}
+}
+
+func TestPrimaryDataSourceID_MissingID(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"object":       "database",
+			"id":           "db-noid",
+			"data_sources": []any{map[string]any{}},
+		})
+	}))
+	defer srv.Close()
+
+	c := newTestClient(srv.URL)
+	_, err := PrimaryDataSourceID(context.Background(), c, "db-noid")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var cliErr *cliErrors.NotionCLIError
+	if !isNotionCLIError(err, &cliErr) || cliErr.Code != cliErrors.CodeDataSourceNotFound {
+		t.Errorf("expected CodeDataSourceNotFound, got %v", err)
+	}
+}
+
+// isNotionCLIError asserts err is a *cliErrors.NotionCLIError and assigns it.
+func isNotionCLIError(err error, out **cliErrors.NotionCLIError) bool {
+	if e, ok := err.(*cliErrors.NotionCLIError); ok {
+		*out = e
+		return true
+	}
+	return false
+}
+
+func TestExtractID_DataSourceQueryParam(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			"dataSource param extracts data source ID",
+			"https://notion.so/workspace/page-8c4d6e5fa1b23c4d5e6f7a8b9c0d1e2f?v=abc&dataSource=aabbccdd00112233aabbccdd00112233",
+			"aabbccdd-0011-2233-aabb-ccdd00112233",
+		},
+		{
+			"dataSource param with hyphenated UUID value",
+			"https://notion.so/ws/db-8c4d6e5fa1b23c4d5e6f7a8b9c0d1e2f?dataSource=aabbccdd-0011-2233-aabb-ccdd00112233",
+			"aabbccdd-0011-2233-aabb-ccdd00112233",
+		},
+		{
+			"no dataSource param falls back to path ID",
+			"https://notion.so/workspace/8c4d6e5fa1b23c4d5e6f7a8b9c0d1e2f",
+			"8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractID(tt.input)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("ExtractID(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
 	}
 }

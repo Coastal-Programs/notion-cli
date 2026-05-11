@@ -1,0 +1,23 @@
+# Lefthook hooks for notion-cli
+# Install: `brew install lefthook` (or `go install github.com/evilmartians/lefthook@latest`)
+# Activate: `lefthook install`
+# Docs: https://lefthook.dev
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: gofmt
+      glob: "*.go"
+      run: |
+        unformatted=$(gofmt -s -l {staged_files})
+        if [ -n "$unformatted" ]; then
+          echo "The following files need gofmt:"
+          echo "$unformatted"
+          echo ""
+          echo "Run: make fmt"
+          exit 1
+        fi
+
+    - name: go-vet
+      glob: "*.go"
+      run: go vet ./...

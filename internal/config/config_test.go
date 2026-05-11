@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDefaults(t *testing.T) {
@@ -478,6 +479,106 @@ func TestGetConfigValue_OAuthKeys(t *testing.T) {
 		if got := GetConfigValue(key); got != want {
 			t.Errorf("GetConfigValue(%q) = %q, want %q", key, got, want)
 		}
+	}
+}
+
+func TestNeedsRefresh_NoRefreshToken(t *testing.T) {
+	cfg := &Config{OAuthTokenExpiresAt: time.Now().Add(-1 * time.Minute).Format(time.RFC3339)}
+	if cfg.NeedsRefresh() {
+		t.Error("NeedsRefresh() should be false when no refresh token")
+	}
+}
+
+func TestNeedsRefresh_NoExpiresAt(t *testing.T) {
+	cfg := &Config{OAuthRefreshToken: "rt_abc"}
+	if cfg.NeedsRefresh() {
+		t.Error("NeedsRefresh() should be false when no expires_at")
+	}
+}
+
+func TestNeedsRefresh_InvalidTimestamp(t *testing.T) {
+	cfg := &Config{OAuthRefreshToken: "rt_abc", OAuthTokenExpiresAt: "not-a-date"}
+	if cfg.NeedsRefresh() {
+		t.Error("NeedsRefresh() should be false on parse error")
+	}
+}
+
+func TestNeedsRefresh_ExpiresInFuture_NotSoon(t *testing.T) {
+	cfg := &Config{
+		OAuthRefreshToken:   "rt_abc",
+		OAuthTokenExpiresAt: time.Now().Add(10 * time.Minute).Format(time.RFC3339),
+	}
+	if cfg.NeedsRefresh() {
+		t.Error("NeedsRefresh() should be false when expires in 10 min")
+	}
+}
+
+func TestNeedsRefresh_ExpiringSoon(t *testing.T) {
+	cfg := &Config{
+		OAuthRefreshToken:   "rt_abc",
+		OAuthTokenExpiresAt: time.Now().Add(4 * time.Minute).Format(time.RFC3339),
+	}
+	if !cfg.NeedsRefresh() {
+		t.Error("NeedsRefresh() should be true when expires in 4 min")
+	}
+}
+
+func TestNeedsRefresh_AlreadyExpired(t *testing.T) {
+	cfg := &Config{
+		OAuthRefreshToken:   "rt_abc",
+		OAuthTokenExpiresAt: time.Now().Add(-1 * time.Minute).Format(time.RFC3339),
+	}
+	if !cfg.NeedsRefresh() {
+		t.Error("NeedsRefresh() should be true when already expired")
+	}
+}
+
+func TestGetConfigValue_OAuthRefreshToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Unsetenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+
+	cfg := &Config{OAuthRefreshToken: "rt_refresh_123"}
+	if err := SaveConfig(cfg); err != nil {
+		t.Fatalf("SaveConfig() error: %v", err)
+	}
+
+	if got := GetConfigValue("oauth_refresh_token"); got != "rt_refresh_123" {
+		t.Errorf("GetConfigValue(oauth_refresh_token) = %q, want %q", got, "rt_refresh_123")
+	}
+}
+
+func TestGetConfigValue_OAuthTokenExpiresAt(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Unsetenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+
+	expiry := time.Now().Add(1 * time.Hour).Format(time.RFC3339)
+	cfg := &Config{OAuthTokenExpiresAt: expiry}
+	if err := SaveConfig(cfg); err != nil {
+		t.Fatalf("SaveConfig() error: %v", err)
+	}
+
+	if got := GetConfigValue("oauth_token_expires_at"); got != expiry {
+		t.Errorf("GetConfigValue(oauth_token_expires_at) = %q, want %q", got, expiry)
 	}
 }
 

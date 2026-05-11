@@ -4,7 +4,7 @@ notion-cli is a Go binary distributed through three channels:
 
 1. **npm** (primary) -- platform-specific binary packages via `npm install -g @coastal-programs/notion-cli`
 2. **GitHub Releases** -- direct binary downloads for all platforms
-3. **Go module** -- `go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@latest`
+3. **Go module** -- `go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@latest`
 
 ---
 
@@ -219,10 +219,10 @@ Go module versions are published automatically when you push a git tag that matc
 
 ```bash
 # Users can install directly via Go:
-go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@latest
+go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@latest
 
 # Or a specific version:
-go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@v6.0.0
+go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@v6.4.0
 ```
 
 Go modules are served by the Go module proxy (proxy.golang.org) which automatically caches tagged versions from the git repository. After pushing a tag, the module becomes available within a few minutes.
@@ -308,7 +308,7 @@ Before every release, verify:
 
 **Go install fails**
 - Ensure Go is installed and `GOPATH/bin` is in your PATH.
-- Try with explicit version: `go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@v6.0.0`
+- Try with explicit version: `go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@v6.4.0`
 
 **Platform package missing binary**
 - Each platform `npm/*/` directory needs a `bin/` folder with the compiled binary before publishing. Run `make release` and copy binaries into place (see "Publishing Platform Packages").

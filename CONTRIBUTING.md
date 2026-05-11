@@ -39,7 +39,7 @@ This project follows a simple code of conduct: be respectful, constructive, and 
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.26 or later
 - Make
 - Git
 - golangci-lint (optional, for extended linting)
@@ -93,6 +93,28 @@ Security rules:
 - Treat the "secret" as a soft secret — anyone with a release binary can extract it via `strings` (this is accepted in OAuth native-app distribution; PKCE mitigates the risk).
 - If a credential leaks, rotate it in the Notion integration settings and cut a patch release.
 - CI logs auto-redact GitHub Actions secrets; locally, `make build` is silenced so the ldflags don't echo to your terminal.
+
+### Pre-commit hooks (Lefthook)
+
+We use [Lefthook](https://lefthook.dev) to run `gofmt` and `go vet` against staged Go files before each commit, so formatting drift never reaches CI. Hooks are opt-in per contributor.
+
+Install the Lefthook binary once:
+
+```bash
+# macOS (recommended)
+brew install lefthook
+
+# Or via Go (any platform)
+go install github.com/evilmartians/lefthook@latest
+```
+
+Then, from the repo root, wire up the git hooks:
+
+```bash
+lefthook install
+```
+
+That writes the hook scripts into `.git/hooks/`. Config lives in `lefthook.yml` (committed); per-contributor overrides go in `lefthook-local.yml` (gitignored).
 
 ## Code Style Guidelines
 

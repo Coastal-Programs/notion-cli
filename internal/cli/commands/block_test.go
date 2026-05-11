@@ -9,9 +9,21 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Coastal-Programs/notion-cli/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
 	"github.com/spf13/cobra"
 )
+
+func runBlockRoot(t *testing.T, args ...string) (*cobra.Command, *bytes.Buffer, error) {
+	t.Helper()
+	root := &cobra.Command{Use: "notion-cli", SilenceErrors: true, SilenceUsage: true}
+	RegisterBlockCommands(root)
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	root.SetArgs(args)
+	err := root.Execute()
+	return root, &buf, err
+}
 
 // testBlockServer creates a test HTTP server that mimics the Notion API for
 // block endpoints. It returns the server and a cleanup function.
@@ -20,7 +32,9 @@ func testBlockServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, 
 	srv := httptest.NewServer(handler)
 
 	origToken := os.Getenv("NOTION_TOKEN")
+	origBase := os.Getenv("NOTION_CLI_BASE_URL")
 	_ = os.Setenv("NOTION_TOKEN", "secret_test_token")
+	_ = os.Setenv("NOTION_CLI_BASE_URL", srv.URL)
 
 	return srv, func() {
 		srv.Close()
@@ -28,6 +42,11 @@ func testBlockServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, 
 			_ = os.Unsetenv("NOTION_TOKEN")
 		} else {
 			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+		if origBase == "" {
+			_ = os.Unsetenv("NOTION_CLI_BASE_URL")
+		} else {
+			_ = os.Setenv("NOTION_CLI_BASE_URL", origBase)
 		}
 	}
 }
@@ -236,8 +255,11 @@ func TestBuildUpdateBody_Archived(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if body["archived"] != true {
-		t.Error("expected archived to be true")
+	if body["in_trash"] != true {
+		t.Error("expected in_trash to be true")
+	}
+	if _, ok := body["archived"]; ok {
+		t.Error("expected legacy `archived` key not to be set; Notion API 2026-03-11 uses `in_trash`")
 	}
 }
 
@@ -620,6 +642,126 @@ func TestBlockAliases(t *testing.T) {
 	}
 }
 
+// newPositionTestCmd builds a cobra command with the position-related flags
+// used by buildPosition.
+func newPositionTestCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("position", "end", "")
+	cmd.Flags().String("after-block", "", "")
+	cmd.Flags().String("after", "", "")
+	return cmd
+}
+
+func TestBuildPosition_EndDefault(t *testing.T) {
+	cmd := newPositionTestCmd()
+	pos, err := buildPosition(cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pos != nil {
+		t.Errorf("want nil position when unset, got %v", pos)
+	}
+}
+
+func TestBuildPosition_EndExplicit(t *testing.T) {
+	cmd := newPositionTestCmd()
+	_ = cmd.Flags().Set("position", "end")
+	pos, err := buildPosition(cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pos == nil || pos["type"] != "end" {
+		t.Errorf("want {type: end}, got %v", pos)
+	}
+}
+
+func TestBuildPosition_Start(t *testing.T) {
+	cmd := newPositionTestCmd()
+	_ = cmd.Flags().Set("position", "start")
+	pos, err := buildPosition(cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pos == nil || pos["type"] != "start" {
+		t.Errorf("want {type: start}, got %v", pos)
+	}
+	if _, ok := pos["after_block"]; ok {
+		t.Errorf("start should not include after_block: %v", pos)
+	}
+}
+
+func TestBuildPosition_AfterBlock(t *testing.T) {
+	cmd := newPositionTestCmd()
+	const id = "11111111-1111-1111-1111-111111111111"
+	_ = cmd.Flags().Set("position", "after")
+	_ = cmd.Flags().Set("after-block", id)
+	pos, err := buildPosition(cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pos == nil || pos["type"] != "after_block" {
+		t.Fatalf("want type after_block, got %v", pos)
+	}
+	ab, ok := pos["after_block"].(map[string]any)
+	if !ok {
+		t.Fatalf("after_block missing: %v", pos)
+	}
+	if ab["id"] != id {
+		t.Errorf("id = %v, want %v", ab["id"], id)
+	}
+}
+
+func TestBuildPosition_LegacyAfterDeprecated(t *testing.T) {
+	cmd := newPositionTestCmd()
+	const id = "22222222-2222-2222-2222-222222222222"
+
+	// Capture stderr to confirm the deprecation warning is emitted.
+	orig := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	defer func() { os.Stderr = orig }()
+
+	_ = cmd.Flags().Set("after", id)
+	pos, err := buildPosition(cmd)
+	_ = w.Close()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	if !bytes.Contains(buf.Bytes(), []byte("deprecated")) {
+		t.Errorf("expected deprecation warning on stderr, got %q", buf.String())
+	}
+
+	if pos == nil || pos["type"] != "after_block" {
+		t.Fatalf("want type after_block, got %v", pos)
+	}
+	ab, ok := pos["after_block"].(map[string]any)
+	if !ok {
+		t.Fatalf("after_block missing: %v", pos)
+	}
+	if ab["id"] != id {
+		t.Errorf("id = %v, want %v", ab["id"], id)
+	}
+}
+
+func TestValidateBlockAppendFlags_InvalidPosition(t *testing.T) {
+	cmd := newBlockAppendCmd()
+	_ = cmd.Flags().Set("position", "middle")
+	if err := validateBlockAppendFlags(cmd, nil); err == nil {
+		t.Error("expected error for invalid position")
+	}
+}
+
+func TestValidateBlockAppendFlags_AfterRequiresAfterBlock(t *testing.T) {
+	cmd := newBlockAppendCmd()
+	_ = cmd.Flags().Set("position", "after")
+	if err := validateBlockAppendFlags(cmd, nil); err == nil {
+		t.Error("expected error when --position=after has no --after-block")
+	}
+}
+
 func TestAllShorthandBlockTypes(t *testing.T) {
 	// Verify each shorthand flag produces the correct block type.
 	tests := []struct {
@@ -673,5 +815,103 @@ func TestAllShorthandBlockTypes(t *testing.T) {
 				t.Errorf("missing %q key in block", tt.blockType)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Block command integration tests (with test server)
+// ---------------------------------------------------------------------------
+
+const testBlockID = "11111111111111111111111111111111"
+
+func TestBlockRetrieve_Success(t *testing.T) {
+	_, cleanup := testBlockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "block", "id": testBlockID})
+	})
+	defer cleanup()
+
+	_, _, err := runBlockRoot(t, "block", "retrieve", testBlockID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBlockRetrieve_RequiresArg(t *testing.T) {
+	_, _, err := runBlockRoot(t, "block", "retrieve")
+	if err == nil {
+		t.Fatal("expected error when no block_id given")
+	}
+}
+
+func TestBlockChildren_Success(t *testing.T) {
+	_, cleanup := testBlockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"object":   "list",
+			"results":  []any{map[string]any{"object": "block", "id": "child-1"}},
+			"has_more": false,
+		})
+	})
+	defer cleanup()
+
+	_, _, err := runBlockRoot(t, "block", "children", testBlockID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBlockUpdate_Success(t *testing.T) {
+	_, cleanup := testBlockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "block", "id": testBlockID})
+	})
+	defer cleanup()
+
+	_, _, err := runBlockRoot(t, "block", "update", testBlockID, "--text", "Updated text")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBlockDelete_Success(t *testing.T) {
+	_, cleanup := testBlockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "block", "id": testBlockID, "archived": true})
+	})
+	defer cleanup()
+
+	_, _, err := runBlockRoot(t, "block", "delete", testBlockID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestBlockAppend_Success(t *testing.T) {
+	_, cleanup := testBlockServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "block", "id": testBlockID})
+	})
+	defer cleanup()
+
+	_, _, err := runBlockRoot(t, "block", "append", "--block-id", testBlockID, "--text", "Hello")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

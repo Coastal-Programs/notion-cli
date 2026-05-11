@@ -49,6 +49,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+lefthook-local.yml
 
 # Build artifacts
 dist/

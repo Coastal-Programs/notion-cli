@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/notion"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 

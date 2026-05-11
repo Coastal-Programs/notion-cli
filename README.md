@@ -16,7 +16,7 @@
     <img src="https://img.shields.io/npm/v/@coastal-programs/notion-cli.svg" alt="npm version">
   </a>
   <a href="https://go.dev/">
-    <img src="https://img.shields.io/badge/go-%3E%3D1.21-00ADD8.svg" alt="Go Version">
+    <img src="https://img.shields.io/badge/go-%3E%3D1.26-00ADD8.svg" alt="Go Version">
   </a>
   <a href="https://github.com/Coastal-Programs/notion-cli/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
@@ -62,6 +62,13 @@ All 26 commands have been ported with identical syntax -- existing scripts work 
 
 **v6.1.0: OAuth Authentication** -- `notion-cli auth login` opens your browser, you authorize, done. No more copying tokens manually.
 
+**Unreleased (next):**
+- `data-source templates` and `data-source properties update` subcommands.
+- `db query` emits a deprecation notice (suppress with `--quiet`); migrate to `data-source query <id>` for direct access.
+- `ds` alias now routes to `data-source` (was `db`) — update any scripts using `notion-cli ds`.
+- Workspace sync now indexes data sources; `list` includes them in output.
+- Resolver handles `?dataSource=<id>` query params in Notion URLs.
+
 **Technical details:**
 - 36 Go source files, ~9,800 lines of code
 - 196 tests across 9 test suites, all passing
@@ -84,10 +91,10 @@ This installs a thin npm wrapper that downloads the correct platform-specific bi
 
 **Option 2: Go install (from source)**
 ```bash
-go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@latest
+go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@latest
 ```
 
-Requires Go 1.21+.
+Requires Go 1.26+.
 
 **Option 3: Build from source**
 ```bash
@@ -588,7 +595,7 @@ notion-cli is built in Go with a focus on simplicity, reliability, and minimal d
 
 ### Prerequisites
 
-- Go 1.21+ (the go.mod specifies 1.25, but the project targets 1.21+ compatibility)
+- Go 1.26+ (matches the version declared in go.mod; CI tracks go.mod via setup-go's go-version-file input)
 - Git
 - Make
 - (Optional) [golangci-lint](https://golangci-lint.run/) for extended linting

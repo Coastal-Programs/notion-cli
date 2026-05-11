@@ -1,4 +1,4 @@
-module github.com/Coastal-Programs/notion-cli
+module github.com/Coastal-Programs/notion-cli/v6
 
 go 1.26
 

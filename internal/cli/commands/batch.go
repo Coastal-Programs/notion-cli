@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/internal/notion"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 

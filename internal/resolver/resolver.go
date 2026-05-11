@@ -4,9 +4,14 @@
 package resolver
 
 import (
+	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
+
+	cliErrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
 )
 
 // hexPattern matches exactly 32 hexadecimal characters.
@@ -45,8 +50,21 @@ func ExtractID(input string) (string, error) {
 		return FormatID(lower), nil
 	}
 
-	// Case 3: Notion URL — extract the last 32 hex chars.
+	// Case 3: Notion URL — check dataSource= query param first, then path ID.
 	if strings.Contains(lower, "notion.so") || strings.Contains(lower, "notion.site") {
+		if u, err := url.Parse(input); err == nil {
+			// Try both casing variants of the dataSource param.
+			ds := u.Query().Get("dataSource")
+			if ds == "" {
+				ds = u.Query().Get("datasource")
+			}
+			if ds != "" {
+				stripped := StripHyphens(strings.ToLower(ds))
+				if hexPattern.MatchString(stripped) && len(stripped) == 32 {
+					return FormatID(stripped), nil
+				}
+			}
+		}
 		if m := urlIDPattern.FindStringSubmatch(lower); len(m) > 1 {
 			return FormatID(m[1]), nil
 		}
@@ -91,4 +109,53 @@ func IsValidID(s string) bool {
 // StripHyphens removes all hyphens from s.
 func StripHyphens(s string) string {
 	return strings.ReplaceAll(s, "-", "")
+}
+
+// PrimaryDataSourceID returns the ID of the first data source attached to the
+// given database. Per the 2025-09-03 Notion API contract, every database has
+// at least one data source; this helper extracts data_sources[0].id from a
+// DatabaseRetrieve response.
+//
+// Returns a NotionCLIError with code data_source_not_found if the response
+// does not contain a non-empty data_sources array.
+func PrimaryDataSourceID(ctx context.Context, c *notion.Client, databaseID string) (string, error) {
+	db, err := c.DatabaseRetrieve(ctx, databaseID)
+	if err != nil {
+		return "", err
+	}
+
+	raw, ok := db["data_sources"].([]any)
+	if !ok || len(raw) == 0 {
+		return "", &cliErrors.NotionCLIError{
+			Code:    cliErrors.CodeDataSourceNotFound,
+			Message: fmt.Sprintf("database %s has no data sources", databaseID),
+			Suggestions: []string{
+				"Run 'notion-cli sync' to refresh the workspace cache",
+				"Verify the database is shared with your integration",
+			},
+		}
+	}
+
+	first, ok := raw[0].(map[string]any)
+	if !ok {
+		return "", &cliErrors.NotionCLIError{
+			Code:    cliErrors.CodeDataSourceNotFound,
+			Message: fmt.Sprintf("database %s returned malformed data_sources entry", databaseID),
+			Suggestions: []string{
+				"Run 'notion-cli sync' to refresh the workspace cache",
+			},
+		}
+	}
+
+	id, _ := first["id"].(string)
+	if id == "" {
+		return "", &cliErrors.NotionCLIError{
+			Code:    cliErrors.CodeDataSourceNotFound,
+			Message: fmt.Sprintf("database %s data source missing id field", databaseID),
+			Suggestions: []string{
+				"Run 'notion-cli sync' to refresh the workspace cache",
+			},
+		}
+	}
+	return id, nil
 }

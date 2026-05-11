@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/cache"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/cache"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -53,9 +53,10 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	if !force && !wc.IsStale() && wc.Count() > 0 {
 		p := output.NewPrinter(outputFormat(cmd))
 		p.PrintSuccess(map[string]any{
-			"message":   "Cache is fresh, skipping sync (use --force to override)",
-			"databases": wc.Count(),
-			"last_sync": wc.LastSyncTime().Format(time.RFC3339),
+			"message":      "Cache is fresh, skipping sync (use --force to override)",
+			"databases":    wc.Count(),
+			"data_sources": wc.DataSourceCount(),
+			"last_sync":    wc.LastSyncTime().Format(time.RFC3339),
 		}, "sync", start)
 		return nil
 	}
@@ -63,6 +64,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	_, _ = fmt.Fprintln(cmd.OutOrStderr(), "Syncing workspace databases...")
 
 	var allDatabases []cache.DatabaseEntry
+	var allDataSources []cache.DataSourceEntry
 	var startCursor string
 	pageCount := 0
 
@@ -127,6 +129,26 @@ func runSync(cmd *cobra.Command, _ []string) error {
 			entry.Aliases = generateAliases(entry.Title)
 
 			allDatabases = append(allDatabases, entry)
+
+			// Extract embedded data_sources if present.
+			if dsArr, ok := db["data_sources"].([]any); ok {
+				for _, rawDS := range dsArr {
+					dsMap, ok := rawDS.(map[string]any)
+					if !ok {
+						continue
+					}
+					dsEntry := cache.DataSourceEntry{
+						ID:         fmt.Sprintf("%v", dsMap["id"]),
+						DatabaseID: entry.ID,
+						Title:      entry.Title,
+						URL:        entry.URL,
+						LastEdited: entry.LastEdited,
+					}
+					if dsEntry.ID != "" && dsEntry.ID != "<nil>" {
+						allDataSources = append(allDataSources, dsEntry)
+					}
+				}
+			}
 		}
 
 		_, _ = fmt.Fprintf(cmd.OutOrStderr(), "  Found %d databases so far...\n", len(allDatabases))
@@ -140,6 +162,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	}
 
 	wc.SetDatabases(allDatabases)
+	wc.SetDataSources(allDataSources)
 	if err := wc.Save(); err != nil {
 		return handleError(cmd, &clierrors.NotionCLIError{
 			Code:    clierrors.CodeInternalError,
@@ -148,13 +171,14 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	}
 
 	elapsed := time.Since(start)
-	_, _ = fmt.Fprintf(cmd.OutOrStderr(), "Synced %d databases in %s\n", len(allDatabases), elapsed.Round(time.Millisecond))
+	_, _ = fmt.Fprintf(cmd.OutOrStderr(), "Synced %d databases (%d data sources) in %s\n", len(allDatabases), len(allDataSources), elapsed.Round(time.Millisecond))
 
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(map[string]any{
-		"databases":  len(allDatabases),
-		"last_sync":  time.Now().Format(time.RFC3339),
-		"elapsed_ms": elapsed.Milliseconds(),
+		"databases":    len(allDatabases),
+		"data_sources": len(allDataSources),
+		"last_sync":    time.Now().Format(time.RFC3339),
+		"elapsed_ms":   elapsed.Milliseconds(),
 	}, "sync", start)
 	return nil
 }

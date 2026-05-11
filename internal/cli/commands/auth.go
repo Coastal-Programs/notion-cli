@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/internal/oauth"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/oauth"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +25,7 @@ func RegisterAuthCommands(root *cobra.Command) {
 		newAuthLoginCmd(),
 		newAuthLogoutCmd(),
 		newAuthStatusCmd(),
+		newAuthRefreshCmd(),
 	)
 
 	root.AddCommand(authCmd)
@@ -94,6 +95,11 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 	cfg.OAuthWorkspaceID = token.WorkspaceID
 	cfg.OAuthWorkspaceName = token.WorkspaceName
 	cfg.OAuthBotID = token.BotID
+	cfg.OAuthRefreshToken = token.RefreshToken
+	if token.ExpiresIn > 0 {
+		cfg.OAuthTokenExpiresAt = time.Now().Add(
+			time.Duration(token.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
+	}
 
 	if err := config.SaveConfig(cfg); err != nil {
 		return handleError(cmd, &clierrors.NotionCLIError{
@@ -122,9 +128,10 @@ func newAuthLogoutCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Log out and clear OAuth tokens",
-		Long:  "Remove stored OAuth tokens from the config file.",
+		Long:  "Remove stored OAuth tokens from the config file. By default the token is also revoked on the Notion API.\n\nUse --local-only to skip the API call and only clear local config.",
 		RunE:  runAuthLogout,
 	}
+	cmd.Flags().Bool("local-only", false, "Clear local config only; do not call the Notion revoke API")
 	addOutputFlags(cmd)
 	return cmd
 }
@@ -149,6 +156,18 @@ func runAuthLogout(cmd *cobra.Command, args []string) error {
 				"If using NOTION_TOKEN env var, unset it instead",
 			},
 		})
+	}
+
+	localOnly, _ := cmd.Flags().GetBool("local-only")
+
+	// Revoke the token on the API unless --local-only was requested.
+	if !localOnly && config.OAuthClientID != "" {
+		ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+		defer cancel()
+		if revokeErr := oauth.TokenRevoke(ctx, config.OAuthClientID, config.OAuthClientSecret, cfg.OAuthAccessToken); revokeErr != nil {
+			// Non-fatal: log a warning and continue with local clear.
+			fmt.Fprintf(os.Stderr, "Warning: token revoke API call failed: %s\n", revokeErr)
+		}
 	}
 
 	workspaceName := cfg.OAuthWorkspaceName
@@ -179,9 +198,10 @@ func newAuthStatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show authentication status",
-		Long:  "Display the current authentication method and details.",
+		Long:  "Display the current authentication method and details.\n\nUse --remote to also call the Notion token introspect API and show active status, scope, and issued_at.",
 		RunE:  runAuthStatus,
 	}
+	cmd.Flags().Bool("remote", false, "Also call Notion token introspect API to verify active status")
 	addOutputFlags(cmd)
 	return cmd
 }
@@ -215,6 +235,9 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 		data["workspace_name"] = cfg.OAuthWorkspaceName
 		data["bot_id"] = cfg.OAuthBotID
 		data["token"] = maskToken(cfg.OAuthAccessToken)
+		if cfg.OAuthTokenExpiresAt != "" {
+			data["expires_at"] = cfg.OAuthTokenExpiresAt
+		}
 	case "token":
 		data["source"] = "config file"
 		data["token"] = maskToken(cfg.Token)
@@ -226,7 +249,105 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// --remote: introspect the token via the Notion API.
+	remote, _ := cmd.Flags().GetBool("remote")
+	if remote && cfg.HasOAuthToken() && config.OAuthClientID != "" {
+		ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+		defer cancel()
+		if introspect, iErr := oauth.TokenIntrospect(ctx, config.OAuthClientID, config.OAuthClientSecret, cfg.OAuthAccessToken); iErr == nil {
+			data["active"] = introspect.Active
+			if introspect.Scope != "" {
+				data["scope"] = introspect.Scope
+			}
+			if introspect.IssuedAt != 0 {
+				data["issued_at"] = time.Unix(introspect.IssuedAt, 0).UTC().Format(time.RFC3339)
+			}
+		} else {
+			data["remote_error"] = iErr.Error()
+		}
+	}
+
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(data, "auth status", start)
+	return nil
+}
+
+// --- auth refresh ---
+
+func newAuthRefreshCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "refresh",
+		Short: "Refresh the OAuth access token",
+		Long:  "Exchange the stored refresh token for a new OAuth access token and persist it to config.",
+		RunE:  runAuthRefresh,
+	}
+	addOutputFlags(cmd)
+	return cmd
+}
+
+func runAuthRefresh(cmd *cobra.Command, args []string) error {
+	start := time.Now()
+
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: fmt.Sprintf("Failed to load config: %s", err),
+		})
+	}
+
+	if cfg.OAuthRefreshToken == "" {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: "No refresh token stored in config",
+			Suggestions: []string{
+				"Run 'notion-cli auth login' to authenticate via OAuth first",
+			},
+		})
+	}
+
+	clientID := config.OAuthClientID
+	clientSecret := config.OAuthClientSecret
+	if clientID == "" || clientSecret == "" {
+		return handleError(cmd, clierrors.OAuthNotConfigured())
+	}
+
+	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Second)
+	defer cancel()
+
+	token, err := oauth.TokenRefresh(ctx, clientID, clientSecret, cfg.OAuthRefreshToken)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	cfg.OAuthAccessToken = token.AccessToken
+	if token.RefreshToken != "" {
+		cfg.OAuthRefreshToken = token.RefreshToken
+	}
+	if token.ExpiresIn > 0 {
+		cfg.OAuthTokenExpiresAt = time.Now().Add(
+			time.Duration(token.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
+	}
+
+	if err := config.SaveConfig(cfg); err != nil {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: fmt.Sprintf("Failed to save config: %s", err),
+		})
+	}
+
+	data := map[string]any{
+		"auth_method":    "oauth",
+		"workspace_id":   token.WorkspaceID,
+		"workspace_name": token.WorkspaceName,
+	}
+	if cfg.OAuthTokenExpiresAt != "" {
+		data["expires_at"] = cfg.OAuthTokenExpiresAt
+	}
+
+	fmt.Fprintln(os.Stderr, "OAuth token refreshed successfully.")
+
+	p := output.NewPrinter(outputFormat(cmd))
+	p.PrintSuccess(data, "auth refresh", start)
 	return nil
 }

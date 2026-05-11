@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/internal/oauth"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/oauth"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 

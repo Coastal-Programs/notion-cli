@@ -302,6 +302,85 @@ func TestGetDatabasesNilData(t *testing.T) {
 	}
 }
 
+func TestDataSourceEntryRoundTrip(t *testing.T) {
+	wc, _ := setupTempWorkspace(t)
+
+	now := time.Now().Truncate(time.Second)
+	dsEntries := []DataSourceEntry{
+		{
+			ID:         "ds-aaa",
+			DatabaseID: "db-111",
+			Title:      "My Source",
+			URL:        "https://notion.so/my-db",
+			LastEdited: now,
+		},
+		{
+			ID:         "ds-bbb",
+			DatabaseID: "db-222",
+			Title:      "Another Source",
+			LastEdited: now,
+		},
+	}
+
+	wc.SetDataSources(dsEntries)
+	if err := wc.Save(); err != nil {
+		t.Fatal(err)
+	}
+
+	wc2 := NewWorkspaceCacheWithPath(wc.filePath)
+	if err := wc2.Load(); err != nil {
+		t.Fatal(err)
+	}
+
+	if wc2.DataSourceCount() != 2 {
+		t.Errorf("expected 2 data sources, got %d", wc2.DataSourceCount())
+	}
+
+	ds := wc2.FindDataSourceByID("ds-aaa")
+	if ds == nil {
+		t.Fatal("expected to find ds-aaa")
+	}
+	if ds.Title != "My Source" {
+		t.Errorf("expected 'My Source', got %q", ds.Title)
+	}
+	if ds.DatabaseID != "db-111" {
+		t.Errorf("expected 'db-111', got %q", ds.DatabaseID)
+	}
+
+	ds2 := wc2.FindDataSourceByName("another")
+	if ds2 == nil {
+		t.Fatal("expected to find 'another source' by name")
+	}
+	if ds2.ID != "ds-bbb" {
+		t.Errorf("expected 'ds-bbb', got %q", ds2.ID)
+	}
+
+	notFound := wc2.FindDataSourceByID("nonexistent")
+	if notFound != nil {
+		t.Errorf("expected nil for nonexistent ID, got %+v", notFound)
+	}
+
+	notFoundByName := wc2.FindDataSourceByName("zzz-missing")
+	if notFoundByName != nil {
+		t.Errorf("expected nil for missing name, got %+v", notFoundByName)
+	}
+}
+
+func TestDataSourceCountNilData(t *testing.T) {
+	wc := &WorkspaceCache{data: nil}
+	if wc.DataSourceCount() != 0 {
+		t.Errorf("expected 0 for nil data, got %d", wc.DataSourceCount())
+	}
+}
+
+func TestGetDataSourcesNilData(t *testing.T) {
+	wc := &WorkspaceCache{data: nil}
+	ds := wc.GetDataSources()
+	if ds != nil {
+		t.Errorf("expected nil for nil data, got %v", ds)
+	}
+}
+
 func TestWorkspaceCacheRoundTrip(t *testing.T) {
 	wc, _ := setupTempWorkspace(t)
 

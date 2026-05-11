@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -80,40 +81,6 @@ func TestTokenInvalid(t *testing.T) {
 	}
 }
 
-func TestIntegrationNotShared(t *testing.T) {
-	e := IntegrationNotShared("database")
-	if e.Code != CodePermissionDenied {
-		t.Errorf("Code = %q, want %q", e.Code, CodePermissionDenied)
-	}
-	if e.HTTPStatus != 403 {
-		t.Errorf("HTTPStatus = %d, want 403", e.HTTPStatus)
-	}
-}
-
-func TestResourceNotFound(t *testing.T) {
-	tests := []struct {
-		resourceType string
-		wantCode     string
-	}{
-		{"database", CodeDatabaseNotFound},
-		{"page", CodePageNotFound},
-		{"block", CodeBlockNotFound},
-		{"user", CodeUserNotFound},
-		{"comment", CodeNotFound},
-	}
-	for _, tt := range tests {
-		t.Run(tt.resourceType, func(t *testing.T) {
-			e := ResourceNotFound(tt.resourceType, "abc-123")
-			if e.Code != tt.wantCode {
-				t.Errorf("Code = %q, want %q", e.Code, tt.wantCode)
-			}
-			if e.HTTPStatus != 404 {
-				t.Errorf("HTTPStatus = %d, want 404", e.HTTPStatus)
-			}
-		})
-	}
-}
-
 func TestInvalidIDFormat(t *testing.T) {
 	e := InvalidIDFormat("not-an-id")
 	if e.Code != CodeInvalidIDFormat {
@@ -121,13 +88,6 @@ func TestInvalidIDFormat(t *testing.T) {
 	}
 	if e.Details != "not-an-id" {
 		t.Errorf("Details = %v, want %q", e.Details, "not-an-id")
-	}
-}
-
-func TestDatabaseIdConfusion(t *testing.T) {
-	e := DatabaseIdConfusion("abc-123")
-	if e.Code != CodeDatabaseIDConfusion {
-		t.Errorf("Code = %q, want %q", e.Code, CodeDatabaseIDConfusion)
 	}
 }
 
@@ -167,41 +127,6 @@ func TestInvalidJSON(t *testing.T) {
 	}
 	if e.Details != "unexpected EOF" {
 		t.Errorf("Details = %v, want %q", e.Details, "unexpected EOF")
-	}
-}
-
-func TestInvalidProperty(t *testing.T) {
-	e := InvalidProperty("Status", "not a valid select option")
-	if e.Code != CodeInvalidProperty {
-		t.Errorf("Code = %q, want %q", e.Code, CodeInvalidProperty)
-	}
-	details, ok := e.Details.(map[string]string)
-	if !ok {
-		t.Fatal("Details should be map[string]string")
-	}
-	if details["property"] != "Status" {
-		t.Errorf("Details.property = %q, want %q", details["property"], "Status")
-	}
-}
-
-func TestNetworkError(t *testing.T) {
-	inner := fmt.Errorf("dial tcp: no route to host")
-	e := NetworkError(inner)
-	if e.Code != CodeNetworkError {
-		t.Errorf("Code = %q, want %q", e.Code, CodeNetworkError)
-	}
-	if !errors.Is(e, inner) {
-		t.Error("should wrap the original error")
-	}
-}
-
-func TestTimeout(t *testing.T) {
-	e := Timeout("30s")
-	if e.Code != CodeTimeout {
-		t.Errorf("Code = %q, want %q", e.Code, CodeTimeout)
-	}
-	if e.Details != "30s" {
-		t.Errorf("Details = %v, want %q", e.Details, "30s")
 	}
 }
 
@@ -311,6 +236,92 @@ func TestExitCodeConstants(t *testing.T) {
 	}
 	if ExitCLIError != 2 {
 		t.Errorf("ExitCLIError = %d, want 2", ExitCLIError)
+	}
+}
+
+func TestOAuthFailed(t *testing.T) {
+	e := OAuthFailed("exchange failed")
+	if e.Code != CodeOAuthFailed {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthFailed)
+	}
+	if !strings.Contains(e.Message, "OAuth token exchange failed") {
+		t.Errorf("Message = %q, want to contain 'OAuth token exchange failed'", e.Message)
+	}
+	if !strings.Contains(e.Message, "exchange failed") {
+		t.Errorf("Message = %q, want to contain detail", e.Message)
+	}
+}
+
+func TestOAuthTimeout(t *testing.T) {
+	e := OAuthTimeout()
+	if e.Code != CodeOAuthTimeout {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthTimeout)
+	}
+	if len(e.Suggestions) == 0 {
+		t.Error("expected suggestions")
+	}
+}
+
+func TestOAuthCancelled(t *testing.T) {
+	e := OAuthCancelled()
+	if e.Code != CodeOAuthCancelled {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthCancelled)
+	}
+	if len(e.Suggestions) == 0 {
+		t.Error("expected suggestions")
+	}
+}
+
+func TestOAuthPortInUse_SinglePort(t *testing.T) {
+	e := OAuthPortInUse([]int{8080})
+	if e.Code != CodeOAuthPortInUse {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthPortInUse)
+	}
+	if !strings.Contains(e.Message, "8080") {
+		t.Errorf("Message = %q, want to contain '8080'", e.Message)
+	}
+}
+
+func TestOAuthPortInUse_PortRange(t *testing.T) {
+	e := OAuthPortInUse([]int{8080, 8081})
+	if !strings.Contains(e.Message, "8080") {
+		t.Errorf("Message = %q, want to contain '8080'", e.Message)
+	}
+	if !strings.Contains(e.Message, "8081") {
+		t.Errorf("Message = %q, want to contain '8081'", e.Message)
+	}
+}
+
+func TestOAuthPortInUse_EmptySlice(t *testing.T) {
+	e := OAuthPortInUse(nil)
+	if e.Code != CodeOAuthPortInUse {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthPortInUse)
+	}
+	if !strings.Contains(e.Message, "8080") {
+		t.Errorf("Message = %q, want to contain default port '8080'", e.Message)
+	}
+}
+
+func TestOAuthStateMismatch(t *testing.T) {
+	e := OAuthStateMismatch()
+	if e.Code != CodeOAuthStateMismatch {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthStateMismatch)
+	}
+	if len(e.Suggestions) == 0 {
+		t.Error("expected suggestions")
+	}
+}
+
+func TestOAuthNotConfigured(t *testing.T) {
+	e := OAuthNotConfigured()
+	if e.Code != CodeOAuthNotConfigured {
+		t.Errorf("Code = %q, want %q", e.Code, CodeOAuthNotConfigured)
+	}
+	if e.Message == "" {
+		t.Error("expected non-empty message")
+	}
+	if len(e.Suggestions) == 0 {
+		t.Error("expected suggestions")
 	}
 }
 

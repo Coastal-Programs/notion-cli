@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
 )
 
 // ─── Envelope Tests ──────────────────────────────────────────────────────────

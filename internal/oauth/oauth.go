@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -21,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
 )
 
 // CallbackPorts is the ordered list of localhost ports the CLI will attempt
@@ -63,14 +64,31 @@ func bindCallbackListener() (net.Listener, int, error) {
 // can override it with an httptest server URL.
 var tokenURL = "https://api.notion.com/v1/oauth/token"
 
-// TokenResponse holds the result of a successful OAuth token exchange.
+// introspectURL is the Notion OAuth token introspect endpoint. It is a var so
+// tests can override it with an httptest server URL.
+var introspectURL = "https://api.notion.com/v1/oauth/introspect"
+
+// revokeURL is the Notion OAuth token revoke endpoint. It is a var so tests
+// can override it with an httptest server URL.
+var revokeURL = "https://api.notion.com/v1/oauth/revoke"
+
+// TokenResponse holds the result of a successful OAuth token exchange or refresh.
 type TokenResponse struct {
 	AccessToken   string `json:"access_token"`
 	TokenType     string `json:"token_type"`
+	RefreshToken  string `json:"refresh_token,omitempty"`
+	ExpiresIn     int    `json:"expires_in,omitempty"` // seconds
 	BotID         string `json:"bot_id"`
 	WorkspaceID   string `json:"workspace_id"`
 	WorkspaceName string `json:"workspace_name"`
 	WorkspaceIcon string `json:"workspace_icon"`
+}
+
+// IntrospectResponse holds the result of a token introspect call.
+type IntrospectResponse struct {
+	Active   bool   `json:"active"`
+	Scope    string `json:"scope,omitempty"`
+	IssuedAt int64  `json:"iat,omitempty"` // Unix seconds
 }
 
 // callbackResult is sent from the HTTP handler back to the Login goroutine.
@@ -314,7 +332,8 @@ func exchangeCode(ctx context.Context, clientID, clientSecret, redirectURI, code
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth(clientID, clientSecret)
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, clierrors.OAuthFailed(err.Error())
 	}
@@ -345,6 +364,151 @@ func exchangeCode(ctx context.Context, clientID, clientSecret, redirectURI, code
 	}
 
 	return &token, nil
+}
+
+// SetTokenURL overrides the token endpoint URL. Intended for use in tests only.
+func SetTokenURL(u string) { tokenURL = u }
+
+// SetIntrospectURL overrides the introspect endpoint URL. Intended for use in tests only.
+func SetIntrospectURL(u string) { introspectURL = u }
+
+// SetRevokeURL overrides the revoke endpoint URL. Intended for use in tests only.
+func SetRevokeURL(u string) { revokeURL = u }
+
+// TokenRefresh exchanges a refresh token for a new access token.
+// It POSTs to tokenURL with grant_type=refresh_token and HTTP Basic auth.
+func TokenRefresh(ctx context.Context, clientID, clientSecret, refreshToken string) (*TokenResponse, error) {
+	bodyMap := map[string]string{
+		"grant_type":    "refresh_token",
+		"refresh_token": refreshToken,
+	}
+	bodyBytes, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(clientID, clientSecret)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
+	defer resp.Body.Close() //nolint:errcheck
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	if err != nil {
+		return nil, clierrors.OAuthFailed("failed to read response")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		if json.Unmarshal(respBody, &errResp) == nil {
+			if msg, ok := errResp["error"].(string); ok {
+				return nil, clierrors.OAuthFailed(msg)
+			}
+		}
+		return nil, clierrors.OAuthFailed(fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)))
+	}
+
+	var token TokenResponse
+	if err := json.Unmarshal(respBody, &token); err != nil {
+		return nil, clierrors.OAuthFailed("failed to parse token response")
+	}
+	if token.AccessToken == "" {
+		return nil, clierrors.OAuthFailed("empty access token in response")
+	}
+	return &token, nil
+}
+
+// TokenIntrospect queries the active status and metadata of an OAuth token.
+// It POSTs to introspectURL with HTTP Basic auth.
+func TokenIntrospect(ctx context.Context, clientID, clientSecret, token string) (*IntrospectResponse, error) {
+	bodyMap := map[string]string{"token": token}
+	bodyBytes, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, introspectURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(clientID, clientSecret)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, clierrors.OAuthFailed(err.Error())
+	}
+	defer resp.Body.Close() //nolint:errcheck
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	if err != nil {
+		return nil, clierrors.OAuthFailed("failed to read response")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		if json.Unmarshal(respBody, &errResp) == nil {
+			if msg, ok := errResp["error"].(string); ok {
+				return nil, clierrors.OAuthFailed(msg)
+			}
+		}
+		return nil, clierrors.OAuthFailed(fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)))
+	}
+
+	var result IntrospectResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, clierrors.OAuthFailed("failed to parse introspect response")
+	}
+	return &result, nil
+}
+
+// TokenRevoke revokes an OAuth token. Returns nil on success.
+// It POSTs to revokeURL with HTTP Basic auth.
+func TokenRevoke(ctx context.Context, clientID, clientSecret, token string) error {
+	bodyMap := map[string]string{"token": token}
+	bodyBytes, err := json.Marshal(bodyMap)
+	if err != nil {
+		return clierrors.OAuthFailed(err.Error())
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, revokeURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return clierrors.OAuthFailed(err.Error())
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(clientID, clientSecret)
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return clierrors.OAuthFailed(err.Error())
+	}
+	defer resp.Body.Close() //nolint:errcheck
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	if err != nil {
+		return clierrors.OAuthFailed("failed to read response")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		if json.Unmarshal(respBody, &errResp) == nil {
+			if msg, ok := errResp["error"].(string); ok {
+				return clierrors.OAuthFailed(msg)
+			}
+		}
+		return clierrors.OAuthFailed(fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)))
+	}
+	return nil
 }
 
 // randomState generates a 32-byte hex-encoded random string.
@@ -383,6 +547,8 @@ func callbackHTML(success bool, title, message string) string {
 		icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`
 	}
 
+	safeTitle := html.EscapeString(title)
+	safeMessage := html.EscapeString(message)
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -442,5 +608,5 @@ func callbackHTML(success bool, title, message string) string {
     <div class="footer">notion-cli · <a href="https://github.com/Coastal-Programs/notion-cli">github.com/Coastal-Programs/notion-cli</a></div>
   </div>
 </body>
-</html>`, accent, title, message, icon)
+</html>`, accent, safeTitle, safeMessage, icon)
 }

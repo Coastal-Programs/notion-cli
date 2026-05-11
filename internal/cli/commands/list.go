@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/cache"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/cache"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -19,8 +19,8 @@ func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"db:list", "ls"},
-		Short:   "List cached databases",
-		Long:    "List all databases from the local workspace cache. Run 'sync' first to populate.",
+		Short:   "List cached databases and data sources",
+		Long:    "List all databases and data sources from the local workspace cache. Run 'sync' first to populate.",
 		Args:    cobra.NoArgs,
 		RunE:    runList,
 	}
@@ -49,20 +49,32 @@ func runList(cmd *cobra.Command, _ []string) error {
 	}
 
 	dbs := wc.GetDatabases()
-	var rows []map[string]any
+	var dbRows []map[string]any
 	for _, db := range dbs {
-		rows = append(rows, map[string]any{
+		dbRows = append(dbRows, map[string]any{
 			"Title":      db.Title,
 			"ID":         db.ID,
 			"LastEdited": db.LastEdited.Format(time.RFC3339),
 		})
 	}
 
+	dsEntries := wc.GetDataSources()
+	var dsRows []map[string]any
+	for _, ds := range dsEntries {
+		dsRows = append(dsRows, map[string]any{
+			"Title":      ds.Title,
+			"ID":         ds.ID,
+			"DatabaseID": ds.DatabaseID,
+			"LastEdited": ds.LastEdited.Format(time.RFC3339),
+		})
+	}
+
 	data := map[string]any{
-		"databases":   rows,
-		"count":       len(rows),
-		"last_sync":   wc.LastSyncTime().Format(time.RFC3339),
-		"cache_stale": wc.IsStale(),
+		"databases":    dbRows,
+		"data_sources": dsRows,
+		"count":        len(dbRows),
+		"last_sync":    wc.LastSyncTime().Format(time.RFC3339),
+		"cache_stale":  wc.IsStale(),
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))

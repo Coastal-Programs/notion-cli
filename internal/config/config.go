@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 // Build-time variables set via ldflags.
@@ -22,22 +23,29 @@ var (
 
 // Config holds all CLI configuration values.
 type Config struct {
-	Token            string `json:"token,omitempty"`
-	BaseURL          string `json:"base_url,omitempty"`
-	MaxRetries       int    `json:"max_retries,omitempty"`
-	BaseDelayMs      int    `json:"base_delay_ms,omitempty"`
-	MaxDelayMs       int    `json:"max_delay_ms,omitempty"`
-	CacheEnabled     bool   `json:"cache_enabled"`
-	CacheMaxSize     int    `json:"cache_max_size,omitempty"`
-	DiskCacheEnabled bool   `json:"disk_cache_enabled"`
-	HTTPKeepAlive    bool   `json:"http_keep_alive"`
-	Verbose          bool   `json:"verbose,omitempty"`
+	Token       string `json:"token,omitempty"`
+	BaseURL     string `json:"base_url,omitempty"`
+	MaxRetries  int    `json:"max_retries,omitempty"`
+	BaseDelayMs int    `json:"base_delay_ms,omitempty"`
+	MaxDelayMs  int    `json:"max_delay_ms,omitempty"`
+	// CacheEnabled, CacheMaxSize, DiskCacheEnabled are reserved for a future
+	// in-memory/disk response cache. They are persisted and exposed via
+	// `config get/set` for forward compatibility but currently have no effect
+	// on runtime behavior. Only the workspace database cache (see
+	// internal/cache/workspace.go) is wired up today.
+	CacheEnabled     bool `json:"cache_enabled"`
+	CacheMaxSize     int  `json:"cache_max_size,omitempty"`
+	DiskCacheEnabled bool `json:"disk_cache_enabled"`
+	HTTPKeepAlive    bool `json:"http_keep_alive"`
+	Verbose          bool `json:"verbose,omitempty"`
 
 	// OAuth fields (populated by 'auth login').
-	OAuthAccessToken   string `json:"oauth_access_token,omitempty"`
-	OAuthWorkspaceID   string `json:"oauth_workspace_id,omitempty"`
-	OAuthWorkspaceName string `json:"oauth_workspace_name,omitempty"`
-	OAuthBotID         string `json:"oauth_bot_id,omitempty"`
+	OAuthAccessToken    string `json:"oauth_access_token,omitempty"`
+	OAuthWorkspaceID    string `json:"oauth_workspace_id,omitempty"`
+	OAuthWorkspaceName  string `json:"oauth_workspace_name,omitempty"`
+	OAuthBotID          string `json:"oauth_bot_id,omitempty"`
+	OAuthRefreshToken   string `json:"oauth_refresh_token,omitempty"`
+	OAuthTokenExpiresAt string `json:"oauth_token_expires_at,omitempty"` // RFC3339
 }
 
 // HasOAuthToken reports whether an OAuth access token is configured.
@@ -51,6 +59,22 @@ func (c *Config) ClearOAuth() {
 	c.OAuthWorkspaceID = ""
 	c.OAuthWorkspaceName = ""
 	c.OAuthBotID = ""
+	c.OAuthRefreshToken = ""
+	c.OAuthTokenExpiresAt = ""
+}
+
+// NeedsRefresh reports whether the OAuth access token expires within 5 minutes
+// and a refresh token is available. Returns false when either token is absent
+// or the expiry timestamp cannot be parsed.
+func (c *Config) NeedsRefresh() bool {
+	if c.OAuthRefreshToken == "" || c.OAuthTokenExpiresAt == "" {
+		return false
+	}
+	t, err := time.Parse(time.RFC3339, c.OAuthTokenExpiresAt)
+	if err != nil {
+		return false
+	}
+	return time.Until(t) < 5*time.Minute
 }
 
 // AuthMethod returns "oauth", "token", or "none" describing how the CLI
@@ -158,6 +182,12 @@ func loadFromFile(cfg *Config) error {
 	if fileCfg.OAuthBotID != "" {
 		cfg.OAuthBotID = fileCfg.OAuthBotID
 	}
+	if fileCfg.OAuthRefreshToken != "" {
+		cfg.OAuthRefreshToken = fileCfg.OAuthRefreshToken
+	}
+	if fileCfg.OAuthTokenExpiresAt != "" {
+		cfg.OAuthTokenExpiresAt = fileCfg.OAuthTokenExpiresAt
+	}
 	// Use a raw map to detect explicitly set fields, including zero values.
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err == nil {
@@ -246,7 +276,7 @@ func SaveConfig(cfg *Config) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
@@ -299,6 +329,10 @@ func GetConfigValue(key string) string {
 		return cfg.OAuthWorkspaceName
 	case "oauth_bot_id":
 		return cfg.OAuthBotID
+	case "oauth_refresh_token":
+		return cfg.OAuthRefreshToken
+	case "oauth_token_expires_at":
+		return cfg.OAuthTokenExpiresAt
 	case "auth_method":
 		return cfg.AuthMethod()
 	default:

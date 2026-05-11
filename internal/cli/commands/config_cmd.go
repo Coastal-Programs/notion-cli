@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -141,8 +141,9 @@ func newConfigGetCmd() *cobra.Command {
 func runConfigGet(cmd *cobra.Command, args []string) error {
 	value := config.GetConfigValue(args[0])
 
-	// Mask token unless --show-secret is set.
-	if args[0] == "token" {
+	// Mask sensitive values unless --show-secret is set.
+	sensitiveKeys := map[string]bool{"token": true, "oauth_access_token": true}
+	if sensitiveKeys[args[0]] {
 		showSecret, _ := cmd.Flags().GetBool("show-secret")
 		if !showSecret {
 			value = maskToken(value)

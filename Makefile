@@ -15,13 +15,13 @@ DATE=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 OAUTH_CLIENT_ID?=$(NOTION_OAUTH_CLIENT_ID)
 OAUTH_CLIENT_SECRET?=$(NOTION_OAUTH_SECRET)
 LDFLAGS=-ldflags "-s -w \
-	-X github.com/Coastal-Programs/notion-cli/internal/config.Version=$(VERSION) \
-	-X github.com/Coastal-Programs/notion-cli/internal/config.Commit=$(COMMIT) \
-	-X github.com/Coastal-Programs/notion-cli/internal/config.Date=$(DATE) \
-	-X github.com/Coastal-Programs/notion-cli/internal/config.OAuthClientID=$(OAUTH_CLIENT_ID) \
-	-X github.com/Coastal-Programs/notion-cli/internal/config.OAuthClientSecret=$(OAUTH_CLIENT_SECRET)"
+	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.Version=$(VERSION) \
+	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.Commit=$(COMMIT) \
+	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.Date=$(DATE) \
+	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.OAuthClientID=$(OAUTH_CLIENT_ID) \
+	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.OAuthClientSecret=$(OAUTH_CLIENT_SECRET)"
 
-.PHONY: build test lint clean release release-check install fmt tidy
+.PHONY: build test lint clean release release-check install fmt fmt-check tidy
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -67,6 +67,14 @@ release: release-check clean
 
 fmt:
 	gofmt -s -w .
+
+fmt-check:
+	@unformatted=$$(gofmt -s -l .); \
+	if [ -n "$$unformatted" ]; then \
+		echo "The following files are not gofmt'd:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
 
 tidy:
 	go mod tidy

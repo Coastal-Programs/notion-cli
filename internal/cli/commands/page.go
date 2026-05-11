@@ -10,11 +10,21 @@ import (
 	"strings"
 	"time"
 
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/internal/notion"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
+
+// isTerminal reports whether stdin is an interactive terminal.
+// It is a variable so tests can override it.
+var isTerminal = func() bool {
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) != 0
+}
 
 // RegisterPageCommands registers all page subcommands under root.
 func RegisterPageCommands(root *cobra.Command) {
@@ -30,6 +40,9 @@ func RegisterPageCommands(root *cobra.Command) {
 		newPageRetrieveCmd(),
 		newPageUpdateCmd(),
 		newPagePropertyItemCmd(),
+		newPageTrashCmd(),
+		newPageRestoreCmd(),
+		newPageMoveCmd(),
 	)
 
 	root.AddCommand(pageCmd)
@@ -51,8 +64,6 @@ func newPageCreateCmd() *cobra.Command {
 	cmd.Flags().StringP("file-path", "f", "", "Path to a markdown file for page content")
 	cmd.Flags().StringP("title-property", "t", "Name", "Title property name")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
-	cmd.Flags().BoolP("simple-properties", "S", false, "Use simple flat properties format (phase 2)")
-	_ = cmd.Flags().MarkHidden("simple-properties")
 	cmd.Flags().String("icon-emoji", "", "Page icon as emoji (e.g. 💰)")
 	cmd.Flags().String("icon-url", "", "Page icon as external image URL (https://...)")
 	cmd.Flags().String("cover-url", "", "Page cover as external image URL (https://...)")
@@ -178,11 +189,6 @@ func newPageRetrieveCmd() *cobra.Command {
 		RunE:    runPageRetrieve,
 	}
 
-	cmd.Flags().Bool("map", false, "Output property map (phase 2)")
-	cmd.Flags().BoolP("recursive", "R", false, "Recursively retrieve child blocks (phase 2)")
-	cmd.Flags().Int("max-depth", 3, "Maximum recursion depth (1-10)")
-	_ = cmd.Flags().MarkHidden("map")
-	_ = cmd.Flags().MarkHidden("recursive")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -226,8 +232,6 @@ func newPageUpdateCmd() *cobra.Command {
 	cmd.Flags().BoolP("archived", "a", false, "Archive the page")
 	cmd.Flags().BoolP("unarchive", "u", false, "Unarchive the page")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
-	cmd.Flags().BoolP("simple-properties", "S", false, "Use simple flat properties format (phase 2)")
-	_ = cmd.Flags().MarkHidden("simple-properties")
 	cmd.Flags().String("icon-emoji", "", "Page icon as emoji, or 'none' to clear")
 	cmd.Flags().String("icon-url", "", "Page icon as external image URL, or 'none' to clear")
 	cmd.Flags().String("cover-url", "", "Page cover as external image URL, or 'none' to clear")
@@ -254,11 +258,12 @@ func runPageUpdate(cmd *cobra.Command, args []string) error {
 	body := map[string]any{}
 
 	// Archive / unarchive.
+	// Notion API 2026-03-11 renamed `archived` -> `in_trash`.
 	if archived, _ := cmd.Flags().GetBool("archived"); archived {
-		body["archived"] = true
+		body["in_trash"] = true
 	}
 	if unarchive, _ := cmd.Flags().GetBool("unarchive"); unarchive {
-		body["archived"] = false
+		body["in_trash"] = false
 	}
 
 	// Properties.
@@ -351,6 +356,198 @@ func runPagePropertyItem(cmd *cobra.Command, args []string) error {
 
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(result, "page property-item", start)
+	return nil
+}
+
+// --- page trash ---
+
+func newPageTrashCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "trash <page_id>",
+		Short: "Move a page to trash",
+		Long:  "Move a Notion page to trash (sets in_trash: true). Requires --yes in non-interactive environments.",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runPageTrash,
+	}
+
+	cmd.Flags().Bool("yes", false, "Skip confirmation prompt")
+	addOutputFlags(cmd)
+
+	return cmd
+}
+
+func runPageTrash(cmd *cobra.Command, args []string) error {
+	start := time.Now()
+
+	yes, _ := cmd.Flags().GetBool("yes")
+
+	if !yes && !isTerminal() {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeMissingRequired,
+			Message: "--yes flag is required in non-interactive environments",
+			Suggestions: []string{
+				"Add --yes to confirm the operation: notion-cli page trash <page_id> --yes",
+			},
+		})
+	}
+
+	if !yes && isTerminal() {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Trash page %s? [y/N]: ", args[0])
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		response := strings.TrimSpace(strings.ToLower(scanner.Text()))
+		if response != "y" && response != "yes" {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "Aborted.")
+			return nil
+		}
+	}
+
+	client, err := newClient()
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	pageID, err := resolveID(args[0])
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	result, err := client.PageTrash(cmd.Context(), pageID)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	p := output.NewPrinter(outputFormat(cmd))
+	p.PrintSuccess(result, "page trash", start)
+	return nil
+}
+
+// --- page restore ---
+
+func newPageRestoreCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "restore <page_id>",
+		Short: "Restore a trashed page",
+		Long:  "Restore a trashed Notion page (sets in_trash: false).",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runPageRestore,
+	}
+
+	addOutputFlags(cmd)
+
+	return cmd
+}
+
+func runPageRestore(cmd *cobra.Command, args []string) error {
+	start := time.Now()
+
+	client, err := newClient()
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	pageID, err := resolveID(args[0])
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	result, err := client.PageRestore(cmd.Context(), pageID)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	p := output.NewPrinter(outputFormat(cmd))
+	p.PrintSuccess(result, "page restore", start)
+	return nil
+}
+
+// --- page move ---
+
+func newPageMoveCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "move <page_id>",
+		Short: "Move a page to a new parent",
+		Long:  "Move a Notion page to a new parent via POST /pages/{id}/move.",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runPageMove,
+	}
+
+	cmd.Flags().String("parent", "", "New parent page ID")
+	cmd.Flags().String("data-source", "", "New parent data source ID")
+	cmd.Flags().Bool("workspace", false, "Move to workspace root")
+	cmd.MarkFlagsMutuallyExclusive("parent", "data-source", "workspace")
+	addOutputFlags(cmd)
+
+	return cmd
+}
+
+func runPageMove(cmd *cobra.Command, args []string) error {
+	start := time.Now()
+
+	parentID, _ := cmd.Flags().GetString("parent")
+	dataSourceID, _ := cmd.Flags().GetString("data-source")
+	workspace, _ := cmd.Flags().GetBool("workspace")
+
+	var parentBody map[string]any
+	switch {
+	case parentID != "":
+		id, err := resolveID(parentID)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+		parentBody = map[string]any{
+			"parent": map[string]any{
+				"type":    "page_id",
+				"page_id": id,
+			},
+		}
+	case dataSourceID != "":
+		id, err := resolveID(dataSourceID)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+		parentBody = map[string]any{
+			"parent": map[string]any{
+				"type":           "data_source_id",
+				"data_source_id": id,
+			},
+		}
+	case workspace:
+		parentBody = map[string]any{
+			"parent": map[string]any{
+				"type":      "workspace",
+				"workspace": true,
+			},
+		}
+	default:
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeMissingRequired,
+			Message: "one of --parent, --data-source, or --workspace is required",
+			Suggestions: []string{
+				"Use --parent <page_id> to move under a page",
+				"Use --data-source <data_source_id> to move under a data source",
+				"Use --workspace to move to the workspace root",
+			},
+		})
+	}
+
+	client, err := newClient()
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	pageID, err := resolveID(args[0])
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	result, err := client.PageMove(cmd.Context(), pageID, parentBody)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	p := output.NewPrinter(outputFormat(cmd))
+	p.PrintSuccess(result, "page move", start)
 	return nil
 }
 

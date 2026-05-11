@@ -7,7 +7,7 @@ package errors
 import (
 	"fmt"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
 )
 
 // Exit codes returned by the CLI process.
@@ -25,6 +25,7 @@ const (
 	CodeTokenInvalid        = "TOKEN_INVALID"
 	CodeNotFound            = "NOT_FOUND"
 	CodeDatabaseNotFound    = "DATABASE_NOT_FOUND"
+	CodeDataSourceNotFound  = "data_source_not_found"
 	CodePageNotFound        = "PAGE_NOT_FOUND"
 	CodeBlockNotFound       = "BLOCK_NOT_FOUND"
 	CodeUserNotFound        = "USER_NOT_FOUND"
@@ -125,45 +126,6 @@ func TokenInvalid(detail string) *NotionCLIError {
 	}
 }
 
-// IntegrationNotShared returns an error when a resource is not shared with
-// the integration.
-func IntegrationNotShared(resource string) *NotionCLIError {
-	return &NotionCLIError{
-		Code:       CodePermissionDenied,
-		Message:    fmt.Sprintf("Integration does not have access to this %s", resource),
-		HTTPStatus: 403,
-		Suggestions: []string{
-			fmt.Sprintf("Share the %s with your integration in Notion", resource),
-			"Open the page/database in Notion → ··· → Connections → Add your integration",
-		},
-	}
-}
-
-// ResourceNotFound returns an error for a missing Notion resource.
-func ResourceNotFound(resourceType, id string) *NotionCLIError {
-	code := CodeNotFound
-	switch resourceType {
-	case "database":
-		code = CodeDatabaseNotFound
-	case "page":
-		code = CodePageNotFound
-	case "block":
-		code = CodeBlockNotFound
-	case "user":
-		code = CodeUserNotFound
-	}
-	return &NotionCLIError{
-		Code:       code,
-		Message:    fmt.Sprintf("%s not found: %s", resourceType, id),
-		HTTPStatus: 404,
-		Suggestions: []string{
-			"Verify the ID is correct",
-			"Ensure the resource is shared with your integration",
-			"Check if the resource has been deleted or archived",
-		},
-	}
-}
-
 // InvalidIDFormat returns an error for a string that cannot be parsed as a
 // Notion resource ID.
 func InvalidIDFormat(id string) *NotionCLIError {
@@ -175,21 +137,6 @@ func InvalidIDFormat(id string) *NotionCLIError {
 			"Notion IDs are 32 hex characters (with or without hyphens)",
 			"You can also paste a Notion URL and the ID will be extracted",
 			"Example: 8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
-		},
-	}
-}
-
-// DatabaseIdConfusion returns an error when a database_id is used where a
-// data_source_id is expected, or vice versa.
-func DatabaseIdConfusion(id string) *NotionCLIError {
-	return &NotionCLIError{
-		Code:    CodeDatabaseIDConfusion,
-		Message: fmt.Sprintf("Wrong database ID type: %s", id),
-		Details: id,
-		Suggestions: []string{
-			"Notion databases have two IDs: database_id and data_source_id",
-			"Use 'notion-cli db retrieve' with either ID - the CLI will resolve it",
-			"Run 'notion-cli sync' then 'notion-cli list' to see correct IDs",
 		},
 	}
 }
@@ -235,47 +182,6 @@ func InvalidJSON(detail string) *NotionCLIError {
 			"Verify your JSON is well-formed",
 			"Use a JSON validator to check syntax",
 			"Ensure strings are double-quoted",
-		},
-	}
-}
-
-// InvalidProperty returns an error for a property name/value problem.
-func InvalidProperty(name, reason string) *NotionCLIError {
-	return &NotionCLIError{
-		Code:    CodeInvalidProperty,
-		Message: fmt.Sprintf("Invalid property '%s': %s", name, reason),
-		Details: map[string]string{"property": name, "reason": reason},
-		Suggestions: []string{
-			"Run 'notion-cli db schema <DATABASE_ID>' to see valid properties",
-			"Property names are case-sensitive",
-		},
-	}
-}
-
-// NetworkError returns an error for connection-level failures.
-func NetworkError(err error) *NotionCLIError {
-	return &NotionCLIError{
-		Code:    CodeNetworkError,
-		Message: "Network error communicating with Notion API",
-		Err:     err,
-		Suggestions: []string{
-			"Check your internet connection",
-			"Verify https://api.notion.com is reachable",
-			"Check if a proxy or firewall is blocking the request",
-		},
-	}
-}
-
-// Timeout returns an error when a request exceeds the allowed duration.
-func Timeout(duration string) *NotionCLIError {
-	return &NotionCLIError{
-		Code:    CodeTimeout,
-		Message: fmt.Sprintf("Request timed out after %s", duration),
-		Details: duration,
-		Suggestions: []string{
-			"The Notion API may be experiencing high load",
-			"Try again in a few moments",
-			"For large operations, consider breaking them into smaller batches",
 		},
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
 )
 
 func TestParseCallbackInput(t *testing.T) {

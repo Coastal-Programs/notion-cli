@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/config"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/internal/notion"
-	"github.com/Coastal-Programs/notion-cli/internal/resolver"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/resolver"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/retry"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -21,25 +22,44 @@ import (
 //  2. OAuth access token from config (interactive login)
 //  3. Manual token from config file (fallback)
 func newClient() (*notion.Client, error) {
+	// Always load config so we can apply tunable settings (base URL, retry,
+	// keep-alive) regardless of where the token comes from.
+	cfg, cfgErr := config.LoadConfig()
+
 	// 1. Environment variable (highest priority).
 	token := os.Getenv("NOTION_TOKEN")
 
 	// 2. Config file: OAuth token, then manual token.
-	if token == "" {
-		cfg, err := config.LoadConfig()
-		if err == nil {
-			if cfg.OAuthAccessToken != "" {
-				token = cfg.OAuthAccessToken
-			} else if cfg.Token != "" {
-				token = cfg.Token
-			}
+	if token == "" && cfgErr == nil {
+		if cfg.OAuthAccessToken != "" {
+			token = cfg.OAuthAccessToken
+		} else if cfg.Token != "" {
+			token = cfg.Token
 		}
 	}
 
 	if token == "" {
 		return nil, clierrors.TokenMissing()
 	}
-	return notion.NewClient(token), nil
+
+	var opts []notion.ClientOption
+	if cfgErr == nil && cfg != nil {
+		if cfg.BaseURL != "" {
+			opts = append(opts, notion.WithBaseURL(cfg.BaseURL))
+		}
+		opts = append(opts, notion.WithRetryConfig(retry.RetryConfig{
+			MaxRetries: cfg.MaxRetries,
+			BaseDelay:  time.Duration(cfg.BaseDelayMs) * time.Millisecond,
+			MaxDelay:   time.Duration(cfg.MaxDelayMs) * time.Millisecond,
+			Jitter:     true,
+		}))
+		opts = append(opts, notion.WithKeepAlive(cfg.HTTPKeepAlive))
+		// Pass config to client so it can auto-refresh OAuth tokens on 401.
+		if os.Getenv("NOTION_TOKEN") == "" && cfg.OAuthRefreshToken != "" {
+			opts = append(opts, notion.WithConfig(cfg))
+		}
+	}
+	return notion.NewClient(token, opts...), nil
 }
 
 // resolveID extracts and validates a Notion ID from the provided argument.
@@ -188,7 +208,7 @@ var readOnlyPropertyTypes = map[string]bool{
 func RegisterDBCommands(root *cobra.Command) {
 	dbCmd := &cobra.Command{
 		Use:     "db",
-		Aliases: []string{"ds", "database"},
+		Aliases: []string{"database"},
 		Short:   "Database operations",
 		Long:    "Query, retrieve, create, update, and inspect Notion databases.",
 	}
@@ -223,6 +243,8 @@ func newDBQueryCmd() *cobra.Command {
 	cmd.Flags().String("filter", "", "Filter as JSON string")
 	cmd.Flags().String("file-filter", "", "Path to JSON file containing filter")
 	cmd.Flags().String("select", "", "Comma-separated list of properties to include")
+	cmd.Flags().String("data-source", "", "Target a specific data_source ID (skips primary data_source resolution; required for multi-source databases)")
+	cmd.Flags().Bool("quiet", false, "Suppress deprecation notices")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -236,9 +258,35 @@ func runDBQuery(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	dbID, err := resolveID(args[0])
-	if err != nil {
-		return handleError(cmd, err)
+	// Resolve target data_source ID. Per Notion API 2025-09-03,
+	// /v1/databases/{id}/query is deprecated in favor of
+	// /v1/data_sources/{id}/query. If --data-source is provided, use it
+	// directly; otherwise resolve the primary data_source from the database.
+	//
+	// TODO(workspace-cache): internal/cache/workspace.go already stores a
+	// DataSourceID per database entry, but we don't yet consult it here to
+	// avoid the DatabaseRetrieve round-trip when a name alias is supplied.
+	// A future change should plumb the resolved cache entry through and
+	// short-circuit PrimaryDataSourceID when DataSourceID is populated.
+	var dataSourceID string
+	if ds, _ := cmd.Flags().GetString("data-source"); ds != "" {
+		dataSourceID, err = resolveID(ds)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+	} else {
+		dbID, err := resolveID(args[0])
+		if err != nil {
+			return handleError(cmd, err)
+		}
+		dataSourceID, err = resolver.PrimaryDataSourceID(cmd.Context(), client, dbID)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+		quiet, _ := cmd.Flags().GetBool("quiet")
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Deprecation: db query routes through data sources. Use 'data-source query %s' directly. Suppress with --quiet.\n", dataSourceID)
+		}
 	}
 
 	body := map[string]any{}
@@ -309,7 +357,7 @@ func runDBQuery(cmd *cobra.Command, args []string) error {
 			break
 		}
 
-		result, err := client.DatabaseQuery(cmd.Context(), dbID, body)
+		result, err := client.DataSourceQuery(cmd.Context(), dataSourceID, body)
 		if err != nil {
 			return handleError(cmd, err)
 		}

@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/internal/cli/commands"
-	"github.com/Coastal-Programs/notion-cli/internal/config"
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/cli/commands"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +25,15 @@ var rootCmd = &cobra.Command{
 	},
 	PersistentPostRun: func(cmd *cobra.Command, args []string) {
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		if !verbose {
+			// Fall back to config (env var or config file) when the flag
+			// is not explicitly set. This makes NOTION_CLI_VERBOSE work.
+			if !cmd.Flags().Changed("verbose") {
+				if cfg, err := config.LoadConfig(); err == nil && cfg != nil {
+					verbose = cfg.Verbose
+				}
+			}
+		}
 		if verbose {
 			elapsed := time.Since(startTime)
 			fmt.Fprintf(os.Stderr, "Execution time: %s\n", elapsed.Round(time.Millisecond))
@@ -48,7 +57,6 @@ func init() {
 	// are added per-command via addOutputFlags to avoid redefinition panics).
 	pf := rootCmd.PersistentFlags()
 	pf.BoolP("verbose", "v", false, "Enable verbose stderr logging")
-	pf.Int("timeout", 30000, "Request timeout in milliseconds")
 
 	// Version template.
 	rootCmd.SetVersionTemplate(fmt.Sprintf("notion-cli version %s (commit: %s, built: %s)\n",
@@ -56,6 +64,7 @@ func init() {
 
 	// Register all command groups.
 	commands.RegisterDBCommands(rootCmd)
+	commands.RegisterDataSourceCommands(rootCmd)
 	commands.RegisterPageCommands(rootCmd)
 	commands.RegisterBlockCommands(rootCmd)
 	commands.RegisterUserCommands(rootCmd)
@@ -68,6 +77,11 @@ func init() {
 	commands.RegisterConfigCommands(rootCmd)
 	commands.RegisterCacheCommands(rootCmd)
 	commands.RegisterAuthCommands(rootCmd)
+	commands.RegisterCommentCommands(rootCmd)
+	commands.RegisterViewCommands(rootCmd)
+	commands.RegisterCustomEmojiCommands(rootCmd)
+	commands.RegisterMarkdownCommands(rootCmd)
+	commands.RegisterFilesCommands(rootCmd)
 }
 
 // ExitCode returns the appropriate exit code for an error.

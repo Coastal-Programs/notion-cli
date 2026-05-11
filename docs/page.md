@@ -7,6 +7,9 @@ Create a page
 * [`notion-cli page retrieve PAGE_ID`](#notion-cli-page-retrieve-page_id)
 * [`notion-cli page property-item PAGE_ID PROPERTY_ID`](#notion-cli-page-property-item-page_id-property_id)
 * [`notion-cli page update PAGE_ID`](#notion-cli-page-update-page_id)
+* [`notion-cli page trash PAGE_ID`](#notion-cli-page-trash-page_id)
+* [`notion-cli page restore PAGE_ID`](#notion-cli-page-restore-page_id)
+* [`notion-cli page move PAGE_ID`](#notion-cli-page-move-page_id)
 
 ## `notion-cli page create`
 
@@ -305,5 +308,135 @@ EXAMPLES
   Update a page and output JSON for automation
 
     $ notion-cli page update PAGE_ID -a --json
+```
+
+
+
+## `notion-cli page trash PAGE_ID`
+
+Move a page to trash
+
+```
+USAGE
+  $ notion-cli page trash PAGE_ID [--yes] [-r] [-j] [--page-size <value>] [--retry] [--timeout <value>]
+    [--no-cache] [-v] [--minimal]
+
+ARGUMENTS
+  PAGE_ID  Page ID or full Notion URL (e.g., https://notion.so/...)
+
+FLAGS
+  -j, --json               Output as JSON (recommended for automation)
+  -r, --raw                Output raw JSON
+  -v, --verbose            [env: NOTION_CLI_VERBOSE] Enable verbose logging to stderr
+      --minimal            Strip unnecessary metadata
+      --no-cache           Bypass cache and force fresh API calls
+      --page-size=<value>  [default: 100] Items per page
+      --retry              Auto-retry on rate limit
+      --timeout=<value>    [default: 30000] Request timeout in milliseconds
+      --yes                Skip confirmation prompt (required in non-interactive environments)
+
+DESCRIPTION
+  Move a Notion page to trash (sets in_trash: true). In interactive terminals, prompts for
+  confirmation unless --yes is provided. In non-interactive environments (CI, scripts),
+  --yes is required.
+
+EXAMPLES
+  Trash a page (interactive prompt)
+
+    $ notion-cli page trash PAGE_ID
+
+  Trash a page without confirmation
+
+    $ notion-cli page trash PAGE_ID --yes
+
+  Trash a page and output JSON
+
+    $ notion-cli page trash PAGE_ID --yes --json
+```
+
+
+
+## `notion-cli page restore PAGE_ID`
+
+Restore a trashed page
+
+```
+USAGE
+  $ notion-cli page restore PAGE_ID [-r] [-j] [--page-size <value>] [--retry] [--timeout <value>]
+    [--no-cache] [-v] [--minimal]
+
+ARGUMENTS
+  PAGE_ID  Page ID or full Notion URL (e.g., https://notion.so/...)
+
+FLAGS
+  -j, --json               Output as JSON (recommended for automation)
+  -r, --raw                Output raw JSON
+  -v, --verbose            [env: NOTION_CLI_VERBOSE] Enable verbose logging to stderr
+      --minimal            Strip unnecessary metadata
+      --no-cache           Bypass cache and force fresh API calls
+      --page-size=<value>  [default: 100] Items per page
+      --retry              Auto-retry on rate limit
+      --timeout=<value>    [default: 30000] Request timeout in milliseconds
+
+DESCRIPTION
+  Restore a trashed Notion page (sets in_trash: false). No confirmation required.
+
+EXAMPLES
+  Restore a trashed page
+
+    $ notion-cli page restore PAGE_ID
+
+  Restore a trashed page and output JSON
+
+    $ notion-cli page restore PAGE_ID --json
+```
+
+
+
+## `notion-cli page move PAGE_ID`
+
+Move a page to a new parent
+
+```
+USAGE
+  $ notion-cli page move PAGE_ID [--parent <value> | --data-source <value> | --workspace] [-r] [-j]
+    [--page-size <value>] [--retry] [--timeout <value>] [--no-cache] [-v] [--minimal]
+
+ARGUMENTS
+  PAGE_ID  Page ID or full Notion URL (e.g., https://notion.so/...)
+
+FLAGS
+  -j, --json                   Output as JSON (recommended for automation)
+  -r, --raw                    Output raw JSON
+  -v, --verbose                [env: NOTION_CLI_VERBOSE] Enable verbose logging to stderr
+      --data-source=<value>    New parent data source ID (mutually exclusive with --parent and --workspace)
+      --minimal                Strip unnecessary metadata
+      --no-cache               Bypass cache and force fresh API calls
+      --page-size=<value>      [default: 100] Items per page
+      --parent=<value>         New parent page ID or URL (mutually exclusive with --data-source and --workspace)
+      --retry                  Auto-retry on rate limit
+      --timeout=<value>        [default: 30000] Request timeout in milliseconds
+      --workspace              Move to workspace root (mutually exclusive with --parent and --data-source)
+
+DESCRIPTION
+  Move a Notion page to a new parent via POST /pages/{id}/move. Exactly one of --parent,
+  --data-source, or --workspace is required.
+
+EXAMPLES
+  Move a page under another page
+
+    $ notion-cli page move PAGE_ID --parent NEW_PARENT_PAGE_ID
+
+  Move a page into a data source (database)
+
+    $ notion-cli page move PAGE_ID --data-source DATA_SOURCE_ID
+
+  Move a page to the workspace root
+
+    $ notion-cli page move PAGE_ID --workspace
+
+  Move a page and output JSON
+
+    $ notion-cli page move PAGE_ID --parent NEW_PARENT_PAGE_ID --json
 ```
 

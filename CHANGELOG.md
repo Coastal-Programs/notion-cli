@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking
+- **Go module path is now `github.com/Coastal-Programs/notion-cli/v6`.** Per Go's [major-version-suffix rule](https://go.dev/ref/mod#major-version-suffixes), modules at v2+ must carry a `/vN` suffix. Without it, `go install github.com/Coastal-Programs/notion-cli/cmd/notion-cli@latest` resolved to `v5.9.0+incompatible` and failed because that older tag did not contain `cmd/notion-cli`. Update any `go install` command and any `import` of `pkg/output` to use the `/v6` prefix (e.g. `go install github.com/Coastal-Programs/notion-cli/v6/cmd/notion-cli@latest`). Fixes #86.
+
+### Changed
+- Bumped default Notion-Version header from 2022-06-28 to 2026-03-11 (latest).
+- `db query` now calls `/v1/data_sources/{id}/query` (Notion API 2025-09-03). Use `--data-source` to target a specific source on multi-source databases.
+- `block append` now uses the `position` object (Notion API 2026-03-11). The `--after` flag is deprecated; use `--position=after --after-block <id>`.
+- Use `in_trash` instead of `archived`; recognise `meeting_notes` block type (renamed from `transcription`) per Notion API 2026-03-11.
+
+### Fixed
+- Config fields previously loaded but never applied to the runtime client are now wired through. `NOTION_CLI_BASE_URL`, `NOTION_CLI_MAX_RETRIES`, `NOTION_CLI_BASE_DELAY`, `NOTION_CLI_MAX_DELAY`, and `NOTION_CLI_HTTP_KEEP_ALIVE` (and their config-file equivalents) now affect HTTP behavior. `NOTION_CLI_VERBOSE` / `verbose` is honored as a fallback when the `--verbose` flag isn't set.
+
+### Added
+- `auth refresh` — explicitly refresh OAuth access token using stored refresh token; prints new expiry.
+- `auth status --remote` — also calls token introspect to show active status, scope, and issued_at/expires_at.
+- `auth logout --local-only` — skip the API revoke call and only clear local config.
+- `oauth.TokenRefresh`, `oauth.TokenIntrospect`, `oauth.TokenRevoke` client functions in `internal/oauth/oauth.go`.
+- `Config.OAuthRefreshToken` and `Config.OAuthTokenExpiresAt` (RFC3339) with full persistence (save/load/clear).
+- `Config.NeedsRefresh()` — returns true when token expires within 5 minutes and a refresh token is present.
+- Auto-refresh-on-401: the Notion HTTP client transparently refreshes the OAuth token and retries once when a refresh token is available in config.
+- `custom-emoji list --all` — auto-paginate through all workspace custom emojis. Table output (`id`, `name`, `url`) by default. New httptest coverage for `CustomEmojiList` client method.
+- `files` command group (`upload`, `retrieve`, `list`) wrapping the Notion File Uploads API. `files upload <path>` auto-selects single-part (≤20 MB) or multi-part (>20 MB) upload, streams file contents in 10 MB chunks, shows a progress bar on TTY, and prints the `file_upload_id` to stdout for piping. `files list` supports `--page-size` and `--all` for full pagination. Five new Notion client methods: `FileUploadCreate`, `FileUploadSend`, `FileUploadComplete`, `FileUploadRetrieve`, `FileUploadList`.
+- `view create` — create a new Notion database view with `--data-source`, `--name`, `--type` (required) and optional `--database`, `--filter`, `--sorts` (JSON string or `@<file>`).
+- `view update <view_id>` — update an existing view's `--name`, `--filter`, and/or `--sorts`.
+- `view delete <view_id>` — delete a Notion view.
+- `view query --all` — auto-paginate through all view query results and clean up the server-side query cache on completion.
+- `ViewCreate`, `ViewUpdate`, `ViewDelete` methods added to the Notion HTTP client.
+- `page trash <page_id>` — moves a page to trash (`in_trash: true`). Requires `--yes` in non-TTY environments. Interactive mode prompts for confirmation.
+- `page restore <page_id>` — restores a trashed page (`in_trash: false`).
+- `page move <page_id>` — moves a page to a new parent via `POST /pages/{id}/move`. Supports `--parent <page-id>`, `--data-source <data-source-id>`, and `--workspace` (mutually exclusive).
+- `PageTrash`, `PageRestore`, `PageMove` methods added to the Notion HTTP client.
+- `comment` command group (`create`, `list`, `retrieve`, `update`, `delete`) wrapping the Notion Comments API (Notion-Version 2026-03-11). `comment create` supports `--page`/`--block`/`--discussion` parents (mutually exclusive), `--text` or `--rich-text <file.json>`, plus optional `--display-name` and repeatable `--attach-file <upload-id>` (max 3). `comment list` supports `--page-size` and `--all` for full pagination.
+- `markdown` command group (`get`, `set`) for reading and writing page content as enhanced markdown via `/v1/pages/{id}/markdown` (Notion API 2026-03-11). `set` supports replace (default) and `--append`, with content from `--content`, `--file`, or stdin.
+- `custom-emoji` command group (list, retrieve) per Notion API 2026-03-11.
+- `notion.WithKeepAlive(bool)` client option installs a transport with `DisableKeepAlives=true` when keep-alive is disabled in config.
+- Data Source HTTP client methods and resolver helper for the 2025-09-03 multi-source database split.
+- `data-source` command group (retrieve, create, update, query) for the 2025-09-03 multi-source database API.
+- `data-source templates <id>` — lists page templates for a data source with `--all` pagination support.
+- `data-source properties update <id> --schema <json|@file>` — updates a data source's properties schema.
+- `db query` now emits a deprecation notice to stderr when routing through auto-resolved data sources; suppress with `--quiet`.
+- Workspace cache (`sync`) now indexes data sources extracted from database search results (`data_sources` key), stored in `~/.notion-cli/databases.json` under `data_sources`.
+- `list` command now includes a `data_sources` array alongside `databases` in the output.
+- `ExtractID` in the resolver now recognises the `dataSource=` query parameter in Notion URLs, returning the data source ID instead of the page/database path ID.
+- `ds` alias moved from `db` to `data-source` (breaking: `notion-cli ds` now invokes `data-source`).
+- `view` command group (list, retrieve, query, results, delete-query) per Notion API 2026-03-11.
+
+### Removed
+- Dead code cleanup: removed the unused in-memory TTL `Cache` struct, `NewCache`, TTL constants (`DatabaseTTL`, `UserTTL`, `PageTTL`, `BlockTTL`), and `CacheKeyForResource` from `internal/cache/cache.go` (and its test file). Only the workspace database cache (`internal/cache/workspace.go`) was ever wired up; the response cache was never integrated. The `cache_enabled` / `cache_max_size` / `disk_cache_enabled` config fields are kept for forward compatibility but documented as reserved.
+- Removed unused error factory functions `IntegrationNotShared`, `ResourceNotFound`, `DatabaseIdConfusion`, `InvalidProperty`, `NetworkError`, and `Timeout` from `internal/errors/errors.go`. The HTTP client uses `FromNotionAPI` for all API errors; these factories had no production callers.
+
 ## [6.3.0] - 2026-05-06
 
 ### Added

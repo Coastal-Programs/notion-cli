@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Coastal-Programs/notion-cli/internal/cli"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/cli"
 )
 
 func main() {

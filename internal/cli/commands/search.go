@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	clierrors "github.com/Coastal-Programs/notion-cli/internal/errors"
-	"github.com/Coastal-Programs/notion-cli/pkg/output"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
+	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -94,18 +94,17 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 	}
 
 	if ps, _ := cmd.Flags().GetInt("page-size"); ps > 0 {
+		if ps > 100 {
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: fmt.Sprintf("--page-size must be between 1 and 100, got %d", ps),
+			})
+		}
 		body["page_size"] = ps
 	}
 
 	if sc, _ := cmd.Flags().GetString("start-cursor"); sc != "" {
 		body["start_cursor"] = sc
-	}
-
-	if ps, _ := cmd.Flags().GetInt("page-size"); ps > 100 {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInvalidRequest,
-			Message: fmt.Sprintf("--page-size must be between 1 and 100, got %d", ps),
-		})
 	}
 
 	limit, _ := cmd.Flags().GetInt("limit")
