@@ -44,6 +44,9 @@ jobs:
         go-version-file: go.mod
 
     - name: Build all platforms
+      env:
+        NOTION_OAUTH_CLIENT_ID: ${{ secrets.NOTION_OAUTH_CLIENT_ID }}
+        NOTION_OAUTH_SECRET: ${{ secrets.NOTION_OAUTH_SECRET }}
       run: make release
 
     - name: Upload binaries
