@@ -76,7 +76,7 @@ func newPageCreateCmd() *cobra.Command {
 func runPageCreate(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -197,7 +197,7 @@ func newPageRetrieveCmd() *cobra.Command {
 func runPageRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -245,7 +245,7 @@ func newPageUpdateCmd() *cobra.Command {
 func runPageUpdate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -331,7 +331,7 @@ func newPagePropertyItemCmd() *cobra.Command {
 func runPagePropertyItem(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -402,7 +402,7 @@ func runPageTrash(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -441,7 +441,7 @@ func newPageRestoreCmd() *cobra.Command {
 func runPageRestore(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -531,7 +531,7 @@ func runPageMove(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

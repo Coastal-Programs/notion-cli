@@ -77,33 +77,35 @@ func TestDoctorCmd_WithToken(t *testing.T) {
 	_, _, _ = runDoctorRoot(t, "doctor")
 }
 
-func TestOAuthCredentialsEmbedded_DefaultBuild(t *testing.T) {
+func TestOAuthCredentialsAvailable_DefaultBuild(t *testing.T) {
 	origID, origSecret := config.OAuthClientID, config.OAuthClientSecret
 	t.Cleanup(func() {
 		config.OAuthClientID = origID
 		config.OAuthClientSecret = origSecret
 	})
+	t.Setenv("NOTION_OAUTH_CLIENT_ID", "")
+	t.Setenv("NOTION_OAUTH_SECRET", "")
 
 	config.OAuthClientID = ""
 	config.OAuthClientSecret = ""
-	if oauthCredentialsEmbedded() {
+	if oauthCredentialsAvailable() {
 		t.Error("expected false when both vars empty")
 	}
 
 	config.OAuthClientID = "id"
-	if oauthCredentialsEmbedded() {
+	if oauthCredentialsAvailable() {
 		t.Error("expected false when only client id set")
 	}
 
 	config.OAuthClientID = ""
 	config.OAuthClientSecret = "secret"
-	if oauthCredentialsEmbedded() {
+	if oauthCredentialsAvailable() {
 		t.Error("expected false when only client secret set")
 	}
 
 	config.OAuthClientID = "id"
 	config.OAuthClientSecret = "secret"
-	if !oauthCredentialsEmbedded() {
+	if !oauthCredentialsAvailable() {
 		t.Error("expected true when both set")
 	}
 }

@@ -53,7 +53,7 @@ func newMarkdownGetCmd() *cobra.Command {
 func runMarkdownGet(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -134,7 +134,7 @@ func newMarkdownSetCmd() *cobra.Command {
 func runMarkdownSet(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

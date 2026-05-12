@@ -557,9 +557,7 @@ func TestBlockRetrieve_Integration(t *testing.T) {
 	})
 	defer cleanup()
 
-	// We cannot easily override the client URL in the current architecture
-	// because newClient() reads NOTION_TOKEN and creates a default client.
-	// Instead, verify the command structure is correct by checking flag parsing.
+	// Verify the command structure is correct by checking flag parsing.
 	_ = srv
 	_ = notion.NewClient("test", notion.WithBaseURL(srv.URL))
 

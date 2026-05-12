@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Workspace-scoped OAuth credentials.** `auth login` now stores OAuth credentials per Notion workspace using a slug derived from the workspace name, with `--slug` for overrides. Added `auth list`, `auth default [workspace]`, `auth logout [workspace]`, global `--auth-workspace`, and `NOTION_WORKSPACE` selection.
+  - Keychain-backed secret storage for named workspace credentials. Non-secret workspace metadata is stored in `~/.config/notion-cli/credentials.json`; OAuth access and refresh tokens are stored in the OS keychain.
+  - Workspace-scoped cache paths for named credentials under `~/.notion-cli/workspaces/<slug>/databases.json`, while the legacy default continues using `~/.notion-cli/databases.json`.
+  - Default workspace invariant: once named workspace credentials exist, one named workspace is always selected as the default; legacy config is used only before workspace credentials exist or when explicitly requested with `--auth-workspace default`.
+  - Interactive default workspace selector: `auth default` lets terminal users choose from stored workspaces with arrow keys or j/k, select with Space, and save with Enter, while non-interactive and formatted output keep printing the current default.
+  - First-run setup: interactive API commands automatically start OAuth setup when no workspace credentials or legacy token exist, then continue using the newly created default workspace.
+  - OAuth credential hardening: local development can use runtime `NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET`, and placeholder OAuth client values fail before opening the browser.
 - **`db create` and `db update` can now set/modify the database column schema** (fixes #97). Both commands accept `--properties` (a JSON object of Notion property definitions) and `--properties-file` (the same JSON from a file).
   - `db create` sends the schema under `initial_data_source.properties` per Notion API version 2025-09-03+ (replacing the previously hard-coded, now-deprecated top-level `properties` payload). A default `Name` title column is injected only when the supplied schema has no title-type property.
   - `db update` applies schema changes via `PATCH /data_sources/{id}`, resolving the primary data source automatically (or an explicit `--data-source`). A property value of JSON `null` deletes that column. `--title` still updates the database object and can be combined with `--properties`.

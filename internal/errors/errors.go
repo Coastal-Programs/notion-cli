@@ -120,6 +120,7 @@ func TokenMissing() *NotionCLIError {
 		Code:    CodeTokenMissing,
 		Message: "Notion API token is not configured",
 		Suggestions: []string{
+			"Run an API command in an interactive terminal to start first-time OAuth setup",
 			"Run 'notion-cli auth login' to authenticate via OAuth",
 			"Or set the NOTION_TOKEN environment variable",
 			"Or run 'notion-cli config set-token <token>' for manual setup",
@@ -384,6 +385,7 @@ func OAuthNotConfigured() *NotionCLIError {
 			"This binary was built without embedded OAuth client credentials",
 			"If you installed via npm: upgrade to >=6.1.2 with `npm i -g @coastal-programs/notion-cli@latest`",
 			"If you built from source: set NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET, then re-run `make build`",
+			"For local development, you can also export NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET at runtime",
 			"As a fallback, set NOTION_TOKEN to use a manually issued integration token instead",
 		},
 	}
