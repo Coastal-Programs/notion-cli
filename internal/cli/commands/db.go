@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,55 +12,111 @@ import (
 	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
 	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/oauth"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/resolver"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/retry"
 	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
 )
 
-// newClient creates a Notion API client using the following precedence:
+func newClientForCommand(cmd *cobra.Command) (*notion.Client, error) {
+	workspaceSlug := authWorkspaceFromCommand(cmd)
+	client, err := newClientForWorkspace(workspaceSlug)
+	if !shouldRunInitialSetup(workspaceSlug, err) {
+		return client, err
+	}
+	if err := runInitialWorkspaceSetup(cmd); err != nil {
+		return nil, err
+	}
+	return newClientForWorkspace(workspaceSlug)
+}
+
+// newClientForWorkspace creates a Notion API client using the following precedence:
 //  1. NOTION_TOKEN environment variable (CI/automation)
-//  2. OAuth access token from config (interactive login)
-//  3. Manual token from config file (fallback)
-func newClient() (*notion.Client, error) {
+//  2. OAuth access token from selected workspace credentials
+//  3. Legacy config token when the default workspace is explicitly selected
+func newClientForWorkspace(workspaceSlug string) (*notion.Client, error) {
 	// Always load config so we can apply tunable settings (base URL, retry,
 	// keep-alive) regardless of where the token comes from.
-	cfg, cfgErr := config.LoadConfig()
+	cfg, active, cfgErr := config.LoadConfigForWorkspace(workspaceSlug)
 
-	// 1. Environment variable (highest priority).
-	token := os.Getenv("NOTION_TOKEN")
-
-	// 2. Config file: OAuth token, then manual token.
-	if token == "" && cfgErr == nil {
-		if cfg.OAuthAccessToken != "" {
-			token = cfg.OAuthAccessToken
-		} else if cfg.Token != "" {
-			token = cfg.Token
-		}
-	}
-
+	token := authTokenFromConfig(cfg)
 	if token == "" {
+		if cfgErr != nil {
+			return nil, cfgErr
+		}
 		return nil, clierrors.TokenMissing()
 	}
 
 	var opts []notion.ClientOption
 	if cfgErr == nil && cfg != nil {
-		if cfg.BaseURL != "" {
-			opts = append(opts, notion.WithBaseURL(cfg.BaseURL))
-		}
-		opts = append(opts, notion.WithRetryConfig(retry.RetryConfig{
-			MaxRetries: cfg.MaxRetries,
-			BaseDelay:  time.Duration(cfg.BaseDelayMs) * time.Millisecond,
-			MaxDelay:   time.Duration(cfg.MaxDelayMs) * time.Millisecond,
-			Jitter:     true,
-		}))
-		opts = append(opts, notion.WithKeepAlive(cfg.HTTPKeepAlive))
+		opts = append(opts, clientOptionsForConfig(cfg)...)
 		// Pass config to client so it can auto-refresh OAuth tokens on 401.
-		if os.Getenv("NOTION_TOKEN") == "" && cfg.OAuthRefreshToken != "" {
+		if cfg.AuthMethod() == "oauth" && cfg.OAuthRefreshToken != "" {
 			opts = append(opts, notion.WithConfig(cfg))
+			opts = append(opts, notion.WithConfigSaver(func(updated *config.Config) error {
+				return config.SaveConfigForWorkspace(active, updated)
+			}))
+			maybeRefreshOAuthConfig(cfg, active)
+			token = cfg.OAuthAccessToken
 		}
 	}
 	return notion.NewClient(token, opts...), nil
+}
+
+func maybeRefreshOAuthConfig(cfg *config.Config, active *config.ActiveWorkspace) {
+	if cfg == nil || !cfg.NeedsRefresh() {
+		return
+	}
+	clientID, clientSecret, ok := config.OAuthClientCredentials()
+	if !ok {
+		return
+	}
+	refreshed, err := oauth.TokenRefresh(context.Background(), clientID, clientSecret, cfg.OAuthRefreshToken)
+	if err != nil {
+		return
+	}
+	cfg.OAuthAccessToken = refreshed.AccessToken
+	if refreshed.RefreshToken != "" {
+		cfg.OAuthRefreshToken = refreshed.RefreshToken
+	}
+	if refreshed.ExpiresIn > 0 {
+		cfg.OAuthTokenExpiresAt = time.Now().Add(
+			time.Duration(refreshed.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
+	}
+	_ = config.SaveConfigForWorkspace(active, cfg)
+}
+
+func authTokenFromConfig(cfg *config.Config) string {
+	if cfg == nil {
+		return ""
+	}
+	switch cfg.AuthMethod() {
+	case "oauth":
+		return cfg.OAuthAccessToken
+	case "env", "token":
+		return cfg.Token
+	default:
+		return ""
+	}
+}
+
+func clientOptionsForConfig(cfg *config.Config) []notion.ClientOption {
+	if cfg == nil {
+		return nil
+	}
+	var opts []notion.ClientOption
+	if cfg.BaseURL != "" {
+		opts = append(opts, notion.WithBaseURL(cfg.BaseURL))
+	}
+	opts = append(opts, notion.WithRetryConfig(retry.RetryConfig{
+		MaxRetries: cfg.MaxRetries,
+		BaseDelay:  time.Duration(cfg.BaseDelayMs) * time.Millisecond,
+		MaxDelay:   time.Duration(cfg.MaxDelayMs) * time.Millisecond,
+		Jitter:     true,
+	}))
+	opts = append(opts, notion.WithKeepAlive(cfg.HTTPKeepAlive))
+	return opts
 }
 
 // resolveID extracts and validates a Notion ID from the provided argument.
@@ -269,7 +326,7 @@ func newDBQueryCmd() *cobra.Command {
 func runDBQuery(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -452,7 +509,7 @@ func newDBRetrieveCmd() *cobra.Command {
 func runDBRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -494,7 +551,7 @@ func newDBSchemaCmd() *cobra.Command {
 func runDBSchema(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -742,7 +799,7 @@ func newDBCreateCmd() *cobra.Command {
 func runDBCreate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -801,7 +858,7 @@ func newDBUpdateCmd() *cobra.Command {
 func runDBUpdate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

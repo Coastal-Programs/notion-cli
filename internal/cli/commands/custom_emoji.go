@@ -61,7 +61,7 @@ func newCustomEmojiListCmd() *cobra.Command {
 func runCustomEmojiList(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -159,7 +159,7 @@ func newCustomEmojiRetrieveCmd() *cobra.Command {
 func runCustomEmojiRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

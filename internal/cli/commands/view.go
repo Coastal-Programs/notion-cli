@@ -149,7 +149,7 @@ func runViewCreate(cmd *cobra.Command, _ []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -221,11 +221,6 @@ func newViewListCmd() *cobra.Command {
 func runViewList(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
-	if err != nil {
-		return handleError(cmd, err)
-	}
-
 	dataSource, _ := cmd.Flags().GetString("data-source")
 	database, _ := cmd.Flags().GetString("database")
 
@@ -238,6 +233,11 @@ func runViewList(cmd *cobra.Command, _ []string) error {
 				"Use --database <database_id> to list views defined on that database",
 			},
 		})
+	}
+
+	client, err := newClientForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, err)
 	}
 
 	var dsID, dbID string
@@ -295,7 +295,7 @@ func newViewRetrieveCmd() *cobra.Command {
 func runViewRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -361,7 +361,7 @@ func runViewUpdate(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -424,7 +424,7 @@ func runViewDelete(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -466,7 +466,7 @@ func newViewQueryCmd() *cobra.Command {
 func runViewQuery(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -574,7 +574,7 @@ func newViewResultsCmd() *cobra.Command {
 func runViewResults(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -627,7 +627,7 @@ func newViewDeleteQueryCmd() *cobra.Command {
 func runViewDeleteQuery(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

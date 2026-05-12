@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,34 @@ var (
 	OAuthClientID     = ""
 	OAuthClientSecret = ""
 )
+
+// OAuthClientCredentials returns OAuth client credentials configured for this
+// binary. Build-time values are preferred; runtime environment variables are a
+// development fallback for local builds and `go run`.
+func OAuthClientCredentials() (string, string, bool) {
+	clientID := cleanOAuthCredential(OAuthClientID)
+	clientSecret := cleanOAuthCredential(OAuthClientSecret)
+	if clientID == "" {
+		clientID = cleanOAuthCredential(os.Getenv("NOTION_OAUTH_CLIENT_ID"))
+	}
+	if clientSecret == "" {
+		clientSecret = cleanOAuthCredential(os.Getenv("NOTION_OAUTH_SECRET"))
+	}
+	if !looksConfiguredOAuthValue(clientID) || !looksConfiguredOAuthValue(clientSecret) {
+		return "", "", false
+	}
+	return clientID, clientSecret, true
+}
+
+func cleanOAuthCredential(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.Trim(value, `"'`)
+	return strings.TrimSpace(value)
+}
+
+func looksConfiguredOAuthValue(value string) bool {
+	return value != "" && !strings.ContainsAny(value, "<>")
+}
 
 // Config holds all CLI configuration values.
 type Config struct {

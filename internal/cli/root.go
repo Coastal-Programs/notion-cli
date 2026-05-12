@@ -29,7 +29,8 @@ var rootCmd = &cobra.Command{
 			// Fall back to config (env var or config file) when the flag
 			// is not explicitly set. This makes NOTION_CLI_VERBOSE work.
 			if !cmd.Flags().Changed("verbose") {
-				if cfg, err := config.LoadConfig(); err == nil && cfg != nil {
+				authWorkspace, _ := cmd.Root().PersistentFlags().GetString("auth-workspace")
+				if cfg, _, err := config.LoadConfigForWorkspace(authWorkspace); err == nil && cfg != nil {
 					verbose = cfg.Verbose
 				}
 			}
@@ -57,6 +58,7 @@ func init() {
 	// are added per-command via addOutputFlags to avoid redefinition panics).
 	pf := rootCmd.PersistentFlags()
 	pf.BoolP("verbose", "v", false, "Enable verbose stderr logging")
+	commands.AddAuthWorkspaceFlag(rootCmd)
 
 	// Version template.
 	rootCmd.SetVersionTemplate(fmt.Sprintf("notion-cli version %s (commit: %s, built: %s)\n",

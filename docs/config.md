@@ -10,7 +10,7 @@ Configuration management
 
 ## `notion-cli config set-token [TOKEN]`
 
-Save the Notion API token to the config file
+Save the Notion API token to the legacy config file
 
 ```
 USAGE
@@ -20,7 +20,11 @@ ARGUMENTS
   [TOKEN]  Notion integration token (starts with secret_ or ntn_)
 
 DESCRIPTION
-  Save the Notion API token to the config file.
+  Save the Notion API token to ~/.config/notion-cli/config.json. Named
+  workspace credentials are created with `notion-cli auth login` and OAuth.
+  Once named workspace credentials exist, the CLI keeps a named workspace as
+  the default and only uses this legacy token when explicitly requested with
+  --auth-workspace default.
 
   If no argument is provided, the token is read from stdin.
   You can pipe a token via stdin to avoid exposing it in process listings:
@@ -43,6 +47,7 @@ EXAMPLES
   Set token via pipe (recommended for security)
 
     $ echo "$NOTION_TOKEN" | notion-cli config set-token
+
 ```
 
 
@@ -53,7 +58,7 @@ Get a configuration value by key
 
 ```
 USAGE
-  $ notion-cli config get KEY [--show-secret]
+  $ notion-cli [--auth-workspace <slug>] config get KEY [--show-secret]
 
 ARGUMENTS
   KEY  Configuration key to retrieve (e.g., token, base_url, max_retries)
@@ -62,7 +67,7 @@ FLAGS
   --show-secret  Show unmasked token value (token is masked by default)
 
 DESCRIPTION
-  Get a configuration value by key.
+  Get a configuration value by key for the active workspace credential.
 
 EXAMPLES
   Get the configured token (masked)
@@ -86,10 +91,12 @@ Show the config file path
 
 ```
 USAGE
-  $ notion-cli config path
+  $ notion-cli [--auth-workspace <slug>] config path
 
 DESCRIPTION
-  Show the full path to the configuration file.
+  Show the full path to the relevant configuration metadata file. Named
+  workspace credentials use ~/.config/notion-cli/credentials.json; explicit
+  legacy commands use ~/.config/notion-cli/config.json.
 
 EXAMPLES
   Show config file path
@@ -105,13 +112,14 @@ List all configuration values
 
 ```
 USAGE
-  $ notion-cli config list [-j]
+  $ notion-cli [--auth-workspace <slug>] config list [-j]
 
 FLAGS
   -j, --json  Output as JSON
 
 DESCRIPTION
-  List all configuration values. Token values are masked for security.
+  List all configuration values for the active workspace. Token values are
+  masked for security.
 
   Displays: token, base_url, max_retries, base_delay_ms, max_delay_ms,
   cache_enabled, cache_max_size, disk_cache_enabled, http_keep_alive, verbose.
@@ -128,4 +136,3 @@ EXAMPLES
 
     $ notion-cli config list --json
 ```
-

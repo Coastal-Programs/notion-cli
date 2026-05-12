@@ -140,12 +140,19 @@ type Client struct {
 	notionVersion string
 	retryConfig   *retry.RetryConfig
 	cfg           *config.Config // optional; enables auto-refresh on 401
+	cfgSaver      func(*config.Config) error
 }
 
 // WithConfig attaches a Config to the client so it can automatically refresh
 // the OAuth access token when a 401 response is received.
 func WithConfig(cfg *config.Config) ClientOption {
 	return func(c *Client) { c.cfg = cfg }
+}
+
+// WithConfigSaver sets the persistence callback used after automatic OAuth
+// refresh. If unset, the legacy config.json path is used.
+func WithConfigSaver(save func(*config.Config) error) ClientOption {
+	return func(c *Client) { c.cfgSaver = save }
 }
 
 // NewClient creates a new Notion API client.
@@ -503,23 +510,30 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 	if !errors.As(err, &apiErr) || apiErr.Status != 401 {
 		return nil, err
 	}
-	if c.cfg == nil || c.cfg.OAuthRefreshToken == "" || config.OAuthClientID == "" {
+	clientID, clientSecret, ok := config.OAuthClientCredentials()
+	if c.cfg == nil || c.cfg.OAuthRefreshToken == "" || !ok {
 		return nil, err
 	}
 
-	newToken, refreshErr := oauth.TokenRefresh(ctx, config.OAuthClientID, config.OAuthClientSecret, c.cfg.OAuthRefreshToken)
+	newToken, refreshErr := oauth.TokenRefresh(ctx, clientID, clientSecret, c.cfg.OAuthRefreshToken)
 	if refreshErr != nil {
 		return nil, err // return original 401
 	}
 
 	c.token = newToken.AccessToken
 	c.cfg.OAuthAccessToken = newToken.AccessToken
-	c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	if newToken.RefreshToken != "" {
+		c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	}
 	if newToken.ExpiresIn > 0 {
 		c.cfg.OAuthTokenExpiresAt = time.Now().Add(
 			time.Duration(newToken.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
 	}
-	_ = config.SaveConfig(c.cfg) // best-effort
+	if c.cfgSaver != nil {
+		_ = c.cfgSaver(c.cfg) // best-effort
+	} else {
+		_ = config.SaveConfig(c.cfg) // best-effort
+	}
 
 	return c.doInternal(ctx, method, path, params, body) // retry once
 }

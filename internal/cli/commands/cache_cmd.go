@@ -38,7 +38,7 @@ func newCacheInfoCmd() *cobra.Command {
 func runCacheInfo(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	cfg, err := config.LoadConfig()
+	cfg, active, err := loadConfigForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, fmt.Errorf("load config: %w", err))
 	}
@@ -47,10 +47,11 @@ func runCacheInfo(cmd *cobra.Command, args []string) error {
 		"cache_enabled":      cfg.CacheEnabled,
 		"cache_max_size":     cfg.CacheMaxSize,
 		"disk_cache_enabled": cfg.DiskCacheEnabled,
+		"workspace":          active.DisplayName(),
 	}
 
 	// Check workspace cache.
-	dataDir := config.GetDataDir()
+	dataDir := config.GetDataDirForWorkspace(active.Slug)
 	if dataDir != "" {
 		cacheFile := filepath.Join(dataDir, "databases.json")
 		if info, err := os.Stat(cacheFile); err == nil {

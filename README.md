@@ -446,28 +446,54 @@ notion-cli cache info --output json
 
 ## Authentication
 
-The CLI supports three authentication methods, checked in this order:
+The CLI supports workspace credentials. `auth login` derives a local workspace
+slug from the Notion workspace name, stores tokens in the OS keychain, and
+keeps one named workspace selected as the default. Use `--auth-workspace` or
+`NOTION_WORKSPACE` to select a non-default stored workspace.
+
+Authentication is checked in this order:
 
 | Priority | Method | Use case |
 |----------|--------|----------|
 | 1 | `NOTION_TOKEN` env var | CI/CD, scripts, automation |
-| 2 | OAuth token (from `auth login`) | Interactive / daily use |
-| 3 | Manual token (from `config set-token`) | Fallback |
+| 2 | Explicit workspace (`--auth-workspace` / `NOTION_WORKSPACE`) | Agents, project notes |
+| 3 | Default workspace credential | Interactive / daily use |
+| 4 | Legacy config.json token | Compatibility before any workspace credentials exist, or explicit `--auth-workspace default` |
 
 ```bash
 # Recommended: OAuth login
 notion-cli auth login
+
+# First run: any API command starts OAuth setup if no credentials exist
+notion-cli whoami
+
+# Use a specific stored workspace
+notion-cli --auth-workspace haven search roadmap
+NOTION_WORKSPACE=haven notion-cli sync
 
 # For CI/automation: environment variable
 export NOTION_TOKEN=secret_your_token_here
 
 # Check which method is active
 notion-cli auth status
+
+# Manage stored workspaces
+notion-cli auth list
+notion-cli auth default haven
+notion-cli auth default  # interactive selector
 ```
+
+On a fresh interactive install, commands that need the Notion API start a
+first-time setup flow automatically: the browser opens, you authorize Notion,
+and the selected workspace becomes the default. Non-interactive shells and
+commands with `NOTION_WORKSPACE` / `--auth-workspace` set fail with setup
+instructions instead of opening a browser.
 
 ### Configuration
 
-The CLI reads configuration from `~/.config/notion-cli/config.json`. You can manage it with:
+The CLI stores legacy configuration in `~/.config/notion-cli/config.json`,
+workspace metadata in `~/.config/notion-cli/credentials.json`, and workspace
+secrets in the OS keychain. You can manage config with:
 
 ```bash
 # Set a value
@@ -553,6 +579,10 @@ notion-cli auth status
 
 # Re-authenticate via OAuth
 notion-cli auth login
+
+# If Notion says "Missing or incomplete Client ID", verify OAuth credentials
+# are embedded or exported for local development:
+notion-cli doctor
 
 # Or verify your token env var is set
 echo $NOTION_TOKEN

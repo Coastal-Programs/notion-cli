@@ -2,8 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -309,6 +311,55 @@ func TestBuildVarsExist(t *testing.T) {
 	if Date == "" {
 		t.Error("Date should have a default value")
 	}
+}
+
+func TestOAuthClientCredentials(t *testing.T) {
+	origID, origSecret := OAuthClientID, OAuthClientSecret
+	t.Cleanup(func() {
+		OAuthClientID = origID
+		OAuthClientSecret = origSecret
+	})
+
+	t.Run("build time values", func(t *testing.T) {
+		t.Setenv("NOTION_OAUTH_CLIENT_ID", "")
+		t.Setenv("NOTION_OAUTH_SECRET", "")
+		OAuthClientID = "  \"client-id\"  "
+		OAuthClientSecret = "  'client-secret'  "
+
+		clientID, clientSecret, ok := OAuthClientCredentials()
+		if !ok {
+			t.Fatal("OAuthClientCredentials() ok = false")
+		}
+		if clientID != "client-id" || clientSecret != "client-secret" {
+			t.Fatalf("credentials = %q/%q", clientID, clientSecret)
+		}
+	})
+
+	t.Run("runtime env fallback", func(t *testing.T) {
+		OAuthClientID = ""
+		OAuthClientSecret = ""
+		t.Setenv("NOTION_OAUTH_CLIENT_ID", "env-client")
+		t.Setenv("NOTION_OAUTH_SECRET", "env-secret")
+
+		clientID, clientSecret, ok := OAuthClientCredentials()
+		if !ok {
+			t.Fatal("OAuthClientCredentials() ok = false")
+		}
+		if clientID != "env-client" || clientSecret != "env-secret" {
+			t.Fatalf("credentials = %q/%q", clientID, clientSecret)
+		}
+	})
+
+	t.Run("reject placeholders", func(t *testing.T) {
+		OAuthClientID = "<from Notion integration settings>"
+		OAuthClientSecret = "secret"
+		t.Setenv("NOTION_OAUTH_CLIENT_ID", "")
+		t.Setenv("NOTION_OAUTH_SECRET", "")
+
+		if _, _, ok := OAuthClientCredentials(); ok {
+			t.Fatal("OAuthClientCredentials() ok = true for placeholder client id")
+		}
+	})
 }
 
 func TestOAuthConfigFields(t *testing.T) {
@@ -619,5 +670,293 @@ func TestLoadConfig_FileWithPartialValues(t *testing.T) {
 	}
 	if !cfg.CacheEnabled {
 		t.Error("CacheEnabled should still be default true")
+	}
+}
+
+func TestSlugFromWorkspaceName(t *testing.T) {
+	tests := []struct {
+		name        string
+		workspaceID string
+		want        string
+	}{
+		{"Haven", "abcd1234-0000", "haven"},
+		{"Ross Berger's Notion", "abcd1234-0000", "ross-berger-s-notion"},
+		{"  Work  / Team!! ", "abcd1234-0000", "work-team"},
+		{"!!!", "17ab3186-873d-418f-b899-c3f6a43f68de", "notion-17ab3186"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SlugFromWorkspaceName(tt.name, tt.workspaceID); got != tt.want {
+				t.Errorf("SlugFromWorkspaceName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestChooseWorkspaceSlug_CollisionAndReauth(t *testing.T) {
+	creds := &CredentialsFile{Workspaces: map[string]WorkspaceCredential{
+		"haven": {Slug: "haven", WorkspaceID: "ws-1"},
+	}}
+	if got, err := ChooseWorkspaceSlug(creds, "", "Haven", "ws-1"); err != nil || got != "haven" {
+		t.Fatalf("reauth slug = %q, %v; want haven", got, err)
+	}
+	if got, err := ChooseWorkspaceSlug(creds, "", "Haven", "abcdef12-9999"); err != nil || got != "haven-abcdef12" {
+		t.Fatalf("collision slug = %q, %v; want haven-abcdef12", got, err)
+	}
+	if got, err := ChooseWorkspaceSlug(creds, "personal", "Haven", "ws-2"); err != nil || got != "personal" {
+		t.Fatalf("explicit slug = %q, %v; want personal", got, err)
+	}
+}
+
+func TestChooseWorkspaceSlug_CollisionExhaustion(t *testing.T) {
+	creds := &CredentialsFile{Workspaces: map[string]WorkspaceCredential{
+		"haven":     {Slug: "haven", WorkspaceID: "ws-1"},
+		"haven-new": {Slug: "haven-new", WorkspaceID: "ws-prefix"},
+	}}
+	for i := 2; i < 1000; i++ {
+		slug := "haven-" + strconv.Itoa(i)
+		creds.Workspaces[slug] = WorkspaceCredential{Slug: slug, WorkspaceID: "ws-collision"}
+	}
+	if _, err := ChooseWorkspaceSlug(creds, "", "Haven", "new"); err == nil {
+		t.Fatal("ChooseWorkspaceSlug succeeded after exhausting generated slugs")
+	}
+}
+
+func TestWorkspaceCredential_LoadConfigForWorkspace(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+	t.Setenv("NOTION_WORKSPACE", "")
+	t.Setenv("NOTION_TOKEN", "")
+
+	store := NewMemorySecretStore()
+	restore := SetSecretStoreForTest(store)
+	t.Cleanup(restore)
+
+	err := SaveWorkspaceCredential(WorkspaceCredential{
+		Slug:                "haven",
+		AuthMethod:          AuthMethodOAuth,
+		WorkspaceID:         "ws-haven",
+		WorkspaceName:       "Haven",
+		BotID:               "bot-haven",
+		OAuthTokenExpiresAt: "2030-01-01T00:00:00Z",
+	}, WorkspaceSecrets{
+		OAuthAccessToken:  "ntn_access",
+		OAuthRefreshToken: "rt_refresh",
+	}, true)
+	if err != nil {
+		t.Fatalf("SaveWorkspaceCredential: %v", err)
+	}
+
+	cfg, active, err := LoadConfigForWorkspace("")
+	if err != nil {
+		t.Fatalf("LoadConfigForWorkspace: %v", err)
+	}
+	if active.DisplayName() != "haven" {
+		t.Fatalf("active workspace = %q, want haven", active.DisplayName())
+	}
+	if cfg.OAuthAccessToken != "ntn_access" || cfg.OAuthRefreshToken != "rt_refresh" {
+		t.Fatalf("oauth secrets not loaded: access=%q refresh=%q", cfg.OAuthAccessToken, cfg.OAuthRefreshToken)
+	}
+	if cfg.OAuthWorkspaceName != "Haven" || cfg.OAuthWorkspaceID != "ws-haven" {
+		t.Fatalf("workspace metadata not loaded: %#v", cfg)
+	}
+}
+
+func TestLoadConfigForWorkspace_PrecedenceCascade(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+	t.Setenv("NOTION_TOKEN", "")
+	t.Setenv("NOTION_WORKSPACE", "")
+
+	store := NewMemorySecretStore()
+	restore := SetSecretStoreForTest(store)
+	t.Cleanup(restore)
+
+	if err := SaveConfig(&Config{Token: "secret_legacy"}); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+	if err := SaveWorkspaceCredential(WorkspaceCredential{
+		Slug:       "personal",
+		AuthMethod: AuthMethodOAuth,
+	}, WorkspaceSecrets{OAuthAccessToken: "ntn_personal", OAuthRefreshToken: "rt_personal"}, true); err != nil {
+		t.Fatalf("SaveWorkspaceCredential personal: %v", err)
+	}
+	if err := SaveWorkspaceCredential(WorkspaceCredential{
+		Slug:       "work",
+		AuthMethod: AuthMethodOAuth,
+	}, WorkspaceSecrets{OAuthAccessToken: "ntn_work", OAuthRefreshToken: "rt_work"}, false); err != nil {
+		t.Fatalf("SaveWorkspaceCredential work: %v", err)
+	}
+
+	t.Setenv("NOTION_TOKEN", "secret_env")
+	cfg, active, err := LoadConfigForWorkspace("work")
+	if err != nil {
+		t.Fatalf("env explicit LoadConfigForWorkspace: %v", err)
+	}
+	if active.DisplayName() != "work" || cfg.AuthMethod() != "env" || cfg.Token != "secret_env" {
+		t.Fatalf("env should mask explicit workspace: active=%s method=%s token=%q", active.DisplayName(), cfg.AuthMethod(), cfg.Token)
+	}
+
+	t.Setenv("NOTION_TOKEN", "")
+	cfg, active, err = LoadConfigForWorkspace("work")
+	if err != nil {
+		t.Fatalf("explicit LoadConfigForWorkspace: %v", err)
+	}
+	if active.DisplayName() != "work" || cfg.AuthMethod() != "oauth" || cfg.OAuthAccessToken != "ntn_work" {
+		t.Fatalf("explicit workspace not selected: active=%s method=%s token=%q", active.DisplayName(), cfg.AuthMethod(), cfg.OAuthAccessToken)
+	}
+
+	t.Setenv("NOTION_WORKSPACE", "work")
+	cfg, active, err = LoadConfigForWorkspace("")
+	if err != nil {
+		t.Fatalf("env workspace LoadConfigForWorkspace: %v", err)
+	}
+	if active.DisplayName() != "work" || cfg.OAuthAccessToken != "ntn_work" {
+		t.Fatalf("NOTION_WORKSPACE not selected: active=%s token=%q", active.DisplayName(), cfg.OAuthAccessToken)
+	}
+
+	t.Setenv("NOTION_WORKSPACE", "")
+	cfg, active, err = LoadConfigForWorkspace("")
+	if err != nil {
+		t.Fatalf("default workspace LoadConfigForWorkspace: %v", err)
+	}
+	if active.DisplayName() != "personal" || cfg.AuthMethod() != "oauth" || cfg.OAuthAccessToken != "ntn_personal" {
+		t.Fatalf("default workspace not selected: active=%s method=%s token=%q", active.DisplayName(), cfg.AuthMethod(), cfg.OAuthAccessToken)
+	}
+
+	if _, err := DeleteWorkspaceCredential("personal"); err != nil {
+		t.Fatalf("DeleteWorkspaceCredential personal: %v", err)
+	}
+	if _, err := DeleteWorkspaceCredential("work"); err != nil {
+		t.Fatalf("DeleteWorkspaceCredential work: %v", err)
+	}
+	cfg, active, err = LoadConfigForWorkspace("")
+	if err != nil {
+		t.Fatalf("legacy fallback LoadConfigForWorkspace: %v", err)
+	}
+	if !active.Legacy || cfg.AuthMethod() != "token" || cfg.Token != "secret_legacy" {
+		t.Fatalf("legacy fallback not selected: active=%#v method=%s token=%q", active, cfg.AuthMethod(), cfg.Token)
+	}
+}
+
+type failingSecretStore struct {
+	err error
+}
+
+func (f failingSecretStore) Get(string) (string, error) {
+	return "", f.err
+}
+
+func (f failingSecretStore) Set(string, string) error {
+	return f.err
+}
+
+func (f failingSecretStore) Delete(string) error {
+	return f.err
+}
+
+func TestWorkspaceCredential_SecretStoreErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+	t.Setenv("NOTION_TOKEN", "")
+	t.Setenv("NOTION_WORKSPACE", "")
+
+	storeErr := errors.New("keychain unavailable")
+	restore := SetSecretStoreForTest(failingSecretStore{err: storeErr})
+	t.Cleanup(restore)
+
+	if err := SaveWorkspaceCredential(WorkspaceCredential{
+		Slug:       "haven",
+		AuthMethod: AuthMethodOAuth,
+	}, WorkspaceSecrets{OAuthAccessToken: "ntn_haven"}, true); !errors.Is(err, storeErr) {
+		t.Fatalf("SaveWorkspaceCredential error = %v, want %v", err, storeErr)
+	}
+
+	if err := SaveCredentials(&CredentialsFile{
+		DefaultWorkspace: "haven",
+		Workspaces: map[string]WorkspaceCredential{
+			"haven": {Slug: "haven", AuthMethod: AuthMethodOAuth},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCredentials: %v", err)
+	}
+	if _, err := LoadWorkspaceSecrets("haven"); !errors.Is(err, storeErr) {
+		t.Fatalf("LoadWorkspaceSecrets error = %v, want %v", err, storeErr)
+	}
+	if _, _, err := LoadConfigForWorkspace("haven"); !errors.Is(err, storeErr) {
+		t.Fatalf("LoadConfigForWorkspace error = %v, want %v", err, storeErr)
+	}
+}
+
+func TestWorkspaceCredential_RequiresNamedDefaultWhenWorkspacesExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+	t.Setenv("NOTION_WORKSPACE", "")
+	t.Setenv("NOTION_TOKEN", "")
+
+	if _, active, err := LoadConfigForWorkspace(""); err != nil || !active.Legacy {
+		t.Fatalf("empty credentials should use legacy fallback: active=%#v err=%v", active, err)
+	}
+
+	if err := SaveCredentials(&CredentialsFile{
+		Workspaces: map[string]WorkspaceCredential{
+			"personal": {Slug: "personal", AuthMethod: AuthMethodOAuth, WorkspaceID: "ws-personal"},
+			"work":     {Slug: "work", AuthMethod: AuthMethodOAuth, WorkspaceID: "ws-work"},
+		},
+	}); err != nil {
+		t.Fatalf("SaveCredentials: %v", err)
+	}
+	creds, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("LoadCredentials: %v", err)
+	}
+	if creds.DefaultWorkspace != "personal" {
+		t.Fatalf("default workspace = %q, want first sorted slug personal", creds.DefaultWorkspace)
+	}
+	if err := SetDefaultWorkspace(LegacyWorkspaceSlug); err == nil {
+		t.Fatal("SetDefaultWorkspace(default) succeeded with named workspaces")
+	}
+}
+
+func TestDeleteWorkspaceCredential_PromotesDefault(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	store := NewMemorySecretStore()
+	restore := SetSecretStoreForTest(store)
+	t.Cleanup(restore)
+
+	if err := SaveWorkspaceCredential(WorkspaceCredential{
+		Slug:       "alpha",
+		AuthMethod: AuthMethodOAuth,
+	}, WorkspaceSecrets{OAuthAccessToken: "ntn_alpha", OAuthRefreshToken: "rt_alpha"}, true); err != nil {
+		t.Fatalf("SaveWorkspaceCredential alpha: %v", err)
+	}
+	if err := SaveWorkspaceCredential(WorkspaceCredential{
+		Slug:       "bravo",
+		AuthMethod: AuthMethodOAuth,
+	}, WorkspaceSecrets{OAuthAccessToken: "ntn_bravo", OAuthRefreshToken: "rt_bravo"}, false); err != nil {
+		t.Fatalf("SaveWorkspaceCredential bravo: %v", err)
+	}
+
+	if _, err := DeleteWorkspaceCredential("alpha"); err != nil {
+		t.Fatalf("DeleteWorkspaceCredential: %v", err)
+	}
+	creds, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("LoadCredentials: %v", err)
+	}
+	if creds.DefaultWorkspace != "bravo" {
+		t.Fatalf("default workspace = %q, want bravo", creds.DefaultWorkspace)
 	}
 }

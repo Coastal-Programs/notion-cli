@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Workspace credentials: `auth login` now stores OAuth credentials per Notion workspace using a slug derived from the workspace name, with `--slug` for overrides. Added `auth list`, `auth default [workspace]`, `auth logout [workspace]`, global `--auth-workspace`, and `NOTION_WORKSPACE` selection.
+- Keychain-backed secret storage for named workspace credentials. Non-secret workspace metadata is stored in `~/.config/notion-cli/credentials.json`; OAuth access and refresh tokens are stored in the OS keychain.
+- Workspace-scoped cache paths for named credentials under `~/.notion-cli/workspaces/<slug>/databases.json`, while the legacy default continues using `~/.notion-cli/databases.json`.
+- Default workspace invariant: once named workspace credentials exist, one named workspace is always selected as the default; legacy config is used only before workspace credentials exist or when explicitly requested with `--auth-workspace default`.
+- Interactive default workspace selector: `auth default` now lets terminal users choose from stored workspaces with arrow keys or j/k, select with Space, and save with Enter, while non-interactive and formatted output keep printing the current default.
+- First-run setup: interactive API commands automatically start OAuth setup when no workspace credentials or legacy token exist, then continue using the newly created default workspace.
+- OAuth credential hardening: local development can use runtime `NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET`, and placeholder OAuth client values fail before opening the browser.
+
+### Fixed
+- `sync` and `search --property database` now send Notion's current `data_source` search filter while keeping the existing database-facing CLI aliases.
+
 ## [6.3.1] - 2026-05-11
 
 ### Breaking

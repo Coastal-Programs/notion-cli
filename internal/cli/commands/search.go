@@ -45,7 +45,7 @@ func newSearchCmd() *cobra.Command {
 func runSearch(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

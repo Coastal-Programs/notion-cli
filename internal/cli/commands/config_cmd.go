@@ -48,11 +48,11 @@ func maskToken(token string) string {
 // --- config set-token ---
 
 func newConfigSetTokenCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     "set-token [token]",
 		Aliases: []string{"token"},
 		Short:   "Set the Notion API token",
-		Long: `Save the Notion API token to the config file.
+		Long: `Save the Notion API token.
 
 If no argument is provided, the token is read from stdin.
 You can pipe a token via stdin to avoid exposing it in process listings:
@@ -62,6 +62,8 @@ You can pipe a token via stdin to avoid exposing it in process listings:
 		Args: cobra.MaximumNArgs(1),
 		RunE: runConfigSetToken,
 	}
+	addOutputFlags(cmd)
+	return cmd
 }
 
 func runConfigSetToken(cmd *cobra.Command, args []string) error {
@@ -110,6 +112,7 @@ func runConfigSetToken(cmd *cobra.Command, args []string) error {
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(map[string]any{
 		"message":     "Token saved successfully",
+		"workspace":   config.LegacyWorkspaceSlug,
 		"config_path": config.GetConfigPath(),
 	}, "config set-token", start)
 	return nil
@@ -130,10 +133,14 @@ func newConfigGetCmd() *cobra.Command {
 }
 
 func runConfigGet(cmd *cobra.Command, args []string) error {
-	value := config.GetConfigValue(args[0])
+	cfg, _, err := loadConfigForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load config", err))
+	}
+	value := configValue(cfg, args[0])
 
 	// Mask sensitive values unless --show-secret is set.
-	sensitiveKeys := map[string]bool{"token": true, "oauth_access_token": true}
+	sensitiveKeys := map[string]bool{"token": true, "oauth_access_token": true, "oauth_refresh_token": true}
 	if sensitiveKeys[args[0]] {
 		showSecret, _ := cmd.Flags().GetBool("show-secret")
 		if !showSecret {
@@ -156,7 +163,11 @@ func newConfigPathCmd() *cobra.Command {
 }
 
 func runConfigPath(cmd *cobra.Command, args []string) error {
-	_, _ = fmt.Fprintln(cmd.OutOrStdout(), config.GetConfigPath())
+	_, active, err := loadConfigForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load config", err))
+	}
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), config.GetConfigPathForWorkspace(active.Slug))
 	return nil
 }
 
@@ -176,7 +187,7 @@ func newConfigListCmd() *cobra.Command {
 func runConfigList(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	cfg, err := config.LoadConfig()
+	cfg, active, err := loadConfigForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load config", err))
 	}
@@ -195,9 +206,52 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		"disk_cache_enabled": cfg.DiskCacheEnabled,
 		"http_keep_alive":    cfg.HTTPKeepAlive,
 		"verbose":            cfg.Verbose,
+		"workspace":          active.DisplayName(),
+		"config_path":        config.GetConfigPathForWorkspace(active.Slug),
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(data, "config list", start)
 	return nil
+}
+
+func configValue(cfg *config.Config, key string) string {
+	switch key {
+	case "token":
+		return cfg.Token
+	case "base_url":
+		return cfg.BaseURL
+	case "max_retries":
+		return fmt.Sprintf("%d", cfg.MaxRetries)
+	case "base_delay_ms":
+		return fmt.Sprintf("%d", cfg.BaseDelayMs)
+	case "max_delay_ms":
+		return fmt.Sprintf("%d", cfg.MaxDelayMs)
+	case "cache_enabled":
+		return fmt.Sprintf("%t", cfg.CacheEnabled)
+	case "cache_max_size":
+		return fmt.Sprintf("%d", cfg.CacheMaxSize)
+	case "disk_cache_enabled":
+		return fmt.Sprintf("%t", cfg.DiskCacheEnabled)
+	case "http_keep_alive":
+		return fmt.Sprintf("%t", cfg.HTTPKeepAlive)
+	case "verbose":
+		return fmt.Sprintf("%t", cfg.Verbose)
+	case "oauth_access_token":
+		return cfg.OAuthAccessToken
+	case "oauth_workspace_id":
+		return cfg.OAuthWorkspaceID
+	case "oauth_workspace_name":
+		return cfg.OAuthWorkspaceName
+	case "oauth_bot_id":
+		return cfg.OAuthBotID
+	case "oauth_refresh_token":
+		return cfg.OAuthRefreshToken
+	case "oauth_token_expires_at":
+		return cfg.OAuthTokenExpiresAt
+	case "auth_method":
+		return cfg.AuthMethod()
+	default:
+		return ""
+	}
 }

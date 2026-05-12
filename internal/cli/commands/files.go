@@ -173,7 +173,7 @@ func runFilesUpload(cmd *cobra.Command, args []string) error {
 	base := filepath.Base(path)
 	ct := detectContentType(base)
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -331,7 +331,7 @@ func newFilesRetrieveCmd() *cobra.Command {
 func runFilesRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -372,7 +372,7 @@ func runFilesList(cmd *cobra.Command, _ []string) error {
 	pageSize, _ := cmd.Flags().GetInt("page-size")
 	pageAll, _ := cmd.Flags().GetBool("all")
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
