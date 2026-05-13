@@ -28,6 +28,14 @@ func TestNotionCLIError_Error(t *testing.T) {
 	})
 }
 
+func TestNotionCLIError_DisplayMessage(t *testing.T) {
+	inner := fmt.Errorf("connection refused")
+	e := &NotionCLIError{Code: CodeNetworkError, Message: "network fail", Err: inner}
+	if got, want := e.DisplayMessage(), "network fail: connection refused"; got != want {
+		t.Errorf("DisplayMessage() = %q, want %q", got, want)
+	}
+}
+
 func TestNotionCLIError_Unwrap(t *testing.T) {
 	inner := fmt.Errorf("root cause")
 	e := &NotionCLIError{Code: CodeInternalError, Message: "oops", Err: inner}
@@ -39,6 +47,20 @@ func TestNotionCLIError_Unwrap(t *testing.T) {
 	e2 := &NotionCLIError{Code: CodeInternalError, Message: "no wrap"}
 	if e2.Unwrap() != nil {
 		t.Error("Unwrap should return nil when no wrapped error")
+	}
+}
+
+func TestWrap(t *testing.T) {
+	inner := fmt.Errorf("disk full")
+	e := Wrap(CodeInternalError, "Failed to save config", inner)
+	if e.Code != CodeInternalError {
+		t.Errorf("Code = %q, want %q", e.Code, CodeInternalError)
+	}
+	if e.Message != "Failed to save config" {
+		t.Errorf("Message = %q", e.Message)
+	}
+	if !errors.Is(e, inner) {
+		t.Error("Wrap should preserve the underlying error")
 	}
 }
 

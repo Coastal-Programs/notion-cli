@@ -90,10 +90,7 @@ func runMarkdownGet(cmd *cobra.Command, args []string) error {
 	filePath, _ := cmd.Flags().GetString("file")
 	if filePath != "" {
 		if err := os.WriteFile(filePath, []byte(md), 0o644); err != nil {
-			return handleError(cmd, &clierrors.NotionCLIError{
-				Code:    clierrors.CodeInternalError,
-				Message: fmt.Sprintf("Cannot write file %q: %s", filePath, err),
-			})
+			return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, fmt.Sprintf("Cannot write file %q", filePath), err))
 		}
 		return nil
 	}
@@ -108,15 +105,7 @@ func runMarkdownGet(cmd *cobra.Command, args []string) error {
 // isStructuredOutputRequested reports whether the caller explicitly asked for
 // a structured output format. When false, `markdown get` prints raw markdown.
 func isStructuredOutputRequested(cmd *cobra.Command) bool {
-	if v, _ := cmd.Flags().GetString("output"); v != "" {
-		return true
-	}
-	for _, name := range []string{"json", "compact-json", "raw", "csv", "markdown", "pretty"} {
-		if cmd.Flags().Changed(name) {
-			return true
-		}
-	}
-	return false
+	return outputFormatExplicit(cmd)
 }
 
 // --- markdown set ---

@@ -28,7 +28,7 @@ func newSearchCmd() *cobra.Command {
 
 	cmd.Flags().StringP("query", "q", "", "Search query text")
 	cmd.Flags().StringP("sort-direction", "d", "desc", "Sort direction (asc or desc)")
-	cmd.Flags().StringP("property", "p", "", "Filter by object type (database or page)")
+	cmd.Flags().StringP("property", "p", "", "Filter by object type (data_source, database, or page)")
 	cmd.Flags().StringP("start-cursor", "c", "", "Pagination cursor")
 	cmd.Flags().IntP("page-size", "s", 5, "Number of results per page")
 	cmd.Flags().String("database", "", "Filter results by database ID")
@@ -71,9 +71,9 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 
 	if prop, _ := cmd.Flags().GetString("property"); prop != "" {
 		switch strings.ToLower(prop) {
-		case "database", "databases", "db":
+		case "data_source", "data-source", "datasource", "database", "databases", "db":
 			body["filter"] = map[string]any{
-				"value":    "database",
+				"value":    "data_source",
 				"property": "object",
 			}
 		case "page", "pages":
@@ -84,9 +84,10 @@ func runSearch(cmd *cobra.Command, _ []string) error {
 		default:
 			return handleError(cmd, &clierrors.NotionCLIError{
 				Code:    clierrors.CodeInvalidRequest,
-				Message: fmt.Sprintf("Invalid --property value %q: must be 'database' or 'page'", prop),
+				Message: fmt.Sprintf("Invalid --property value %q: must be 'data_source', 'database', or 'page'", prop),
 				Suggestions: []string{
-					"Use --property database to filter for databases",
+					"Use --property data_source to filter for data sources",
+					"Use --property database as a compatibility alias",
 					"Use --property page to filter for pages",
 				},
 			})

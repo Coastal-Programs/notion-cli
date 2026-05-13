@@ -137,8 +137,8 @@ func TestClientSideFilter_EditedBefore(t *testing.T) {
 func TestClientSideFilter_MultipleFilters(t *testing.T) {
 	created := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	items := []any{
-		makeItem("db-a", created, ""),          // passes both
-		makeItem("db-b", created, ""),          // fails dbFilter
+		makeItem("db-a", created, ""),                // passes both
+		makeItem("db-b", created, ""),                // fails dbFilter
 		makeItem("db-a", "2023-01-01T00:00:00Z", ""), // fails createdAfter
 	}
 	got := clientSideFilter(items, "db-a", "2024-01-01", "", "", "")
@@ -272,6 +272,33 @@ func TestSearchCmd_PropertyPageFilter(t *testing.T) {
 	}
 	if filter["value"] != "page" {
 		t.Errorf("filter.value = %v, want page", filter["value"])
+	}
+	if filter["property"] != "object" {
+		t.Errorf("filter.property = %v, want object", filter["property"])
+	}
+}
+
+func TestSearchCmd_PropertyDatabaseFilterUsesDataSource(t *testing.T) {
+	var capturedBody map[string]any
+	_, cleanup := testSearchServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"results":[],"has_more":false}`))
+	})
+	defer cleanup()
+
+	_, _, err := runSearchRoot(t, "search", "--property", "database")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	filter, ok := capturedBody["filter"].(map[string]any)
+	if !ok {
+		t.Fatal("filter field missing from request body")
+	}
+	if filter["value"] != "data_source" {
+		t.Errorf("filter.value = %v, want data_source", filter["value"])
 	}
 	if filter["property"] != "object" {
 		t.Errorf("filter.property = %v, want object", filter["property"])
