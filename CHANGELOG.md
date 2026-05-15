@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.3] - 2026-05-15
+
 ### Tests
 - **OAuth `/callback` handler now has direct coverage** for its DNS-rebinding and method guards. `internal/oauth/oauth.go` extracts the handler into `newCallbackHandler` (no behavior change) so `internal/oauth/oauth_test.go` can assert: non-GET → 405 with `Allow: GET`, mismatched `Host` → 421, and valid `localhost:PORT` / `127.0.0.1:PORT` hosts → 200 with the code+state delivered on `resultCh`. Each test was confirmed to fail when its corresponding guard is removed.
 
