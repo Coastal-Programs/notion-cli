@@ -39,6 +39,12 @@ const (
 
 	// maxResponseBody limits the token exchange response to 1 MB.
 	maxResponseBody = 1 << 20
+
+	// notionVersion is the Notion API version sent on OAuth requests.
+	// Matches the default in internal/notion/client.go and the official
+	// makenotion/notion-sdk-js, which sends Notion-Version on every request
+	// including OAuth endpoints. Keep in sync with defaultNotionVersion.
+	notionVersion = "2026-03-11"
 )
 
 // redirectURIFor returns the canonical redirect URI for the given port. It
@@ -330,6 +336,8 @@ func exchangeCode(ctx context.Context, clientID, clientSecret, redirectURI, code
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -392,6 +400,8 @@ func TokenRefresh(ctx context.Context, clientID, clientSecret, refreshToken stri
 		return nil, clierrors.OAuthFailed(err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -440,6 +450,8 @@ func TokenIntrospect(ctx context.Context, clientID, clientSecret, token string) 
 		return nil, clierrors.OAuthFailed(err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -485,6 +497,8 @@ func TokenRevoke(ctx context.Context, clientID, clientSecret, token string) erro
 		return clierrors.OAuthFailed(err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}

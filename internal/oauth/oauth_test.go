@@ -175,6 +175,16 @@ func TestExchangeCode_Success(t *testing.T) {
 			t.Errorf("Content-Type = %q, want application/json", ct)
 		}
 
+		// Verify Accept header (defensive — some OAuth servers content-negotiate).
+		if a := r.Header.Get("Accept"); a != "application/json" {
+			t.Errorf("Accept = %q, want application/json", a)
+		}
+
+		// Verify Notion-Version header (matches official notion-sdk-js behavior).
+		if v := r.Header.Get("Notion-Version"); v != notionVersion {
+			t.Errorf("Notion-Version = %q, want %q", v, notionVersion)
+		}
+
 		resp := TokenResponse{
 			AccessToken:   "ntn_test_token_abc123",
 			TokenType:     "bearer",
@@ -300,6 +310,72 @@ func TestLogin_ContextCancelled(t *testing.T) {
 	}
 	if cliErr.Code != clierrors.CodeOAuthTimeout {
 		t.Errorf("error code = %q, want %q", cliErr.Code, clierrors.CodeOAuthTimeout)
+	}
+}
+
+// assertOAuthHeaders fails the test if the request is missing any of the
+// three headers we send on every OAuth endpoint call: Content-Type,
+// Accept, and Notion-Version.
+func assertOAuthHeaders(t *testing.T, r *http.Request) {
+	t.Helper()
+	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	if a := r.Header.Get("Accept"); a != "application/json" {
+		t.Errorf("Accept = %q, want application/json", a)
+	}
+	if v := r.Header.Get("Notion-Version"); v != notionVersion {
+		t.Errorf("Notion-Version = %q, want %q", v, notionVersion)
+	}
+}
+
+func TestTokenRefresh_SendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		_ = json.NewEncoder(w).Encode(TokenResponse{AccessToken: "new-token"})
+	}))
+	defer server.Close()
+
+	origURL := tokenURL
+	tokenURL = server.URL
+	defer func() { tokenURL = origURL }()
+
+	_, err := TokenRefresh(context.Background(), "id", "secret", "refresh-tok")
+	if err != nil {
+		t.Fatalf("TokenRefresh() error: %v", err)
+	}
+}
+
+func TestTokenIntrospect_SendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		_ = json.NewEncoder(w).Encode(IntrospectResponse{Active: true})
+	}))
+	defer server.Close()
+
+	origURL := introspectURL
+	introspectURL = server.URL
+	defer func() { introspectURL = origURL }()
+
+	_, err := TokenIntrospect(context.Background(), "id", "secret", "tok")
+	if err != nil {
+		t.Fatalf("TokenIntrospect() error: %v", err)
+	}
+}
+
+func TestTokenRevoke_SendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	origURL := revokeURL
+	revokeURL = server.URL
+	defer func() { revokeURL = origURL }()
+
+	if err := TokenRevoke(context.Background(), "id", "secret", "tok"); err != nil {
+		t.Fatalf("TokenRevoke() error: %v", err)
 	}
 }
 
