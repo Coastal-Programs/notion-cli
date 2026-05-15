@@ -514,7 +514,12 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 
 	c.token = newToken.AccessToken
 	c.cfg.OAuthAccessToken = newToken.AccessToken
-	c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	// Only overwrite the stored refresh token if the server returned a new one.
+	// Notion does not always rotate refresh tokens; an empty response field
+	// must not blank out the credential we already have on disk.
+	if newToken.RefreshToken != "" {
+		c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	}
 	if newToken.ExpiresIn > 0 {
 		c.cfg.OAuthTokenExpiresAt = time.Now().Add(
 			time.Duration(newToken.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)

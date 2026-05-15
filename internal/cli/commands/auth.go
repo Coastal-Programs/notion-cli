@@ -39,10 +39,12 @@ func newAuthLoginCmd() *cobra.Command {
 		Short: "Log in via Notion OAuth",
 		Long: "Authenticate with Notion by opening your browser and completing the OAuth flow.\n\n" +
 			"Use --manual when running over SSH, in a container, or behind a firewall " +
-			"where the local callback server cannot be reached by your browser.",
+			"where the local callback server cannot be reached by your browser. In manual " +
+			"mode you must paste the FULL redirected URL (the authorization code alone is " +
+			"not sufficient \u2014 the state parameter must be present for CSRF protection).",
 		RunE: runAuthLogin,
 	}
-	cmd.Flags().Bool("manual", false, "Skip the local callback server and paste the redirected URL by hand")
+	cmd.Flags().Bool("manual", false, "Skip the local callback server and paste the FULL redirected URL by hand")
 	addOutputFlags(cmd)
 	return cmd
 }

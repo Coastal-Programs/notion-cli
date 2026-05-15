@@ -142,7 +142,11 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 	value := config.GetConfigValue(args[0])
 
 	// Mask sensitive values unless --show-secret is set.
-	sensitiveKeys := map[string]bool{"token": true, "oauth_access_token": true}
+	sensitiveKeys := map[string]bool{
+		"token":               true,
+		"oauth_access_token":  true,
+		"oauth_refresh_token": true,
+	}
 	if sensitiveKeys[args[0]] {
 		showSecret, _ := cmd.Flags().GetBool("show-secret")
 		if !showSecret {
@@ -197,16 +201,18 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 	token := maskToken(cfg.Token)
 
 	data := map[string]any{
-		"token":              token,
-		"base_url":           cfg.BaseURL,
-		"max_retries":        cfg.MaxRetries,
-		"base_delay_ms":      cfg.BaseDelayMs,
-		"max_delay_ms":       cfg.MaxDelayMs,
-		"cache_enabled":      cfg.CacheEnabled,
-		"cache_max_size":     cfg.CacheMaxSize,
-		"disk_cache_enabled": cfg.DiskCacheEnabled,
-		"http_keep_alive":    cfg.HTTPKeepAlive,
-		"verbose":            cfg.Verbose,
+		"token":               token,
+		"oauth_access_token":  maskToken(cfg.OAuthAccessToken),
+		"oauth_refresh_token": maskToken(cfg.OAuthRefreshToken),
+		"base_url":            cfg.BaseURL,
+		"max_retries":         cfg.MaxRetries,
+		"base_delay_ms":       cfg.BaseDelayMs,
+		"max_delay_ms":        cfg.MaxDelayMs,
+		"cache_enabled":       cfg.CacheEnabled,
+		"cache_max_size":      cfg.CacheMaxSize,
+		"disk_cache_enabled":  cfg.DiskCacheEnabled,
+		"http_keep_alive":     cfg.HTTPKeepAlive,
+		"verbose":             cfg.Verbose,
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))

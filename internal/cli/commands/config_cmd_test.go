@@ -100,6 +100,55 @@ func TestConfigGet_ShowSecret(t *testing.T) {
 	}
 }
 
+func TestConfigGet_OAuthRefreshTokenMasked(t *testing.T) {
+	// Set up an isolated HOME with a config file containing the refresh token.
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Unsetenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+
+	cfgDir := filepath.Join(tmpDir, ".config", "notion-cli")
+	if err := os.MkdirAll(cfgDir, 0o700); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	cfgPath := filepath.Join(cfgDir, "config.json")
+	const rawRefresh = "rt_supersecretrefreshvalue"
+	contents := `{"oauth_refresh_token":"` + rawRefresh + `"}`
+	if err := os.WriteFile(cfgPath, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	// Default: should be masked.
+	_, buf, err := runConfigRoot(t, "config", "get", "oauth_refresh_token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	out := buf.String()
+	if strings.Contains(out, rawRefresh) {
+		t.Errorf("oauth_refresh_token should be masked by default, got: %q", out)
+	}
+	if !strings.Contains(out, "***") {
+		t.Errorf("masked output should contain ***, got: %q", out)
+	}
+
+	// With --show-secret: should reveal.
+	_, buf2, err := runConfigRoot(t, "config", "get", "oauth_refresh_token", "--show-secret")
+	if err != nil {
+		t.Fatalf("unexpected error with --show-secret: %v", err)
+	}
+	if !strings.Contains(buf2.String(), rawRefresh) {
+		t.Errorf("with --show-secret, output should contain raw refresh token, got: %q", buf2.String())
+	}
+}
+
 func TestConfigGet_UnknownKey(t *testing.T) {
 	_, _, err := runConfigRoot(t, "config", "get", "nonexistent_key_xyz")
 	if err != nil {

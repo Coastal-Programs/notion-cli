@@ -77,21 +77,31 @@ Get your token from: https://www.notion.so/my-integrations
 
 The `auth login` command uses Notion's OAuth flow, which requires a public Client ID and Client Secret embedded into the binary at build time via `-ldflags -X`. CI release builds get these from GitHub Actions secrets (`NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET`); local dev builds without them simply return `OAuthNotConfigured` if you try `auth login` (everything else still works with `NOTION_TOKEN`).
 
-If you are a maintainer and want OAuth in a local `make build`, create a gitignored `.env.local` at the repo root — the Makefile auto-loads it:
+If you are a maintainer and want OAuth in a local `make build`, store the
+credentials at `~/.config/notion-cli-dev/.env` — the Makefile auto-loads it.
+This path lives **outside the repo tree** so a stray `git add .` cannot stage
+it and a typo in `.gitignore` cannot expose it:
 
 ```bash
-# .env.local (NEVER commit this; it is in .gitignore)
+mkdir -p ~/.config/notion-cli-dev
+cat > ~/.config/notion-cli-dev/.env <<'EOF'
 NOTION_OAUTH_CLIENT_ID=<from Notion integration settings>
 NOTION_OAUTH_SECRET=<from Notion integration settings>
+EOF
+chmod 600 ~/.config/notion-cli-dev/.env
 ```
 
 Then `make build` and verify with `./build/notion-cli doctor --json | grep oauth_credentials_embedded` — it should report `true`.
 
+> **Migrating from `.env.local`?** Earlier versions read these vars from
+> `.env.local` in the repo root. Move the contents to the path above and
+> shred the old file: `shred -u .env.local` (or `rm -P .env.local` on macOS).
+
 Security rules:
 
-- **Never** commit `.env.local`, paste it in issues, or share it in screenshots / screen recordings.
+- **Never** commit the dotfile, paste it in issues, or share it in screenshots / screen recordings.
 - Treat the "secret" as a soft secret — anyone with a release binary can extract it via `strings` (this is accepted in OAuth native-app distribution; PKCE mitigates the risk).
-- If a credential leaks, rotate it in the Notion integration settings and cut a patch release.
+- If a credential leaks, follow the rotation procedure in `SECURITY.md` and cut a patch release.
 - CI logs auto-redact GitHub Actions secrets; locally, `make build` is silenced so the ldflags don't echo to your terminal.
 
 ### Pre-commit hooks (Lefthook)

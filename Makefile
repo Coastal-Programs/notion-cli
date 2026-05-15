@@ -1,11 +1,14 @@
 BINARY_NAME=notion-cli
 BUILD_DIR=build
 
-# Auto-load maintainer secrets from .env.local if present.
-# CI sets the same vars via repository secrets, so this is a no-op there.
-# .env.local is gitignored — see CONTRIBUTING.md for the format.
-ifneq (,$(wildcard .env.local))
-    include .env.local
+# Auto-load maintainer secrets from $HOME/.config/notion-cli-dev/.env if present.
+# The dotfile lives OUTSIDE the repo tree so a stray `git add .` can never stage it,
+# and a typo in .gitignore can never expose it. CI sets the same vars via
+# repository secrets, so this include is a no-op there.
+# See CONTRIBUTING.md for the file format and migration notes.
+MAINTAINER_ENV := $(HOME)/.config/notion-cli-dev/.env
+ifneq (,$(wildcard $(MAINTAINER_ENV)))
+    include $(MAINTAINER_ENV)
     export
 endif
 
@@ -21,7 +24,7 @@ LDFLAGS=-ldflags "-s -w \
 	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.OAuthClientID=$(OAUTH_CLIENT_ID) \
 	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.OAuthClientSecret=$(OAUTH_CLIENT_SECRET)"
 
-.PHONY: build test lint clean release release-check install fmt fmt-check tidy
+.PHONY: build test test-race test-cover lint clean release release-check install fmt fmt-check tidy
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -31,6 +34,15 @@ build:
 
 test:
 	go test ./... -v -count=1
+
+test-race:
+	go test ./... -race -count=1
+
+test-cover:
+	@mkdir -p $(BUILD_DIR)
+	go test ./... -count=1 -coverprofile=$(BUILD_DIR)/coverage.out
+	@go tool cover -func=$(BUILD_DIR)/coverage.out | tail -1
+	@echo "HTML report: go tool cover -html=$(BUILD_DIR)/coverage.out"
 
 lint:
 	go vet ./...
@@ -46,10 +58,25 @@ install:
 # Cross-compilation targets
 PLATFORMS=darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64
 
+# SHA-256 of the historically-leaked OAuth client secret. We compare hashes
+# instead of the literal value so the tripwire itself doesn't trip GitHub's
+# secret-scanning push protection. Any release build that still embeds the
+# leaked value means rotation never happened in the Notion dev portal — fail
+# loudly so we never re-ship a known-compromised credential.
+# To rotate, see SECURITY.md → "Credential rotation".
+LEAKED_OAUTH_SECRET_SHA256 := 4221a9d34ed19a38fb0e904941b2b19347009de04669f825852c3fd1f50d0a39
+
 release-check:
 	@if [ -z "$(OAUTH_CLIENT_ID)" ] || [ -z "$(OAUTH_CLIENT_SECRET)" ]; then \
 		echo "ERROR: NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET must be set for release builds."; \
 		echo "       Export them in your shell or CI environment before running 'make release'."; \
+		exit 1; \
+	fi
+	@actual_sha=$$(printf '%s' "$(OAUTH_CLIENT_SECRET)" | shasum -a 256 | cut -d' ' -f1); \
+	if [ "$$actual_sha" = "$(LEAKED_OAUTH_SECRET_SHA256)" ]; then \
+		echo "ERROR: refusing to build a release with the known-leaked OAuth client secret."; \
+		echo "       Rotate it in the Notion dev portal and update your secrets."; \
+		echo "       See SECURITY.md \"Credential rotation\" for the procedure."; \
 		exit 1; \
 	fi
 

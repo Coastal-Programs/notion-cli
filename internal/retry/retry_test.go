@@ -373,3 +373,53 @@ func TestDoContextDeadline(t *testing.T) {
 		t.Errorf("expected context.DeadlineExceeded, got %v", err)
 	}
 }
+
+// TestCalculateDelay_AttemptZero_NoJitter verifies that with jitter disabled,
+// attempt 0 returns exactly BaseDelay (BaseDelay * 2^0 = BaseDelay).
+func TestCalculateDelay_AttemptZero_NoJitter(t *testing.T) {
+	cfg := RetryConfig{
+		BaseDelay: 250 * time.Millisecond,
+		MaxDelay:  10 * time.Second,
+		Jitter:    false,
+	}
+
+	got := CalculateDelay(0, cfg)
+	if got != cfg.BaseDelay {
+		t.Errorf("CalculateDelay(0, no jitter) = %v, want %v", got, cfg.BaseDelay)
+	}
+}
+
+// TestCalculateDelay_AttemptZero_Jitter verifies that with jitter enabled,
+// attempt 0 returns a value within [BaseDelay/2, BaseDelay]. The impl uses
+// equal jitter: half + rand.Float64()*half, giving range [half, 2*half).
+func TestCalculateDelay_AttemptZero_Jitter(t *testing.T) {
+	cfg := RetryConfig{
+		BaseDelay: 1 * time.Second,
+		MaxDelay:  30 * time.Second,
+		Jitter:    true,
+	}
+
+	low := cfg.BaseDelay / 2
+	high := cfg.BaseDelay
+	for i := 0; i < 50; i++ {
+		got := CalculateDelay(0, cfg)
+		if got < low || got > high {
+			t.Errorf("iter %d: CalculateDelay(0, jitter) = %v, want in [%v, %v]", i, got, low, high)
+		}
+	}
+}
+
+// TestRetryableError_NilUnwrap verifies that calling Unwrap on a RetryableError
+// whose Err is nil returns nil without panicking.
+func TestRetryableError_NilUnwrap(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("unexpected panic: %v", r)
+		}
+	}()
+
+	re := &RetryableError{Err: nil}
+	if got := re.Unwrap(); got != nil {
+		t.Errorf("Unwrap() = %v, want nil", got)
+	}
+}
