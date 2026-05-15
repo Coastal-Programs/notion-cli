@@ -152,9 +152,9 @@ func TestSync_Force(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"results": []any{
 				map[string]any{
-					"object": "database",
-					"id":     "db-1",
-					"title": []any{map[string]any{"plain_text": "My DB"}},
+					"object":           "database",
+					"id":               "db-1",
+					"title":            []any{map[string]any{"plain_text": "My DB"}},
 					"last_edited_time": time.Now().Format(time.RFC3339),
 				},
 			},

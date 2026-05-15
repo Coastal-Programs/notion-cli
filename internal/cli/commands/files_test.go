@@ -455,3 +455,69 @@ func TestFilesList_PageSize(t *testing.T) {
 		t.Errorf("expected page_size=25, got %q", seenPageSize)
 	}
 }
+
+func TestFilesList_All(t *testing.T) {
+	callCount := 0
+	_, cleanup := testFilesServer(t, func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		if callCount == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object":      "list",
+				"results":     []any{map[string]any{"id": "fu-1"}},
+				"has_more":    true,
+				"next_cursor": "cursor1",
+			})
+		} else {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object":   "list",
+				"results":  []any{map[string]any{"id": "fu-2"}},
+				"has_more": false,
+			})
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runFilesRoot(t, "files", "list", "--all")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount < 2 {
+		t.Errorf("expected at least 2 API calls for --all, got %d", callCount)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// parseChunkSize pure-function tests
+// ---------------------------------------------------------------------------
+
+func TestParseChunkSize_MB(t *testing.T) {
+	n, err := parseChunkSize("10MB")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if n != 10*1024*1024 {
+		t.Errorf("n = %d, want %d", n, 10*1024*1024)
+	}
+}
+
+func TestParseChunkSize_OutOfRange(t *testing.T) {
+	_, err := parseChunkSize("100MB")
+	if err == nil {
+		t.Fatal("expected error for out-of-range size")
+	}
+}
+
+func TestParseChunkSize_UnknownUnit(t *testing.T) {
+	_, err := parseChunkSize("100GB")
+	if err == nil {
+		t.Fatal("expected error for unknown unit")
+	}
+}
+
+func TestParseChunkSize_InvalidNumber(t *testing.T) {
+	_, err := parseChunkSize("abcMB")
+	if err == nil {
+		t.Fatal("expected error for invalid number")
+	}
+}

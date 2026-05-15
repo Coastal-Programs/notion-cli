@@ -428,3 +428,130 @@ func TestViewRetrieve_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// loadJSONFlag pure-function tests
+// ---------------------------------------------------------------------------
+
+func TestLoadJSONFlag_InlineJSON(t *testing.T) {
+	var dest map[string]any
+	if err := loadJSONFlag(`{"key":"value"}`, &dest); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dest["key"] != "value" {
+		t.Errorf("key = %v, want value", dest["key"])
+	}
+}
+
+func TestLoadJSONFlag_InvalidJSON(t *testing.T) {
+	var dest map[string]any
+	if err := loadJSONFlag(`not json`, &dest); err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestLoadJSONFlag_FromFile(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "flag-*.json")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, _ = tmpFile.WriteString(`{"from":"file"}`)
+	_ = tmpFile.Close()
+
+	var dest map[string]any
+	if err := loadJSONFlag("@"+tmpFile.Name(), &dest); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dest["from"] != "file" {
+		t.Errorf("from = %v, want file", dest["from"])
+	}
+}
+
+func TestLoadJSONFlag_FileNotFound(t *testing.T) {
+	var dest map[string]any
+	if err := loadJSONFlag("@/nonexistent/file.json", &dest); err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// view update / list extra coverage
+// ---------------------------------------------------------------------------
+
+func TestViewUpdate_WithFilter(t *testing.T) {
+	_, cleanup := testViewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": testView2ID, "object": "view"})
+	})
+	defer cleanup()
+
+	_, _, err := runViewRoot(t, "view", "update", testView2ID, "--filter", `{"property":"Status"}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestViewUpdate_WithSorts(t *testing.T) {
+	_, cleanup := testViewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": testView2ID, "object": "view"})
+	})
+	defer cleanup()
+
+	_, _, err := runViewRoot(t, "view", "update", testView2ID, "--sorts", `[{"property":"Name","direction":"ascending"}]`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestViewList_WithDatabase(t *testing.T) {
+	_, cleanup := testViewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"results":  []any{map[string]any{"id": "v1"}},
+			"has_more": false,
+		})
+	})
+	defer cleanup()
+
+	_, _, err := runViewRoot(t, "view", "list", "--database", testView2ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestViewCreate_WithDatabase(t *testing.T) {
+	_, cleanup := testViewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "v-new", "object": "view"})
+	})
+	defer cleanup()
+
+	_, _, err := runViewRoot(t, "view", "create",
+		"--data-source", testView2ID,
+		"--name", "My View",
+		"--type", "table",
+		"--database", testView2ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestViewCreate_WithFilterAndSorts(t *testing.T) {
+	_, cleanup := testViewServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "v-new", "object": "view"})
+	})
+	defer cleanup()
+
+	_, _, err := runViewRoot(t, "view", "create",
+		"--data-source", testView2ID,
+		"--name", "Filtered View",
+		"--type", "table",
+		"--filter", `{"property":"Status"}`,
+		"--sorts", `[{"property":"Name","direction":"ascending"}]`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

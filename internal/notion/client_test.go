@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/oauth"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/retry"
 )
 
@@ -1860,6 +1862,80 @@ func TestDo_401NoRefreshToken(t *testing.T) {
 	_, err := c.UsersMe(context.Background())
 	if err == nil {
 		t.Fatal("expected error for 401")
+	}
+}
+
+func TestDo_AutoRefreshOn401(t *testing.T) {
+	// Mock OAuth token endpoint.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, 200, map[string]any{
+			"access_token":  "new_access_token",
+			"refresh_token": "new_refresh_token",
+			"token_type":    "bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenSrv.Close()
+
+	oauth.SetTokenURL(tokenSrv.URL)
+	defer oauth.SetTokenURL("https://api.notion.com/v1/oauth/token")
+
+	origClientID := config.OAuthClientID
+	config.OAuthClientID = "test-client-id"
+	defer func() { config.OAuthClientID = origClientID }()
+
+	var callCount int32
+	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&callCount, 1)
+		if n == 1 {
+			writeJSON(t, w, 401, map[string]any{"code": "unauthorized", "message": "token expired"})
+		} else {
+			writeJSON(t, w, 200, map[string]any{"object": "user", "id": "u1"})
+		}
+	})
+
+	cfg := &config.Config{
+		OAuthRefreshToken: "old_refresh_token",
+	}
+	c.cfg = cfg
+
+	result, err := c.UsersMe(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error after auto-refresh: %v", err)
+	}
+	if atomic.LoadInt32(&callCount) != 2 {
+		t.Errorf("expected 2 API calls (401 + retry), got %d", callCount)
+	}
+	if result["id"] != "u1" {
+		t.Errorf("id = %v, want u1", result["id"])
+	}
+	if c.token != "new_access_token" {
+		t.Errorf("token = %q, want updated to new_access_token", c.token)
+	}
+}
+
+func TestDo_AutoRefreshFails_Returns401(t *testing.T) {
+	// Token refresh fails → original 401 should be returned.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer tokenSrv.Close()
+
+	oauth.SetTokenURL(tokenSrv.URL)
+	defer oauth.SetTokenURL("https://api.notion.com/v1/oauth/token")
+
+	origClientID := config.OAuthClientID
+	config.OAuthClientID = "test-client-id"
+	defer func() { config.OAuthClientID = origClientID }()
+
+	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, 401, map[string]any{"code": "unauthorized", "message": "expired"})
+	})
+	c.cfg = &config.Config{OAuthRefreshToken: "refresh_token"}
+
+	_, err := c.UsersMe(context.Background())
+	if err == nil {
+		t.Fatal("expected error when refresh fails")
 	}
 }
 

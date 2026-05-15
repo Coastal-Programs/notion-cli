@@ -460,7 +460,7 @@ func TestDBSchema_Success(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"object": "database",
 			"id":     "db-1",
-			"title": []any{map[string]any{"plain_text": "My DB"}},
+			"title":  []any{map[string]any{"plain_text": "My DB"}},
 			"properties": map[string]any{
 				"Name": map[string]any{"type": "title"},
 			},
@@ -504,6 +504,91 @@ func TestDBUpdate_Success(t *testing.T) {
 	_, _, err := runDBRoot(t, "db", "update", "11111111111111111111111111111111", "--title", "Renamed")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// outputFormat pure-function tests
+// ---------------------------------------------------------------------------
+
+func TestOutputFormat_Flags(t *testing.T) {
+	for _, tc := range []struct {
+		flag string
+		want string
+	}{
+		{"--compact-json", "compact-json"},
+		{"--raw", "raw"},
+		{"--csv", "csv"},
+		{"--markdown", "markdown"},
+		{"--pretty", "pretty"},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "test"}
+			addOutputFlags(cmd)
+			_ = cmd.ParseFlags([]string{tc.flag})
+			got := string(outputFormat(cmd))
+			if got != tc.want {
+				t.Errorf("outputFormat(%s) = %q, want %q", tc.flag, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDBQuery_PageSizeTooLarge(t *testing.T) {
+	_, _, err := runDBRoot(t, "db", "query", "11111111111111111111111111111111", "--page-size", "200")
+	if err == nil {
+		t.Fatal("expected error for --page-size > 100")
+	}
+}
+
+func TestDBQuery_InvalidSortDirection(t *testing.T) {
+	const dbID = "11111111111111111111111111111111"
+	const dsID = "22222222222222222222222222222222"
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "GET" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object": "database", "id": dbID,
+				"data_sources": []any{map[string]any{"id": dsID}},
+			})
+		} else {
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": []any{}, "has_more": false})
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "query", dbID, "--sort-property", "Name", "--sort-direction", "invalid")
+	if err == nil {
+		t.Fatal("expected error for invalid --sort-direction")
+	}
+}
+
+func TestDBQuery_WithFilter(t *testing.T) {
+	const dbID = "11111111111111111111111111111111"
+	const dsID = "22222222222222222222222222222222"
+	var capturedBody map[string]any
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "GET" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object": "database", "id": dbID,
+				"data_sources": []any{map[string]any{"id": dsID}},
+			})
+		} else {
+			_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": []any{}, "has_more": false})
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "query", dbID,
+		"--filter", `{"property":"Status","select":{"equals":"Done"}}`,
+		"--quiet")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedBody["filter"] == nil {
+		t.Error("expected filter in request body")
 	}
 }
 

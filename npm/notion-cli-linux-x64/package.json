@@ -1,6 +1,6 @@
 {
   "name": "@coastal-programs/notion-cli-linux-x64",
-  "version": "6.3.1",
+  "version": "6.3.2",
   "description": "notion-cli binary for Linux x64",
   "os": [
     "linux"

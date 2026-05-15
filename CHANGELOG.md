@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.3.2] - 2026-05-15
+
 ### Fixed
 - OAuth token endpoint requests now include `Notion-Version` and `Accept: application/json` headers, matching the official Notion JS SDK (`makenotion/notion-sdk-js`) and developer-docs spec. Applied to `exchangeCode`, `TokenRefresh`, `TokenIntrospect`, and `TokenRevoke` in `internal/oauth/oauth.go`.
 

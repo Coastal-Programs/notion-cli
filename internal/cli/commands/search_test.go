@@ -137,8 +137,8 @@ func TestClientSideFilter_EditedBefore(t *testing.T) {
 func TestClientSideFilter_MultipleFilters(t *testing.T) {
 	created := time.Date(2024, 6, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)
 	items := []any{
-		makeItem("db-a", created, ""),          // passes both
-		makeItem("db-b", created, ""),          // fails dbFilter
+		makeItem("db-a", created, ""),                // passes both
+		makeItem("db-b", created, ""),                // fails dbFilter
 		makeItem("db-a", "2023-01-01T00:00:00Z", ""), // fails createdAfter
 	}
 	got := clientSideFilter(items, "db-a", "2024-01-01", "", "", "")

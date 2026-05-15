@@ -416,3 +416,44 @@ func TestPageCreate_WithParentPage(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestPageTrash_WithYesFlag(t *testing.T) {
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": testPageID, "in_trash": true})
+	})
+	defer cleanup()
+
+	_, _, err := runPageRoot(t, "page", "trash", testPageID, "--yes")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPageMove_WithParent(t *testing.T) {
+	const parentID = "22222222222222222222222222222222"
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": testPageID})
+	})
+	defer cleanup()
+
+	_, _, err := runPageRoot(t, "page", "move", testPageID, "--parent", parentID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPageMove_WithDataSource(t *testing.T) {
+	const dsID = "22222222222222222222222222222222"
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": testPageID})
+	})
+	defer cleanup()
+
+	_, _, err := runPageRoot(t, "page", "move", testPageID, "--data-source", dsID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
