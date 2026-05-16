@@ -37,6 +37,7 @@ A powerful command-line interface for the Notion API, optimized for AI coding as
 **Key Features:**
 - **Single binary**: ~8MB, zero runtime dependencies, instant startup
 - **OAuth login**: `notion-cli auth login` -- authenticate in your browser, no token management
+- **Official API parity**: `notion-cli api` supports `ntn api`-style raw requests, inline typed JSON, query params, headers, endpoint docs/spec lookup, and multipart file sends
 - **AI-first design**: JSON envelope output, structured errors, exit codes
 - **Non-interactive**: Perfect for scripts and automation
 - **Flexible output**: JSON, CSV, table, or raw API responses
@@ -63,6 +64,9 @@ All 26 commands have been ported with identical syntax -- existing scripts work 
 **v6.1.0: OAuth Authentication** -- `notion-cli auth login` opens your browser, you authorize, done. No more copying tokens manually.
 
 **Unreleased (next):**
+- `api <path>` command compatible with official `ntn api` request syntax, including inline `=`, `:=`, `==`, and `Header:Value` arguments, stdin/`--data`, `--file`, `api ls`, `--spec`, and `--docs`.
+- Official-style aliases: root `login`/`logout`, `datasources`, `pages`, and `files create/get/list`.
+- `NOTION_API_TOKEN`, `NOTION_API_VERSION`, and `--notion-version` compatibility.
 - `data-source templates` and `data-source properties update` subcommands.
 - `db query` emits a deprecation notice (suppress with `--quiet`); migrate to `data-source query <id>` for direct access.
 - `ds` alias now routes to `data-source` (was `db`) — update any scripts using `notion-cli ds`.
@@ -120,6 +124,10 @@ notion-cli whoami
 # Set your Notion API token
 export NOTION_TOKEN="secret_your_token_here"
 
+# Official Notion CLI-compatible aliases also work
+export NOTION_API_TOKEN="$NOTION_TOKEN"
+export NOTION_API_VERSION="2026-03-11"
+
 # Or save it to the config file
 notion-cli config set-token <YOUR_TOKEN>
 ```
@@ -149,17 +157,55 @@ notion-cli page create --database-id <DATABASE_ID> \
 
 # Search the workspace
 notion-cli search "project" --output json
+
+# Make an official ntn-style raw API request
+notion-cli api v1/search query=project page_size:=10
 ```
 
 All commands support `--output json` for machine-readable responses.
 
 ## Commands
 
+### Raw API Requests
+
+```bash
+# GET by default when no body is supplied
+notion-cli api v1/users/me
+
+# POST by default when inline body fields are supplied
+notion-cli api v1/search query=roadmap page_size:=10
+
+# PATCH with typed JSON and a custom header
+notion-cli api "v1/pages/$PAGE_ID" -X PATCH \
+  archived:=true \
+  X-Trace-Id:cli-test-123
+
+# Query parameters and endpoint introspection
+notion-cli api v1/file_uploads page_size==25
+notion-cli api ls --json
+notion-cli api v1/comments --spec -X POST
+notion-cli api v1/comments --docs -X POST
+
+# Multipart file send for low-level upload control
+notion-cli api "v1/file_uploads/$FILE_UPLOAD_ID/send" \
+  --file ./chunk.bin \
+  part_number:=1
+```
+
+Inline syntax matches official `ntn api`: `path=value` for string body fields,
+`path:=json` for typed JSON body fields, `name==value` for query parameters,
+and `Header:Value` for request headers. Body paths support bracket and dot
+notation, indexed arrays, and `[]` appends.
+
 ### Authentication
 
 ```bash
 # Log in via OAuth (opens browser)
 notion-cli auth login
+
+# Official-style aliases
+notion-cli login
+notion-cli logout
 
 # Check current auth status
 notion-cli auth status
@@ -211,6 +257,10 @@ notion-cli db update <DATABASE_ID> --title "New Title"
 
 # Extract schema (AI-friendly)
 notion-cli db schema <DATABASE_ID> --output json
+
+# Official-style data source aliases
+notion-cli datasources query <DATA_SOURCE_ID> --limit 50 --json
+notion-cli datasources resolve <DATABASE_ID> --json
 ```
 
 ### Page Commands
@@ -230,6 +280,12 @@ notion-cli page update <PAGE_ID> \
 
 # Get page property item
 notion-cli page property-item <PAGE_ID> --property-id <PROPERTY_ID>
+
+# Official-style markdown page aliases
+notion-cli pages get <PAGE_ID>
+notion-cli pages create --parent page:<PAGE_ID> --content "# Meeting notes"
+notion-cli pages update <PAGE_ID> --content "# Updated notes"
+notion-cli pages trash <PAGE_ID> --yes
 ```
 
 ### Block Commands
@@ -263,6 +319,19 @@ notion-cli user retrieve <USER_ID>
 
 # Get bot user info
 notion-cli user bot
+```
+
+### File Upload Commands
+
+```bash
+# Existing path-based upload
+notion-cli files upload ./photo.png --json
+
+# Official-style stdin upload and external URL import
+notion-cli files create --filename photo.png --content-type image/png < ./photo.png
+notion-cli files create --external-url https://example.com/photo.png --filename photo.png --plain
+notion-cli files get <FILE_UPLOAD_ID> --plain
+notion-cli files list --json
 ```
 
 ### Search

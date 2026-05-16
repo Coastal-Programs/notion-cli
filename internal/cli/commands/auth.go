@@ -34,6 +34,18 @@ func RegisterAuthCommands(root *cobra.Command) {
 	root.AddCommand(authCmd)
 }
 
+// RegisterRootAuthAliases adds official ntn-style root login/logout aliases
+// while preserving the existing auth command group.
+func RegisterRootAuthAliases(root *cobra.Command) {
+	login := newAuthLoginCmd()
+	login.Use = "login"
+	login.Short = "Log in to Notion"
+	logout := newAuthLogoutCmd()
+	logout.Use = "logout [workspace]"
+	logout.Short = "Log out of Notion"
+	root.AddCommand(login, logout)
+}
+
 // --- auth login ---
 
 func newAuthLoginCmd() *cobra.Command {
@@ -257,10 +269,14 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 
 	switch method {
 	case "env":
-		data["source"] = "NOTION_TOKEN environment variable"
+		source := "NOTION_TOKEN environment variable"
+		if os.Getenv("NOTION_TOKEN") == "" && os.Getenv("NOTION_API_TOKEN") != "" {
+			source = "NOTION_API_TOKEN environment variable"
+		}
+		data["source"] = source
 		data["token"] = maskToken(cfg.Token)
 		if cfg.HasOAuthToken() || (!active.Legacy && active.Metadata != nil) {
-			data["note"] = "Stored workspace credential is also configured but NOTION_TOKEN takes precedence"
+			data["note"] = "Stored workspace credential is also configured but environment token takes precedence"
 		}
 	case "oauth":
 		data["workspace_id"] = cfg.OAuthWorkspaceID
@@ -280,7 +296,7 @@ func runAuthStatus(cmd *cobra.Command, args []string) error {
 		data["message"] = "Not authenticated"
 		data["suggestions"] = []string{
 			"Run 'notion-cli auth login' to authenticate via OAuth",
-			"Or set NOTION_TOKEN environment variable",
+			"Or set NOTION_TOKEN / NOTION_API_TOKEN environment variable",
 		}
 	}
 

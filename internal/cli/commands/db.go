@@ -21,14 +21,14 @@ import (
 
 func newClientForCommand(cmd *cobra.Command) (*notion.Client, error) {
 	workspaceSlug := authWorkspaceFromCommand(cmd)
-	client, err := newClientForWorkspace(workspaceSlug)
+	client, err := newClientForWorkspaceAndCommand(workspaceSlug, cmd)
 	if !shouldRunInitialSetup(workspaceSlug, err) {
 		return client, err
 	}
 	if err := runInitialWorkspaceSetup(cmd); err != nil {
 		return nil, err
 	}
-	return newClientForWorkspace(workspaceSlug)
+	return newClientForWorkspaceAndCommand(workspaceSlug, cmd)
 }
 
 // newClientForWorkspace creates a Notion API client using the following precedence:
@@ -36,6 +36,10 @@ func newClientForCommand(cmd *cobra.Command) (*notion.Client, error) {
 //  2. OAuth access token from selected workspace credentials
 //  3. Legacy config token when the default workspace is explicitly selected
 func newClientForWorkspace(workspaceSlug string) (*notion.Client, error) {
+	return newClientForWorkspaceAndCommand(workspaceSlug, nil)
+}
+
+func newClientForWorkspaceAndCommand(workspaceSlug string, cmd *cobra.Command) (*notion.Client, error) {
 	// Always load config so we can apply tunable settings (base URL, retry,
 	// keep-alive) regardless of where the token comes from.
 	cfg, active, cfgErr := config.LoadConfigForWorkspace(workspaceSlug)
@@ -51,6 +55,9 @@ func newClientForWorkspace(workspaceSlug string) (*notion.Client, error) {
 	var opts []notion.ClientOption
 	if cfgErr == nil && cfg != nil {
 		opts = append(opts, clientOptionsForConfig(cfg)...)
+		if version := notionVersionForCommand(cmd, cfg); version != "" {
+			opts = append(opts, notion.WithNotionVersion(version))
+		}
 		// Pass config to client so it can auto-refresh OAuth tokens on 401.
 		if cfg.AuthMethod() == "oauth" && cfg.OAuthRefreshToken != "" {
 			opts = append(opts, notion.WithConfig(cfg))
@@ -62,6 +69,29 @@ func newClientForWorkspace(workspaceSlug string) (*notion.Client, error) {
 		}
 	}
 	return notion.NewClient(token, opts...), nil
+}
+
+func notionVersionForCommand(cmd *cobra.Command, cfg *config.Config) string {
+	if cmd != nil {
+		if flag := cmd.Flags().Lookup("notion-version"); flag != nil && flag.Changed {
+			v, _ := cmd.Flags().GetString("notion-version")
+			return strings.TrimSpace(v)
+		}
+		if flag := cmd.InheritedFlags().Lookup("notion-version"); flag != nil && flag.Changed {
+			v, _ := cmd.InheritedFlags().GetString("notion-version")
+			return strings.TrimSpace(v)
+		}
+		if cmd.Root() != nil {
+			if flag := cmd.Root().PersistentFlags().Lookup("notion-version"); flag != nil && flag.Changed {
+				v, _ := cmd.Root().PersistentFlags().GetString("notion-version")
+				return strings.TrimSpace(v)
+			}
+		}
+	}
+	if cfg != nil && strings.TrimSpace(cfg.NotionVersion) != "" {
+		return strings.TrimSpace(cfg.NotionVersion)
+	}
+	return ""
 }
 
 func maybeRefreshOAuthConfig(cfg *config.Config, active *config.ActiveWorkspace) {
@@ -108,6 +138,9 @@ func clientOptionsForConfig(cfg *config.Config) []notion.ClientOption {
 	var opts []notion.ClientOption
 	if cfg.BaseURL != "" {
 		opts = append(opts, notion.WithBaseURL(cfg.BaseURL))
+	}
+	if cfg.NotionVersion != "" {
+		opts = append(opts, notion.WithNotionVersion(cfg.NotionVersion))
 	}
 	opts = append(opts, notion.WithRetryConfig(retry.RetryConfig{
 		MaxRetries: cfg.MaxRetries,

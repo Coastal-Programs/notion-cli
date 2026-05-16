@@ -54,6 +54,23 @@ type QueryParams struct {
 	PageID      string
 }
 
+// RawRequest describes a generic Notion API request.
+type RawRequest struct {
+	Method      string
+	Path        string
+	Query       url.Values
+	Headers     http.Header
+	Body        []byte
+	ContentType string
+}
+
+// RawResponse captures the status, headers, and body for a generic API call.
+type RawResponse struct {
+	StatusCode int
+	Headers    http.Header
+	Body       []byte
+}
+
 // Values converts QueryParams to url.Values for use in HTTP requests.
 func (q QueryParams) Values() url.Values {
 	v := url.Values{}
@@ -475,6 +492,49 @@ func (c *Client) FileUploadList(ctx context.Context, query QueryParams) (map[str
 	return c.get(ctx, "/file_uploads", query.Values())
 }
 
+// Raw executes a generic Notion API request. It is used by the ntn-compatible
+// `api` command for endpoints that do not have a typed wrapper yet.
+func (c *Client) Raw(ctx context.Context, raw RawRequest) (*RawResponse, error) {
+	if raw.Method == "" {
+		raw.Method = http.MethodGet
+	}
+	u, err := c.rawURL(raw.Path, raw.Query)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.rawInternal(ctx, raw.Method, u, raw.Headers, raw.Body, raw.ContentType)
+	if err == nil {
+		return result, nil
+	}
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) || apiErr.Status != 401 {
+		return nil, err
+	}
+	clientID, clientSecret, ok := config.OAuthClientCredentials()
+	if c.cfg == nil || c.cfg.OAuthRefreshToken == "" || !ok {
+		return nil, err
+	}
+	newToken, refreshErr := oauth.TokenRefresh(ctx, clientID, clientSecret, c.cfg.OAuthRefreshToken)
+	if refreshErr != nil {
+		return nil, err
+	}
+	c.token = newToken.AccessToken
+	c.cfg.OAuthAccessToken = newToken.AccessToken
+	if newToken.RefreshToken != "" {
+		c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	}
+	if newToken.ExpiresIn > 0 {
+		c.cfg.OAuthTokenExpiresAt = time.Now().Add(
+			time.Duration(newToken.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)
+	}
+	if c.cfgSaver != nil {
+		_ = c.cfgSaver(c.cfg)
+	} else {
+		_ = config.SaveConfig(c.cfg)
+	}
+	return c.rawInternal(ctx, raw.Method, u, raw.Headers, raw.Body, raw.ContentType)
+}
+
 // --- Internal HTTP helpers ---
 
 func (c *Client) get(ctx context.Context, path string, params url.Values) (map[string]any, error) {
@@ -533,6 +593,128 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 	}
 
 	return c.doInternal(ctx, method, path, params, body) // retry once
+}
+
+func (c *Client) rawURL(path string, params url.Values) (string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", fmt.Errorf("empty API path")
+	}
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		u, err := url.Parse(path)
+		if err != nil {
+			return "", err
+		}
+		q := u.Query()
+		for k, values := range params {
+			for _, v := range values {
+				q.Add(k, v)
+			}
+		}
+		u.RawQuery = q.Encode()
+		return u.String(), nil
+	}
+	path = strings.TrimLeft(path, "/")
+	if !strings.HasPrefix(path, "v1/") {
+		path = "v1/" + path
+	}
+	base := strings.TrimRight(c.baseURL, "/")
+	base = strings.TrimSuffix(base, "/v1")
+	u, err := url.Parse(base + "/" + path)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	for k, values := range params {
+		for _, v := range values {
+			q.Add(k, v)
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func (c *Client) rawInternal(ctx context.Context, method, rawURL string, headers http.Header, body []byte, contentType string) (*RawResponse, error) {
+	var result *RawResponse
+	err := retry.Do(ctx, *c.retryConfig, func() error {
+		req, err := http.NewRequestWithContext(ctx, method, rawURL, bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("create request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Notion-Version", c.notionVersion)
+		req.Header.Set("User-Agent", userAgent)
+		req.Header.Set("Accept-Encoding", "gzip")
+		if len(body) > 0 && contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+		for k, values := range headers {
+			req.Header.Del(k)
+			for _, v := range values {
+				req.Header.Add(k, v)
+			}
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			if method == http.MethodGet {
+				return &retry.RetryableError{Err: fmt.Errorf("execute request: %w", err)}
+			}
+			return fmt.Errorf("execute request: %w", err)
+		}
+		defer resp.Body.Close() //nolint:errcheck
+
+		var reader io.Reader = resp.Body
+		if resp.Header.Get("Content-Encoding") == "gzip" {
+			gr, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				return fmt.Errorf("create gzip reader: %w", err)
+			}
+			defer gr.Close() //nolint:errcheck
+			reader = gr
+		}
+
+		const maxResponseSize = 50 * 1024 * 1024
+		respBody, err := io.ReadAll(io.LimitReader(reader, maxResponseSize))
+		if err != nil {
+			return fmt.Errorf("read response body: %w", err)
+		}
+
+		if resp.StatusCode >= 400 {
+			var apiErr APIError
+			if jsonErr := json.Unmarshal(respBody, &apiErr); jsonErr != nil {
+				apiErr = APIError{
+					Status:  resp.StatusCode,
+					Code:    "unknown",
+					Message: string(respBody),
+				}
+			}
+			apiErr.Status = resp.StatusCode
+			if retry.IsRetryable(resp.StatusCode) {
+				retryAfter := parseDuration(resp.Header.Get("Retry-After"))
+				return &retry.RetryableError{
+					Err:        &apiErr,
+					StatusCode: resp.StatusCode,
+					RetryAfter: retryAfter,
+				}
+			}
+			return &apiErr
+		}
+
+		result = &RawResponse{
+			StatusCode: resp.StatusCode,
+			Headers:    resp.Header.Clone(),
+			Body:       respBody,
+		}
+		return nil
+	})
+	if err != nil {
+		if retryErr, ok := err.(*retry.RetryableError); ok {
+			return nil, retryErr.Err
+		}
+		return nil, err
+	}
+	return result, nil
 }
 
 func (c *Client) doInternal(ctx context.Context, method, path string, params url.Values, body map[string]any) (map[string]any, error) {

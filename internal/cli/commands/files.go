@@ -54,12 +54,100 @@ func RegisterFilesCommands(root *cobra.Command) {
 	}
 
 	filesCmd.AddCommand(
+		newFilesCreateCmd(),
 		newFilesUploadCmd(),
 		newFilesRetrieveCmd(),
 		newFilesListCmd(),
 	)
 
 	root.AddCommand(filesCmd)
+}
+
+// ---------------------------------------------------------------------------
+// files create (official ntn-compatible stdin / external URL entrypoint)
+// ---------------------------------------------------------------------------
+
+func newFilesCreateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a file upload",
+		Long:  "Upload bytes from stdin or import a public HTTPS URL as a Notion file upload.",
+		Args:  cobra.NoArgs,
+		RunE:  runFilesCreate,
+	}
+	cmd.Flags().String("filename", "", "Filename to store for stdin or external URL uploads")
+	cmd.Flags().String("content-type", "", "Content type override")
+	cmd.Flags().String("external-url", "", "Import a public HTTPS URL instead of reading stdin")
+	cmd.Flags().String("chunk-size", "10MB", "Chunk size for multi-part stdin uploads (5MB–20MB)")
+	cmd.Flags().Bool("plain", false, "Output tab-separated fields with upload ID first")
+	addOutputFlags(cmd)
+	return cmd
+}
+
+func runFilesCreate(cmd *cobra.Command, _ []string) error {
+	start := time.Now()
+	client, err := newClientForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
+	filename, _ := cmd.Flags().GetString("filename")
+	contentType, _ := cmd.Flags().GetString("content-type")
+	externalURL, _ := cmd.Flags().GetString("external-url")
+	if externalURL != "" {
+		if err := validateExternalURL(externalURL, "--external-url"); err != nil {
+			return handleError(cmd, err)
+		}
+		body := map[string]any{
+			"mode":         "external_url",
+			"external_url": externalURL,
+		}
+		if filename != "" {
+			body["filename"] = filename
+		}
+		if contentType != "" {
+			body["content_type"] = contentType
+		}
+		result, err := client.FileUploadCreate(cmd.Context(), body)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+		return printFileCommandResult(cmd, result, "files create", start)
+	}
+
+	data, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Cannot read stdin", err))
+	}
+	if len(data) == 0 {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeMissingRequired,
+			Message: "No file bytes received on stdin",
+			Suggestions: []string{
+				"Redirect a file: notion-cli files create < ./photo.png",
+				"Or import a URL: notion-cli files create --external-url https://example.com/photo.png",
+			},
+		})
+	}
+	if filename == "" {
+		filename = "upload.bin"
+	}
+	if contentType == "" {
+		contentType = detectContentType(filename)
+	}
+	chunkSizeStr, _ := cmd.Flags().GetString("chunk-size")
+	chunkSize, err := parseChunkSize(chunkSizeStr)
+	if err != nil {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: err.Error(),
+		})
+	}
+	result, err := uploadBytes(cmd, client, data, filename, contentType, chunkSize)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	return printFileCommandResult(cmd, result, "files create", start)
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +398,72 @@ func printUploadResult(cmd *cobra.Command, result map[string]any, start time.Tim
 	return nil
 }
 
+func uploadBytes(cmd *cobra.Command, client *notion.Client, data []byte, filename, contentType string, chunkSize int64) (map[string]any, error) {
+	ctx := cmd.Context()
+	fileSize := int64(len(data))
+	if fileSize <= singlePartMaxBytes {
+		createResult, err := client.FileUploadCreate(ctx, map[string]any{
+			"mode":         "single_part",
+			"filename":     filename,
+			"content_type": contentType,
+		})
+		if err != nil {
+			return nil, err
+		}
+		id, _ := createResult["id"].(string)
+		if id == "" {
+			return nil, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInternalError,
+				Message: "File upload create response missing id",
+			}
+		}
+		return client.FileUploadSend(ctx, id, 0, filename, contentType, data)
+	}
+
+	numParts := int((fileSize + chunkSize - 1) / chunkSize)
+	createResult, err := client.FileUploadCreate(ctx, map[string]any{
+		"mode":            "multi_part",
+		"filename":        filename,
+		"content_type":    contentType,
+		"number_of_parts": numParts,
+	})
+	if err != nil {
+		return nil, err
+	}
+	id, _ := createResult["id"].(string)
+	if id == "" {
+		return nil, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInternalError,
+			Message: "File upload create response missing id",
+		}
+	}
+	for i := 0; i < numParts; i++ {
+		start := int64(i) * chunkSize
+		end := start + chunkSize
+		if end > fileSize {
+			end = fileSize
+		}
+		if _, err := client.FileUploadSend(ctx, id, i+1, filename, contentType, data[start:end]); err != nil {
+			return nil, err
+		}
+	}
+	return client.FileUploadComplete(ctx, id)
+}
+
+func printFileCommandResult(cmd *cobra.Command, result map[string]any, command string, start time.Time) error {
+	plain, _ := cmd.Flags().GetBool("plain")
+	if plain {
+		id, _ := result["id"].(string)
+		filename, _ := result["filename"].(string)
+		status, _ := result["status"].(string)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\n", id, filename, status)
+		return nil
+	}
+	p := output.NewPrinter(outputFormat(cmd))
+	p.PrintSuccess(result, command, start)
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // files retrieve
 // ---------------------------------------------------------------------------
@@ -324,6 +478,7 @@ func newFilesRetrieveCmd() *cobra.Command {
 		RunE:    runFilesRetrieve,
 	}
 
+	cmd.Flags().Bool("plain", false, "Output tab-separated fields with upload ID first")
 	addOutputFlags(cmd)
 	return cmd
 }
@@ -341,9 +496,7 @@ func runFilesRetrieve(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	p := output.NewPrinter(outputFormat(cmd))
-	p.PrintSuccess(result, "files retrieve", start)
-	return nil
+	return printFileCommandResult(cmd, result, "files retrieve", start)
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +514,7 @@ func newFilesListCmd() *cobra.Command {
 
 	cmd.Flags().Int("page-size", 50, "Number of results per page")
 	cmd.Flags().Bool("all", false, "Paginate until all file uploads are retrieved")
+	cmd.Flags().Bool("plain", false, "Output tab-separated rows with upload ID first")
 
 	addOutputFlags(cmd)
 	return cmd
@@ -384,6 +538,10 @@ func runFilesList(cmd *cobra.Command, _ []string) error {
 		result, err := client.FileUploadList(ctx, qp)
 		if err != nil {
 			return handleError(cmd, err)
+		}
+		if plain, _ := cmd.Flags().GetBool("plain"); plain {
+			printFileListPlain(cmd, result)
+			return nil
 		}
 		p := output.NewPrinter(outputFormat(cmd))
 		p.PrintSuccess(result, "files list", start)
@@ -426,4 +584,15 @@ func runFilesList(cmd *cobra.Command, _ []string) error {
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(data, "files list", start)
 	return nil
+}
+
+func printFileListPlain(cmd *cobra.Command, result map[string]any) {
+	results, _ := result["results"].([]any)
+	for _, raw := range results {
+		m, _ := raw.(map[string]any)
+		id, _ := m["id"].(string)
+		filename, _ := m["filename"].(string)
+		status, _ := m["status"].(string)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\n", id, filename, status)
+	}
 }

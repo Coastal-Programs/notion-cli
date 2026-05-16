@@ -204,6 +204,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 		"oauth_access_token":  maskToken(cfg.OAuthAccessToken),
 		"oauth_refresh_token": maskToken(cfg.OAuthRefreshToken),
 		"base_url":            cfg.BaseURL,
+		"notion_version":      cfg.NotionVersion,
 		"max_retries":         cfg.MaxRetries,
 		"base_delay_ms":       cfg.BaseDelayMs,
 		"max_delay_ms":        cfg.MaxDelayMs,
@@ -227,6 +228,8 @@ func configValue(cfg *config.Config, key string) string {
 		return cfg.Token
 	case "base_url":
 		return cfg.BaseURL
+	case "notion_version":
+		return cfg.NotionVersion
 	case "max_retries":
 		return fmt.Sprintf("%d", cfg.MaxRetries)
 	case "base_delay_ms":

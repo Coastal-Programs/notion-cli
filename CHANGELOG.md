@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `api <path>` command with official `ntn api`-style authenticated requests, including inline body/query/header syntax (`=`, `:=`, `==`, `Header:Value`), stdin/`--data` JSON bodies, `--file` multipart uploads, method overrides, raw-default output, and embedded endpoint `ls`/`--spec`/`--docs` introspection.
+- Official CLI compatibility aliases: root `login`/`logout`, `datasources` for `data-source`, `datasources resolve`, `pages get/create/update/trash`, and `files create/get/list` with stdin uploads, external URL imports, `--plain`, filename, and content-type overrides.
+- `NOTION_API_TOKEN` is accepted as an auth token alias after `NOTION_TOKEN`, and `NOTION_API_VERSION` / `--notion-version` can override the `Notion-Version` request header.
+- Embedded Notion API catalog refresh helper at `scripts/refresh_notion_api_catalog.sh`.
+
 ## [6.4.1] - 2026-06-25
 
 ### Added

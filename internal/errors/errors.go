@@ -122,7 +122,7 @@ func TokenMissing() *NotionCLIError {
 		Suggestions: []string{
 			"Run an API command in an interactive terminal to start first-time OAuth setup",
 			"Run 'notion-cli auth login' to authenticate via OAuth",
-			"Or set the NOTION_TOKEN environment variable",
+			"Or set the NOTION_TOKEN / NOTION_API_TOKEN environment variable",
 			"Or run 'notion-cli config set-token <token>' for manual setup",
 			"Get a token at https://www.notion.so/my-integrations",
 		},

@@ -58,6 +58,7 @@ func init() {
 	// are added per-command via addOutputFlags to avoid redefinition panics).
 	pf := rootCmd.PersistentFlags()
 	pf.BoolP("verbose", "v", false, "Enable verbose stderr logging")
+	pf.String("notion-version", "", "Override Notion-Version header (or NOTION_API_VERSION)")
 	commands.AddAuthWorkspaceFlag(rootCmd)
 
 	// Version template.
@@ -68,6 +69,7 @@ func init() {
 	commands.RegisterDBCommands(rootCmd)
 	commands.RegisterDataSourceCommands(rootCmd)
 	commands.RegisterPageCommands(rootCmd)
+	commands.RegisterPagesCommands(rootCmd)
 	commands.RegisterBlockCommands(rootCmd)
 	commands.RegisterUserCommands(rootCmd)
 	commands.RegisterSearchCommand(rootCmd)
@@ -79,11 +81,13 @@ func init() {
 	commands.RegisterConfigCommands(rootCmd)
 	commands.RegisterCacheCommands(rootCmd)
 	commands.RegisterAuthCommands(rootCmd)
+	commands.RegisterRootAuthAliases(rootCmd)
 	commands.RegisterCommentCommands(rootCmd)
 	commands.RegisterViewCommands(rootCmd)
 	commands.RegisterCustomEmojiCommands(rootCmd)
 	commands.RegisterMarkdownCommands(rootCmd)
 	commands.RegisterFilesCommands(rootCmd)
+	commands.RegisterAPICommands(rootCmd)
 }
 
 // ExitCode returns the appropriate exit code for an error.

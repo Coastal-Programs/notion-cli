@@ -3,7 +3,9 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 	"time"
 
 	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
@@ -20,7 +22,7 @@ import (
 func RegisterDataSourceCommands(root *cobra.Command) {
 	dsCmd := &cobra.Command{
 		Use:     "data-source",
-		Aliases: []string{"ds", "data_source", "datasource"},
+		Aliases: []string{"ds", "data_source", "datasource", "datasources"},
 		Short:   "Data source operations (Notion API 2025-09-03)",
 		Long: "Retrieve, create, update, and query Notion data sources. " +
 			"Each Notion database has one or more data sources; these commands address them directly.",
@@ -31,6 +33,7 @@ func RegisterDataSourceCommands(root *cobra.Command) {
 		newDataSourceCreateCmd(),
 		newDataSourceUpdateCmd(),
 		newDataSourceQueryCmd(),
+		newDataSourceResolveCmd(),
 		newDataSourceTemplatesCmd(),
 		newDataSourcePropertiesCmd(),
 	)
@@ -238,8 +241,11 @@ func newDataSourceQueryCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String("filter", "", "Filter as JSON string")
+	cmd.Flags().String("filter-file", "", "Read filter JSON from a file, or '-' for stdin")
 	cmd.Flags().String("sorts", "", "Sorts as JSON array")
+	cmd.Flags().StringArrayP("sort", "s", nil, "Sort spec: '<property> [asc|desc]' (repeatable)")
 	cmd.Flags().Int("page-size", 0, "Number of results per page (1-100)")
+	cmd.Flags().Int("limit", 0, "Number of results per page (official ntn alias)")
 	cmd.Flags().String("start-cursor", "", "Pagination cursor")
 	addOutputFlags(cmd)
 
@@ -261,7 +267,26 @@ func runDataSourceQuery(cmd *cobra.Command, args []string) error {
 
 	body := map[string]any{}
 
-	if f, _ := cmd.Flags().GetString("filter"); f != "" {
+	if filterFile, _ := cmd.Flags().GetString("filter-file"); filterFile != "" {
+		var data []byte
+		var readErr error
+		if filterFile == "-" {
+			data, readErr = io.ReadAll(cmd.InOrStdin())
+		} else {
+			data, readErr = os.ReadFile(filterFile)
+		}
+		if readErr != nil {
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: fmt.Sprintf("Cannot read filter file: %s", readErr),
+			})
+		}
+		var filter map[string]any
+		if err := json.Unmarshal(data, &filter); err != nil {
+			return handleError(cmd, clierrors.InvalidJSON(fmt.Sprintf("--filter-file: %s", err)))
+		}
+		body["filter"] = filter
+	} else if f, _ := cmd.Flags().GetString("filter"); f != "" {
 		var filter map[string]any
 		if err := json.Unmarshal([]byte(f), &filter); err != nil {
 			return handleError(cmd, clierrors.InvalidJSON(fmt.Sprintf("--filter: %s", err)))
@@ -276,6 +301,17 @@ func runDataSourceQuery(cmd *cobra.Command, args []string) error {
 		}
 		body["sorts"] = sorts
 	}
+	if sortSpecs, _ := cmd.Flags().GetStringArray("sort"); len(sortSpecs) > 0 {
+		sorts := make([]map[string]any, 0, len(sortSpecs))
+		for _, spec := range sortSpecs {
+			property, direction := parseSortSpec(spec)
+			sorts = append(sorts, map[string]any{
+				"property":  property,
+				"direction": direction,
+			})
+		}
+		body["sorts"] = sorts
+	}
 
 	if ps, _ := cmd.Flags().GetInt("page-size"); ps > 0 {
 		if ps > 100 {
@@ -285,6 +321,15 @@ func runDataSourceQuery(cmd *cobra.Command, args []string) error {
 			})
 		}
 		body["page_size"] = ps
+	}
+	if limit, _ := cmd.Flags().GetInt("limit"); limit > 0 {
+		if limit > 100 {
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: fmt.Sprintf("--limit must be between 1 and 100, got %d", limit),
+			})
+		}
+		body["page_size"] = limit
 	}
 
 	if c, _ := cmd.Flags().GetString("start-cursor"); c != "" {
@@ -298,6 +343,69 @@ func runDataSourceQuery(cmd *cobra.Command, args []string) error {
 
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(result, "data-source query", start)
+	return nil
+}
+
+func parseSortSpec(spec string) (property, direction string) {
+	fields := strings.Fields(spec)
+	if len(fields) == 0 {
+		return spec, "ascending"
+	}
+	property = strings.Join(fields, " ")
+	direction = "ascending"
+	last := strings.ToLower(fields[len(fields)-1])
+	if len(fields) > 1 && (last == "asc" || last == "ascending" || last == "desc" || last == "descending") {
+		property = strings.Join(fields[:len(fields)-1], " ")
+		if last == "desc" || last == "descending" {
+			direction = "descending"
+		}
+	}
+	return property, direction
+}
+
+// --- data-source resolve ---
+
+func newDataSourceResolveCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "resolve <database_id>",
+		Short: "Resolve a database to data source IDs",
+		Long:  "Resolve a Notion database ID to the data source IDs returned by the database metadata.",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runDataSourceResolve,
+	}
+	addOutputFlags(cmd)
+	return cmd
+}
+
+func runDataSourceResolve(cmd *cobra.Command, args []string) error {
+	start := time.Now()
+	client, err := newClientForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	dbID, err := resolveID(args[0])
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	result, err := client.DatabaseRetrieve(cmd.Context(), dbID)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	rawSources, _ := result["data_sources"].([]any)
+	ids := make([]string, 0, len(rawSources))
+	for _, raw := range rawSources {
+		if m, ok := raw.(map[string]any); ok {
+			if id, _ := m["id"].(string); id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+	p := output.NewPrinter(outputFormat(cmd))
+	p.PrintSuccess(map[string]any{
+		"database_id":     dbID,
+		"data_source_ids": ids,
+		"data_sources":    rawSources,
+	}, "data-source resolve", start)
 	return nil
 }
 

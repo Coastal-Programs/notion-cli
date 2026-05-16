@@ -22,6 +22,7 @@ Individual command documentation:
 - **[doctor](doctor.md)** - Health checks and diagnostics
 - **[config](config.md)** - Configuration management (set-token, get, path, list)
 - **[cache](cache.md)** - Cache info and statistics
+- **[api](api.md)** - Official ntn-style raw API requests and endpoint introspection
 - **[help](help.md)** - Built-in help system
 
 ## User Guides

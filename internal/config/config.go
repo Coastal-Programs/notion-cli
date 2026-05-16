@@ -52,11 +52,12 @@ func looksConfiguredOAuthValue(value string) bool {
 
 // Config holds all CLI configuration values.
 type Config struct {
-	Token       string `json:"token,omitempty"`
-	BaseURL     string `json:"base_url,omitempty"`
-	MaxRetries  int    `json:"max_retries,omitempty"`
-	BaseDelayMs int    `json:"base_delay_ms,omitempty"`
-	MaxDelayMs  int    `json:"max_delay_ms,omitempty"`
+	Token         string `json:"token,omitempty"`
+	BaseURL       string `json:"base_url,omitempty"`
+	NotionVersion string `json:"notion_version,omitempty"`
+	MaxRetries    int    `json:"max_retries,omitempty"`
+	BaseDelayMs   int    `json:"base_delay_ms,omitempty"`
+	MaxDelayMs    int    `json:"max_delay_ms,omitempty"`
 	// CacheEnabled, CacheMaxSize, DiskCacheEnabled are reserved for a future
 	// in-memory/disk response cache. They are persisted and exposed via
 	// `config get/set` for forward compatibility but currently have no effect
@@ -112,6 +113,9 @@ func (c *Config) AuthMethod() string {
 	if os.Getenv("NOTION_TOKEN") != "" {
 		return "env"
 	}
+	if os.Getenv("NOTION_API_TOKEN") != "" {
+		return "env"
+	}
 	if c.OAuthAccessToken != "" {
 		return "oauth"
 	}
@@ -125,6 +129,7 @@ func (c *Config) AuthMethod() string {
 func defaults() *Config {
 	return &Config{
 		BaseURL:          "https://api.notion.com/v1",
+		NotionVersion:    "2026-03-11",
 		MaxRetries:       3,
 		BaseDelayMs:      1000,
 		MaxDelayMs:       30000,
@@ -199,6 +204,9 @@ func loadFromFile(cfg *Config) error {
 	if fileCfg.BaseURL != "" {
 		cfg.BaseURL = fileCfg.BaseURL
 	}
+	if fileCfg.NotionVersion != "" {
+		cfg.NotionVersion = fileCfg.NotionVersion
+	}
 	if fileCfg.OAuthAccessToken != "" {
 		cfg.OAuthAccessToken = fileCfg.OAuthAccessToken
 	}
@@ -253,9 +261,14 @@ func loadFromFile(cfg *Config) error {
 func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("NOTION_TOKEN"); v != "" {
 		cfg.Token = v
+	} else if v := os.Getenv("NOTION_API_TOKEN"); v != "" {
+		cfg.Token = v
 	}
 	if v := os.Getenv("NOTION_CLI_BASE_URL"); v != "" {
 		cfg.BaseURL = v
+	}
+	if v := os.Getenv("NOTION_API_VERSION"); v != "" {
+		cfg.NotionVersion = v
 	}
 	if v, err := strconv.Atoi(os.Getenv("NOTION_CLI_MAX_RETRIES")); err == nil {
 		cfg.MaxRetries = v
@@ -334,6 +347,8 @@ func GetConfigValue(key string) string {
 		return cfg.Token
 	case "base_url":
 		return cfg.BaseURL
+	case "notion_version":
+		return cfg.NotionVersion
 	case "max_retries":
 		return strconv.Itoa(cfg.MaxRetries)
 	case "base_delay_ms":
