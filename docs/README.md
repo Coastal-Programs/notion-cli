@@ -2,9 +2,9 @@
 
 This directory contains comprehensive documentation for the Notion CLI.
 
-> **Note:** As of v6.0.0, notion-cli has been completely rewritten from TypeScript to Go.
+> **Note:** Since v6.0.0, notion-cli has been a Go/Cobra rewrite of the TypeScript CLI.
 > It is distributed as a single ~8MB binary via npm (platform-specific packages) or built from source with `make build`.
-> All 26 commands from v5.x are fully ported with identical syntax and output formats.
+> Current source builds also include official `ntn`-style API request compatibility, workspace OAuth, and data-source-first commands.
 
 ## Command Reference
 
@@ -72,14 +72,14 @@ make tidy      # go mod tidy
 
 ## Phase 2 Features (Planned)
 
-The following v5.x features are planned for a future release:
+The following features are still planned for a future release:
 
-- Interactive setup wizard (`init` command)
+- Disk cache
+- Request deduplication
+- Circuit breaker
 - Simple properties (`-S` flag) for page create/update
 - Recursive page retrieval (`-R` flag)
-- Markdown output from page content
-- Disk cache and request deduplication
-- Circuit breaker
+- Interactive setup wizard (`init` command)
 - Update notifications
 
 ---

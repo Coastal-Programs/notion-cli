@@ -1,7 +1,7 @@
 `notion-cli init`
 =================
 
-> **Note:** The `init` command is planned for a future release (Phase 2). It is not available in the current Go rewrite (v6.0.0).
+> **Note:** The standalone `init` wizard is planned for a future release. Current Go builds use OAuth login and first-run setup instead.
 
 Interactive first-time setup wizard for Notion CLI
 
@@ -9,17 +9,32 @@ Interactive first-time setup wizard for Notion CLI
 
 This command was available in v5.x (TypeScript) and will be re-implemented in a future Go release.
 
-## Alternative Setup (v6.0.0)
+Current Go builds use OAuth login and first-run setup instead of a standalone
+`init` command. In an interactive shell, commands that need the Notion API can
+start OAuth setup automatically when no credentials exist. Non-interactive
+shells print setup instructions instead of opening a browser.
 
-In the current version, set up your token using one of these methods:
+## Current Setup
 
-**Option 1: Environment variable (recommended)**
+**Option 1: OAuth login (recommended for interactive use)**
+
+```bash
+notion-cli auth login
+
+# Official-style alias
+notion-cli login
+```
+
+**Option 2: Environment variable (recommended for CI and automation)**
 
 ```bash
 export NOTION_TOKEN="secret_your_token_here"
+
+# Official CLI compatibility alias when NOTION_TOKEN is unset
+export NOTION_API_TOKEN="secret_your_token_here"
 ```
 
-**Option 2: Config file**
+**Option 3: Legacy config file**
 
 ```bash
 # Set token via config command
@@ -29,7 +44,7 @@ notion-cli config set-token
 echo "$NOTION_TOKEN" | notion-cli config set-token
 ```
 
-**Option 3: Verify setup**
+**Verify setup**
 
 ```bash
 # Check connectivity
@@ -41,4 +56,3 @@ notion-cli doctor
 # Sync workspace databases
 notion-cli sync
 ```
-

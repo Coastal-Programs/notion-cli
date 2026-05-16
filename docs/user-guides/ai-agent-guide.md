@@ -12,7 +12,7 @@ This guide provides comprehensive instructions for AI agents to effectively use 
 2. [First-Time Setup](#first-time-setup)
 3. [Health Checks & Diagnostics](#health-checks--diagnostics)
 4. [Core Workflow](#core-workflow)
-5. [Simple Properties Mode](#simple-properties-mode)
+5. [Planned Simple Properties Mode](#planned-simple-properties-mode)
 6. [Database Operations](#database-operations)
 7. [Troubleshooting](#troubleshooting)
 8. [Best Practices](#best-practices)
@@ -43,10 +43,16 @@ notion-cli --version
 
 ## First-Time Setup
 
-### Token Setup
+### Authentication Setup
 
 ```bash
-# Mac/Linux
+# Recommended for interactive use
+notion-cli auth login
+
+# Official-style alias
+notion-cli login
+
+# Mac/Linux automation
 export NOTION_TOKEN="secret_your_token_here"
 
 # Windows (Command Prompt)
@@ -55,7 +61,7 @@ set NOTION_TOKEN=secret_your_token_here
 # Windows (PowerShell)
 $env:NOTION_TOKEN="secret_your_token_here"
 
-# Or use the config command
+# Or use the legacy config command
 notion-cli config set-token
 ```
 
@@ -121,8 +127,8 @@ notion-cli whoami
 # Run health check
 notion-cli doctor
 
-# If any checks fail, init command will guide you
-notion-cli init
+# If auth is missing in an interactive shell, start OAuth setup
+notion-cli auth login
 ```
 
 **2. Sync Workspace (One-Time Setup)**
@@ -171,9 +177,9 @@ notion-cli db query <ID> --search "urgent" --json
 
 ---
 
-## Simple Properties Mode (Phase 2)
+## Planned Simple Properties Mode
 
-> **Note:** Simple Properties (`-S` flag) is a Phase 2 feature not yet available in v6.0.0. For now, use the standard Notion API property format when creating/updating pages. This feature will be added in a future release.
+> **Note:** Simple Properties (`-S` flag) is still planned. For now, use the standard Notion API property format when creating/updating pages.
 
 ---
 
@@ -235,7 +241,7 @@ notion-cli list --json
 
 ```bash
 # Check cache status
-notion-cli cache:info --json
+notion-cli cache info --json
 
 # Sync workspace
 notion-cli sync
@@ -261,8 +267,8 @@ This will identify the specific issue (token, connectivity, permissions, etc.)
 
 **Issue: Token Not Configured**
 ```bash
-# Solution: Run init wizard
-notion-cli init
+# Solution: Start OAuth login in an interactive shell
+notion-cli auth login
 
 # Or set manually
 export NOTION_TOKEN="secret_your_token_here"
@@ -273,8 +279,8 @@ export NOTION_TOKEN="secret_your_token_here"
 # Check token validity
 notion-cli whoami
 
-# Re-run setup
-notion-cli init
+# Re-run OAuth setup
+notion-cli auth login
 ```
 
 **Issue: Database Not Found**
@@ -291,8 +297,8 @@ notion-cli sync
 # Get schema to see valid properties
 notion-cli db schema <ID> --with-examples --json
 
-# Use simple properties for easier syntax
-notion-cli page create -d <ID> -S --properties '{...}'
+# Use the standard Notion API property shape
+notion-cli page create -d <ID> --properties '{...}'
 ```
 
 **Issue: Permission Denied**
@@ -315,7 +321,7 @@ Error: NOTION_TOKEN not found
 Set your token:
   set NOTION_TOKEN=secret_your_token_here
 
-Or run: notion-cli init
+Or run: notion-cli auth login
 ```
 
 **Windows (PowerShell):**
@@ -325,7 +331,7 @@ Error: NOTION_TOKEN not found
 Set your token:
   $env:NOTION_TOKEN="secret_your_token_here"
 
-Or run: notion-cli init
+Or run: notion-cli auth login
 ```
 
 **Unix/Mac:**
@@ -335,7 +341,7 @@ Error: NOTION_TOKEN not found
 Set your token:
   export NOTION_TOKEN="secret_your_token_here"
 
-Or run: notion-cli init
+Or run: notion-cli auth login
 ```
 
 ---
@@ -371,7 +377,7 @@ notion-cli db query <ID> --json | jq '.data.results'
 **5. Check Cache Freshness**
 ```bash
 # Before bulk operations
-notion-cli cache:info --json
+notion-cli cache info --json
 ```
 
 **6. Sync Workspace Periodically**
@@ -474,7 +480,7 @@ notion-cli doctor
 
 ```bash
 # Setup & Health
-notion-cli init           # First-time setup wizard
+notion-cli auth login     # First-time OAuth setup
 notion-cli doctor         # Comprehensive health check
 notion-cli whoami         # Quick connection test
 
@@ -493,11 +499,11 @@ notion-cli page update <ID> --properties '{...}'
 notion-cli db query <ID> --filter '{...}' --json
 
 # Cache Management
-notion-cli cache:info --json
+notion-cli cache info --json
 ```
 
 **Recommended Workflow:**
-1. `notion-cli init` - First-time setup
+1. `notion-cli auth login` - First-time OAuth setup
 2. `notion-cli doctor` - Verify health
 3. `notion-cli sync` - Cache workspace
 4. `notion-cli db schema <ID> --output json` - Discover structure

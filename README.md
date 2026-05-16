@@ -49,9 +49,9 @@ A powerful command-line interface for the Notion API, optimized for AI coding as
 - **Cross-platform**: macOS (arm64, amd64), Linux (amd64, arm64), Windows (amd64)
 - **Near-zero supply chain risk**: 2 Go dependencies (cobra, pflag) vs 573 npm packages in v5.x
 
-## What's New in v6.0.0
+## What's New in v6
 
-**Complete rewrite from TypeScript/oclif to Go/Cobra.**
+**v6.0.0: Complete rewrite from TypeScript/oclif to Go/Cobra.**
 
 All 26 commands have been ported with identical syntax -- existing scripts work unchanged. The JSON envelope format (`{success, data, metadata}`) and environment variables (`NOTION_TOKEN`) are the same.
 
@@ -63,7 +63,7 @@ All 26 commands have been ported with identical syntax -- existing scripts work 
 
 **v6.1.0: OAuth Authentication** -- `notion-cli auth login` opens your browser, you authorize, done. No more copying tokens manually.
 
-**Unreleased (next):**
+**Current v6 capabilities: official ntn-style API parity and data-source updates.**
 - `api <path>` command compatible with official `ntn api` request syntax, including inline `=`, `:=`, `==`, and `Header:Value` arguments, stdin/`--data`, `--file`, `api ls`, `--spec`, and `--docs`.
 - Official-style aliases: root `login`/`logout`, `datasources`, `pages`, and `files create/get/list`.
 - `NOTION_API_TOKEN`, `NOTION_API_VERSION`, and `--notion-version` compatibility.
@@ -74,11 +74,11 @@ All 26 commands have been ported with identical syntax -- existing scripts work 
 - Resolver handles `?dataSource=<id>` query params in Notion URLs.
 
 **Technical details:**
-- 36 Go source files, ~9,800 lines of code
-- 196 tests across 9 test suites, all passing
+- Go/Cobra command suite with focused command, client, and parser tests
+- Single stripped Go binary with no runtime dependency on Node.js
 - ~8MB binary (stripped, darwin/arm64)
 
-**Deferred to Phase 2:** Disk cache, request deduplication, circuit breaker, simple properties (`-S` flag), recursive page retrieval, markdown output from page content, interactive init wizard, update notifications.
+**Still planned:** Disk cache, request deduplication, circuit breaker, simple properties (`-S` flag), recursive page retrieval, interactive init wizard, and update notifications.
 
 See [CHANGELOG.md](./CHANGELOG.md) for full details.
 
