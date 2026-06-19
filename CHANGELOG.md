@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`db create` and `db update` can now set/modify the database column schema** (fixes #97). Both commands accept `--properties` (a JSON object of Notion property definitions) and `--properties-file` (the same JSON from a file).
   - `db create` sends the schema under `initial_data_source.properties` per Notion API version 2025-09-03+ (replacing the previously hard-coded, now-deprecated top-level `properties` payload). A default `Name` title column is injected only when the supplied schema has no title-type property.
-  - `db update` applies schema changes via `PATCH /data_sources/{id}/properties`, resolving the primary data source automatically (or an explicit `--data-source`). A property value of JSON `null` deletes that column. `--title` still updates the database object and can be combined with `--properties`.
+  - `db update` applies schema changes via `PATCH /data_sources/{id}`, resolving the primary data source automatically (or an explicit `--data-source`). A property value of JSON `null` deletes that column. `--title` still updates the database object and can be combined with `--properties`.
 
 ### CI
 - **Dependabot PRs now auto-merge.** New `.github/workflows/dependabot-auto-merge.yml` reads update metadata via `dependabot/fetch-metadata` (SHA-pinned) and runs `gh pr merge --auto --squash` for non-major updates; the merge only completes once required checks pass. Requires repo settings: "Allow auto-merge" enabled and a branch-protection rule on `main` requiring the `CI Success` check.

@@ -568,7 +568,7 @@ func TestDBCreate_WithProperties(t *testing.T) {
 }
 
 // TestDBUpdate_PropertiesRoutesToDataSource verifies schema edits resolve the
-// primary data source and PATCH /data_sources/{id}/properties.
+// primary data source and PATCH /data_sources/{id}.
 func TestDBUpdate_PropertiesRoutesToDataSource(t *testing.T) {
 	const dbID = "11111111111111111111111111111111"
 	const dsID = "22222222222222222222222222222222"
@@ -582,7 +582,7 @@ func TestDBUpdate_PropertiesRoutesToDataSource(t *testing.T) {
 				"object": "database", "id": dbID,
 				"data_sources": []any{map[string]any{"id": dsID}},
 			})
-		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/data_sources/") && strings.HasSuffix(r.URL.Path, "/properties"):
+		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/data_sources/"):
 			propsPath = r.URL.Path
 			_ = json.NewDecoder(r.Body).Decode(&capturedBody)
 			_ = json.NewEncoder(w).Encode(map[string]any{"object": "data_source", "id": dsID})

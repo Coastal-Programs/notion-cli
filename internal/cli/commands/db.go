@@ -892,8 +892,8 @@ func runDBUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Schema edits go through the data source's properties endpoint. A JSON
-	// null value deletes a property.
+	// Schema edits go through PATCH /data_sources/{id} with a properties body,
+	// per the 2025-09-03 Notion API. A JSON null value deletes a property.
 	var dataSourceID string
 	if ds, _ := cmd.Flags().GetString("data-source"); ds != "" {
 		dataSourceID, err = resolveID(ds)
@@ -907,7 +907,7 @@ func runDBUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	result, err := client.DataSourcePropertiesUpdate(cmd.Context(), dataSourceID, map[string]any{"properties": schema})
+	result, err := client.DataSourceUpdate(cmd.Context(), dataSourceID, map[string]any{"properties": schema})
 	if err != nil {
 		return handleError(cmd, err)
 	}

@@ -445,7 +445,7 @@ func runDataSourcePropertiesUpdate(cmd *cobra.Command, args []string) error {
 		"properties": properties,
 	}
 
-	result, err := client.DataSourcePropertiesUpdate(cmd.Context(), dsID, body)
+	result, err := client.DataSourceUpdate(cmd.Context(), dsID, body)
 	if err != nil {
 		return handleError(cmd, err)
 	}

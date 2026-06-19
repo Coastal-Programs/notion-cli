@@ -235,8 +235,7 @@ DESCRIPTION
 
 ALIASES
   $ notion-cli db r
-  $ notion-cli ds retrieve
-  $ notion-cli ds r
+  $ notion-cli db get
 
 EXAMPLES
   Retrieve a data source with full schema (recommended for AI assistants)
@@ -288,8 +287,6 @@ DESCRIPTION
 
 ALIASES
   $ notion-cli db s
-  $ notion-cli ds schema
-  $ notion-cli ds s
 
 EXAMPLES
   Get full schema in JSON format (recommended for AI agents)
@@ -373,8 +370,6 @@ DESCRIPTION
 
 ALIASES
   $ notion-cli db u
-  $ notion-cli ds update
-  $ notion-cli ds u
 
 EXAMPLES
   Update a data source with a specific data_source_id and title
@@ -406,7 +401,7 @@ SCHEMA NOTES
 
 - `--title` renames the database via `PATCH /databases/{id}`.
 - `--properties` / `--properties-file` apply column-schema changes via
-  `PATCH /data_sources/{id}/properties`. The primary data source is resolved
+  `PATCH /data_sources/{id}`. The primary data source is resolved
   automatically; use `--data-source` to target a specific one on multi-source
   databases. Set a property's value to JSON `null` to delete it.
 - `--title` and `--properties` can be combined in one invocation.

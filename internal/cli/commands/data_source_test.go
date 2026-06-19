@@ -252,7 +252,7 @@ func TestDataSourcePropertiesUpdate_HappyPath(t *testing.T) {
 
 	srv, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method == "PATCH" && strings.Contains(r.URL.Path, "/data_sources/") && strings.HasSuffix(r.URL.Path, "/properties") {
+		if r.Method == "PATCH" && strings.Contains(r.URL.Path, "/data_sources/") {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &receivedBody)
 			_ = json.NewEncoder(w).Encode(map[string]any{
