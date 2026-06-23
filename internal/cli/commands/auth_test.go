@@ -510,11 +510,17 @@ func TestPerformOAuthLogin_SavesWorkspaceCredential(t *testing.T) {
 	oauth.SetTokenURL(srv.URL)
 	defer resetOAuthURLs()
 
+	// Manual flow requires a matching CSRF state. Pin the generated state so the
+	// pasted callback URL below can carry the same value (production keeps the
+	// crypto-random generator).
+	restoreState := oauth.SetStateGeneratorForTest(func() (string, error) { return "test-state", nil })
+	t.Cleanup(restoreState)
+
 	readEnd, writeEnd, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("os.Pipe: %v", err)
 	}
-	_, _ = writeEnd.WriteString("http://localhost:8080/callback?code=test-code\n")
+	_, _ = writeEnd.WriteString("http://localhost:8080/callback?code=test-code&state=test-state\n")
 	_ = writeEnd.Close()
 	origStdin := os.Stdin
 	os.Stdin = readEnd

@@ -174,7 +174,7 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 	}
 
 	// Generate random state for CSRF protection.
-	state, err := randomState()
+	state, err := stateGenerator()
 	if err != nil {
 		return nil, &clierrors.NotionCLIError{
 			Code:    clierrors.CodeInternalError,
@@ -262,7 +262,7 @@ func LoginManual(ctx context.Context, clientID, clientSecret string, in io.Reade
 		return nil, clierrors.OAuthNotConfigured()
 	}
 
-	state, err := randomState()
+	state, err := stateGenerator()
 	if err != nil {
 		return nil, &clierrors.NotionCLIError{
 			Code:    clierrors.CodeInternalError,
@@ -575,6 +575,20 @@ func TokenRevoke(ctx context.Context, clientID, clientSecret, token string) erro
 		return clierrors.OAuthFailed(fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(respBody)))
 	}
 	return nil
+}
+
+// stateGenerator produces the CSRF state parameter. Production always uses the
+// crypto-random randomState; tests may override it via SetStateGeneratorForTest
+// to exercise the success paths of Login/LoginManual deterministically.
+var stateGenerator = randomState
+
+// SetStateGeneratorForTest overrides the OAuth state generator and returns a
+// restore function. Intended for tests only; production code never calls it, so
+// the crypto-random generator remains in force at runtime.
+func SetStateGeneratorForTest(fn func() (string, error)) func() {
+	prev := stateGenerator
+	stateGenerator = fn
+	return func() { stateGenerator = prev }
 }
 
 // randomState generates a 32-byte hex-encoded random string.
