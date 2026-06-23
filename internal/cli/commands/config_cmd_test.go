@@ -15,6 +15,7 @@ import (
 func runConfigRoot(t *testing.T, args ...string) (*cobra.Command, *bytes.Buffer, error) {
 	t.Helper()
 	root := &cobra.Command{Use: "notion-cli", SilenceErrors: true, SilenceUsage: true}
+	AddAuthWorkspaceFlag(root)
 	RegisterConfigCommands(root)
 
 	var buf bytes.Buffer
@@ -242,7 +243,7 @@ func TestConfigSetToken_ViaArg(t *testing.T) {
 		}
 	})
 
-	_, _, err := runConfigRoot(t, "config", "set-token", "secret_newtoken")
+	_, _, err := runConfigRoot(t, "--auth-workspace", "default", "config", "set-token", "secret_newtoken")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

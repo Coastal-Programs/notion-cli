@@ -26,6 +26,22 @@ func TestNewWorkspaceCache(t *testing.T) {
 	}
 }
 
+func TestNewWorkspaceCacheForWorkspace(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	legacy := NewWorkspaceCacheForWorkspace("")
+	if want := filepath.Join(tmpDir, ".notion-cli", "databases.json"); legacy.filePath != want {
+		t.Fatalf("legacy cache path = %q, want %q", legacy.filePath, want)
+	}
+	named := NewWorkspaceCacheForWorkspace("haven")
+	if want := filepath.Join(tmpDir, ".notion-cli", "workspaces", "haven", "databases.json"); named.filePath != want {
+		t.Fatalf("named cache path = %q, want %q", named.filePath, want)
+	}
+}
+
 func TestWorkspaceCacheLoadNoFile(t *testing.T) {
 	wc, _ := setupTempWorkspace(t)
 

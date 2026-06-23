@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
 )
 
 // DatabaseEntry represents a cached Notion database.
@@ -42,12 +44,21 @@ type WorkspaceCache struct {
 
 // NewWorkspaceCache creates a new WorkspaceCache using ~/.notion-cli/databases.json.
 func NewWorkspaceCache() *WorkspaceCache {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
+	return &WorkspaceCache{
+		filePath: config.GetWorkspaceCachePath(""),
+		data:     &WorkspaceData{},
+	}
+}
+
+// NewWorkspaceCacheForWorkspace creates a WorkspaceCache scoped to a named
+// auth workspace. An empty slug uses the legacy cache path.
+func NewWorkspaceCacheForWorkspace(slug string) *WorkspaceCache {
+	path := config.GetWorkspaceCachePath(slug)
+	if path == "" {
+		path = filepath.Join(".", ".notion-cli", "databases.json")
 	}
 	return &WorkspaceCache{
-		filePath: filepath.Join(home, ".notion-cli", "databases.json"),
+		filePath: path,
 		data:     &WorkspaceData{},
 	}
 }

@@ -97,7 +97,7 @@ func TestRetrieveResource_Page(t *testing.T) {
 	cmd, cleanup := makeFakeCmd(t, srv.URL)
 	defer cleanup()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		t.Fatalf("newClient: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestRetrieveResource_Block(t *testing.T) {
 	cmd, cleanup := makeFakeCmd(t, srv.URL)
 	defer cleanup()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		t.Fatalf("newClient: %v", err)
 	}
@@ -155,7 +155,7 @@ func TestRetrieveResource_Database(t *testing.T) {
 	cmd, cleanup := makeFakeCmd(t, srv.URL)
 	defer cleanup()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		t.Fatalf("newClient: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestRetrieveResource_UnknownType(t *testing.T) {
 		}
 	})
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		t.Fatalf("newClient: %v", err)
 	}

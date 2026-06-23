@@ -56,7 +56,7 @@ func newDataSourceRetrieveCmd() *cobra.Command {
 func runDataSourceRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -101,7 +101,7 @@ func newDataSourceCreateCmd() *cobra.Command {
 func runDataSourceCreate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -165,7 +165,7 @@ func newDataSourceUpdateCmd() *cobra.Command {
 func runDataSourceUpdate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -249,7 +249,7 @@ func newDataSourceQueryCmd() *cobra.Command {
 func runDataSourceQuery(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -323,7 +323,7 @@ func newDataSourceTemplatesCmd() *cobra.Command {
 func runDataSourceTemplates(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -411,7 +411,7 @@ func newDataSourcePropertiesUpdateCmd() *cobra.Command {
 func runDataSourcePropertiesUpdate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

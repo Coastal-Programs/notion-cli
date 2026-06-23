@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Coastal-Programs/notion-cli/v6/internal/cache"
 	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
 	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
@@ -32,12 +31,12 @@ func newListCmd() *cobra.Command {
 func runList(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	wc := cache.NewWorkspaceCache()
+	wc, active, err := workspaceCacheForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
 	if err := wc.Load(); err != nil {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInternalError,
-			Message: fmt.Sprintf("Failed to load workspace cache: %s", err),
-		})
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load workspace cache", err))
 	}
 
 	if wc.Count() == 0 {
@@ -75,6 +74,7 @@ func runList(cmd *cobra.Command, _ []string) error {
 		"count":        len(dbRows),
 		"last_sync":    wc.LastSyncTime().Format(time.RFC3339),
 		"cache_stale":  wc.IsStale(),
+		"workspace":    active.DisplayName(),
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))

@@ -143,7 +143,7 @@ func runCommentCreate(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -248,7 +248,7 @@ func runCommentList(cmd *cobra.Command, _ []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -335,7 +335,7 @@ func runCommentRetrieve(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -394,7 +394,7 @@ func runCommentUpdate(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -448,7 +448,7 @@ func runCommentDelete(cmd *cobra.Command, args []string) error {
 		return handleError(cmd, err)
 	}
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

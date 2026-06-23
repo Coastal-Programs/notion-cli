@@ -36,12 +36,15 @@ func newSyncCmd() *cobra.Command {
 func runSync(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
 
-	wc := cache.NewWorkspaceCache()
+	wc, active, err := workspaceCacheForCommand(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
 	if err := wc.Load(); err != nil {
 		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load workspace cache", err))
 	}
@@ -54,6 +57,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 			"databases":    wc.Count(),
 			"data_sources": wc.DataSourceCount(),
 			"last_sync":    wc.LastSyncTime().Format(time.RFC3339),
+			"workspace":    active.DisplayName(),
 		}, "sync", start)
 		return nil
 	}
@@ -127,6 +131,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		"data_sources": len(allDataSources),
 		"last_sync":    time.Now().Format(time.RFC3339),
 		"elapsed_ms":   elapsed.Milliseconds(),
+		"workspace":    active.DisplayName(),
 	}, "sync", start)
 	return nil
 }

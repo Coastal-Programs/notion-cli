@@ -1853,8 +1853,13 @@ func TestDo_AutoRefreshOn401(t *testing.T) {
 	defer oauth.SetTokenURL("https://api.notion.com/v1/oauth/token")
 
 	origClientID := config.OAuthClientID
+	origClientSecret := config.OAuthClientSecret
 	config.OAuthClientID = "test-client-id"
-	defer func() { config.OAuthClientID = origClientID }()
+	config.OAuthClientSecret = "test-client-secret"
+	defer func() {
+		config.OAuthClientID = origClientID
+		config.OAuthClientSecret = origClientSecret
+	}()
 
 	var callCount int32
 	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {

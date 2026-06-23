@@ -47,7 +47,7 @@ func newBatchRetrieveCmd() *cobra.Command {
 func runBatchRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

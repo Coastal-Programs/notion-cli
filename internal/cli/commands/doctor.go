@@ -31,11 +31,12 @@ func RegisterDoctorCommand(root *cobra.Command) {
 	root.AddCommand(cmd)
 }
 
-// oauthCredentialsEmbedded reports whether the build embedded the OAuth
-// client ID and secret via ldflags. False indicates this binary cannot
-// perform the `auth login` browser-based flow.
-func oauthCredentialsEmbedded() bool {
-	return config.OAuthClientID != "" && config.OAuthClientSecret != ""
+// oauthCredentialsAvailable reports whether OAuth client credentials are
+// available either from build-time ldflags or local development environment
+// variables.
+func oauthCredentialsAvailable() bool {
+	_, _, ok := config.OAuthClientCredentials()
+	return ok
 }
 
 type checkResult struct {
@@ -57,18 +58,11 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	})
 
 	// Check 2: Token configured + auth method.
-	cfg, cfgErr := config.LoadConfig()
-	token := os.Getenv("NOTION_TOKEN")
+	cfg, active, cfgErr := loadConfigForCommand(cmd)
+	token := authTokenFromConfig(cfg)
 	authMethod := "none"
 	if cfgErr == nil {
 		authMethod = cfg.AuthMethod()
-	}
-	if token == "" && cfgErr == nil {
-		if cfg.OAuthAccessToken != "" {
-			token = cfg.OAuthAccessToken
-		} else if cfg.Token != "" {
-			token = cfg.Token
-		}
 	}
 	if token == "" {
 		checks = append(checks, checkResult{
@@ -106,16 +100,20 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			Message: msg,
 		})
 	case "env":
+		msg := "NOTION_TOKEN environment variable"
+		if cfgErr == nil && active != nil && !active.Legacy {
+			msg = fmt.Sprintf("NOTION_TOKEN environment variable (masks workspace: %s)", active.DisplayName())
+		}
 		checks = append(checks, checkResult{
 			Name:    "Auth Method",
 			Status:  "pass",
-			Message: "NOTION_TOKEN environment variable",
+			Message: msg,
 		})
 	case "token":
 		checks = append(checks, checkResult{
 			Name:    "Auth Method",
 			Status:  "pass",
-			Message: "Manual token (config file)",
+			Message: "Legacy config token",
 		})
 	default:
 		checks = append(checks, checkResult{
@@ -123,6 +121,33 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			Status:  "fail",
 			Message: "Not authenticated. Run 'notion-cli auth login' or set NOTION_TOKEN.",
 		})
+	}
+
+	if creds, err := config.LoadCredentials(); err != nil {
+		checks = append(checks, checkResult{
+			Name:    "Workspace Credentials",
+			Status:  "fail",
+			Message: fmt.Sprintf("Could not load workspace credentials: %s", err),
+		})
+	} else {
+		slugs := creds.SortedWorkspaceSlugs()
+		if len(slugs) == 0 {
+			checks = append(checks, checkResult{
+				Name:    "Workspace Credentials",
+				Status:  "warn",
+				Message: "No stored workspace credentials; legacy config is active.",
+			})
+		} else {
+			defaultWorkspace := creds.DefaultWorkspace
+			if defaultWorkspace == "" {
+				defaultWorkspace = "(none)"
+			}
+			checks = append(checks, checkResult{
+				Name:    "Workspace Credentials",
+				Status:  "pass",
+				Message: fmt.Sprintf("%d configured (default: %s; workspaces: %s)", len(slugs), defaultWorkspace, strings.Join(slugs, ", ")),
+			})
+		}
 	}
 
 	// Check 3: Token format.
@@ -161,7 +186,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 5: API connection (only if token is set).
 	if token != "" {
-		client, err := newClient()
+		client, err := newClientForCommand(cmd)
 		if err == nil {
 			apiStart := time.Now()
 			_, apiErr := client.UsersMe(cmd.Context())
@@ -221,9 +246,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	// www.notion.so/install-integration means the integration record exists.
 	// Anything else (404, 400, etc.) means the integration was deleted or
 	// disabled in Notion's developer settings.
-	if config.OAuthClientID != "" {
+	clientID, _, oauthAvailable := config.OAuthClientCredentials()
+	if oauthAvailable {
 		probeURL := fmt.Sprintf("%s?%s", "https://api.notion.com/v1/oauth/authorize", url.Values{
-			"client_id":     {config.OAuthClientID},
+			"client_id":     {clientID},
 			"response_type": {"code"},
 			"owner":         {"user"},
 			"redirect_uri":  {fmt.Sprintf("http://localhost:%d/callback", oauth.CallbackPorts[0])},
@@ -248,7 +274,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			checks = append(checks, checkResult{
 				Name:    "OAuth Integration",
 				Status:  "pass",
-				Message: "Notion accepts the embedded client_id",
+				Message: "Notion accepts the configured client_id",
 			})
 		default:
 			_ = resp.Body.Close()
@@ -260,25 +286,27 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Check 6c: OAuth credentials embedded at build time.
-	oauthEmbedded := oauthCredentialsEmbedded()
-	if oauthEmbedded {
+	// Check 6c: OAuth credentials available.
+	if oauthCredentialsAvailable() {
 		checks = append(checks, checkResult{
-			Name:    "OAuth Build Credentials",
+			Name:    "OAuth Credentials",
 			Status:  "pass",
-			Message: "OAuth client credentials are embedded in this binary",
+			Message: "OAuth client credentials are available",
 		})
 	} else {
 		checks = append(checks, checkResult{
-			Name:   "OAuth Build Credentials",
+			Name:   "OAuth Credentials",
 			Status: "warn",
 			Message: "OAuth credentials not embedded. Upgrade via `npm i -g @coastal-programs/notion-cli@latest` (>=6.1.2) " +
-				"or rebuild from source with NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET set.",
+				"rebuild from source with NOTION_OAUTH_CLIENT_ID and NOTION_OAUTH_SECRET set, or export those variables for local development.",
 		})
 	}
 
 	// Check 6: Config directory.
 	dataDir := config.GetDataDir()
+	if cfgErr == nil && active != nil {
+		dataDir = config.GetDataDirForWorkspace(active.Slug)
+	}
 	if dataDir != "" {
 		if info, err := os.Stat(dataDir); err == nil && info.IsDir() {
 			checks = append(checks, checkResult{
@@ -341,9 +369,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	data := map[string]any{
-		"checks":                     checks,
-		"summary":                    fmt.Sprintf("%d passed, %d warnings, %d failed", passCount, warnCount, failCount),
-		"oauth_credentials_embedded": oauthEmbedded,
+		"checks":                      checks,
+		"summary":                     fmt.Sprintf("%d passed, %d warnings, %d failed", passCount, warnCount, failCount),
+		"oauth_credentials_available": oauthAvailable,
+		"oauth_credentials_embedded":  oauthAvailable,
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))

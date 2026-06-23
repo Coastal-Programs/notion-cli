@@ -124,7 +124,7 @@ func validateBlockAppendFlags(cmd *cobra.Command, _ []string) error {
 func runBlockAppend(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -311,7 +311,7 @@ func newBlockRetrieveCmd() *cobra.Command {
 func runBlockRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -356,7 +356,7 @@ func newBlockChildrenCmd() *cobra.Command {
 func runBlockChildren(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -471,7 +471,7 @@ func newBlockUpdateCmd() *cobra.Command {
 func runBlockUpdate(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -615,7 +615,7 @@ func newBlockDeleteCmd() *cobra.Command {
 func runBlockDelete(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}

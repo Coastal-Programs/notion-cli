@@ -75,7 +75,7 @@ Get your token from: https://www.notion.so/my-integrations
 
 ### OAuth Credentials (maintainers only)
 
-The `auth login` command uses Notion's OAuth flow, which requires a public Client ID and Client Secret embedded into the binary at build time via `-ldflags -X`. CI release builds get these from GitHub Actions secrets (`NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET`); local dev builds without them simply return `OAuthNotConfigured` if you try `auth login` (everything else still works with `NOTION_TOKEN`).
+The `auth login` command uses Notion's OAuth flow, which requires a public Client ID and Client Secret. CI release builds embed these into the binary via `-ldflags -X` from GitHub Actions secrets (`NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET`). Local dev builds can either embed them at build time or read them from runtime environment variables; builds without usable credentials return `OAuthNotConfigured` if you try `auth login` (everything else still works with `NOTION_TOKEN`).
 
 If you are a maintainer and want OAuth in a local `make build`, store the
 credentials at `~/.config/notion-cli-dev/.env` — the Makefile auto-loads it.
@@ -91,7 +91,7 @@ EOF
 chmod 600 ~/.config/notion-cli-dev/.env
 ```
 
-Then `make build` and verify with `./build/notion-cli doctor --json | grep oauth_credentials_embedded` — it should report `true`.
+Then `make build` and verify with `./build/notion-cli doctor --json` — the `OAuth Credentials` check should pass.
 
 > **Migrating from `.env.local`?** Earlier versions read these vars from
 > `.env.local` in the repo root. Move the contents to the path above and

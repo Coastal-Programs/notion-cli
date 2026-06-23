@@ -46,7 +46,7 @@ func newUserListCmd() *cobra.Command {
 func runUserList(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -125,7 +125,7 @@ func newUserRetrieveCmd() *cobra.Command {
 func runUserRetrieve(cmd *cobra.Command, args []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
@@ -163,7 +163,7 @@ func newUserBotCmd() *cobra.Command {
 func runUserBot(cmd *cobra.Command, _ []string) error {
 	start := time.Now()
 
-	client, err := newClient()
+	client, err := newClientForCommand(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
