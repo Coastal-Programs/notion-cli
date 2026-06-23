@@ -1,12 +1,14 @@
 package oauth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,6 +177,16 @@ func TestExchangeCode_Success(t *testing.T) {
 			t.Errorf("Content-Type = %q, want application/json", ct)
 		}
 
+		// Verify Accept header (defensive — some OAuth servers content-negotiate).
+		if a := r.Header.Get("Accept"); a != "application/json" {
+			t.Errorf("Accept = %q, want application/json", a)
+		}
+
+		// Verify Notion-Version header (matches official notion-sdk-js behavior).
+		if v := r.Header.Get("Notion-Version"); v != notionVersion {
+			t.Errorf("Notion-Version = %q, want %q", v, notionVersion)
+		}
+
 		resp := TokenResponse{
 			AccessToken:   "ntn_test_token_abc123",
 			TokenType:     "bearer",
@@ -303,6 +315,161 @@ func TestLogin_ContextCancelled(t *testing.T) {
 	}
 }
 
+// assertOAuthHeaders fails the test if the request is missing any of the
+// three headers we send on every OAuth endpoint call: Content-Type,
+// Accept, and Notion-Version.
+func assertOAuthHeaders(t *testing.T, r *http.Request) {
+	t.Helper()
+	if ct := r.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	if a := r.Header.Get("Accept"); a != "application/json" {
+		t.Errorf("Accept = %q, want application/json", a)
+	}
+	if v := r.Header.Get("Notion-Version"); v != notionVersion {
+		t.Errorf("Notion-Version = %q, want %q", v, notionVersion)
+	}
+}
+
+func TestTokenRefresh_SendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		_ = json.NewEncoder(w).Encode(TokenResponse{AccessToken: "new-token"})
+	}))
+	defer server.Close()
+
+	origURL := tokenURL
+	tokenURL = server.URL
+	defer func() { tokenURL = origURL }()
+
+	_, err := TokenRefresh(context.Background(), "id", "secret", "refresh-tok")
+	if err != nil {
+		t.Fatalf("TokenRefresh() error: %v", err)
+	}
+}
+
+func TestTokenIntrospect_SendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		_ = json.NewEncoder(w).Encode(IntrospectResponse{Active: true})
+	}))
+	defer server.Close()
+
+	origURL := introspectURL
+	introspectURL = server.URL
+	defer func() { introspectURL = origURL }()
+
+	_, err := TokenIntrospect(context.Background(), "id", "secret", "tok")
+	if err != nil {
+		t.Fatalf("TokenIntrospect() error: %v", err)
+	}
+}
+
+func TestTokenRevoke_SendsHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	origURL := revokeURL
+	revokeURL = server.URL
+	defer func() { revokeURL = origURL }()
+
+	if err := TokenRevoke(context.Background(), "id", "secret", "tok"); err != nil {
+		t.Fatalf("TokenRevoke() error: %v", err)
+	}
+}
+
+// TestLoginManual_RejectsBareCode verifies that pasting only a bare
+// authorization code (no state) into the manual flow is rejected with an
+// OAuth state-mismatch error and that the token endpoint is never called.
+func TestLoginManual_RejectsBareCode(t *testing.T) {
+	tokenServerHit := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenServerHit = true
+		_ = json.NewEncoder(w).Encode(TokenResponse{AccessToken: "should-not-be-returned"})
+	}))
+	defer server.Close()
+
+	origURL := tokenURL
+	tokenURL = server.URL
+	defer func() { tokenURL = origURL }()
+
+	in := strings.NewReader("bare-auth-code-xyz\n")
+	var out bytes.Buffer
+
+	_, err := LoginManual(context.Background(), "client-id", "client-secret", in, &out)
+	if err == nil {
+		t.Fatal("LoginManual should reject a bare authorization code")
+	}
+
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok {
+		t.Fatalf("expected NotionCLIError, got %T: %v", err, err)
+	}
+	if cliErr.Code != clierrors.CodeOAuthStateMismatch {
+		t.Errorf("error code = %q, want %q", cliErr.Code, clierrors.CodeOAuthStateMismatch)
+	}
+	// The bare-code path must surface a message that points the user at the
+	// real mistake (pasting just the code), not the generic CSRF text.
+	if !strings.Contains(cliErr.Message, "missing") {
+		t.Errorf("error message = %q, want it to mention %q", cliErr.Message, "missing")
+	}
+	foundFullHint := false
+	for _, s := range cliErr.Suggestions {
+		if strings.Contains(s, "FULL") {
+			foundFullHint = true
+			break
+		}
+	}
+	if !foundFullHint {
+		t.Errorf("expected a suggestion mentioning %q, got %v", "FULL", cliErr.Suggestions)
+	}
+	if tokenServerHit {
+		t.Error("token endpoint was called \u2014 the bare code should have been rejected before exchangeCode")
+	}
+}
+
+// TestLoginManual_RejectsMismatchedState verifies that pasting a redirected
+// URL whose state does not match the generated state is rejected.
+func TestLoginManual_RejectsMismatchedState(t *testing.T) {
+	tokenServerHit := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenServerHit = true
+		_ = json.NewEncoder(w).Encode(TokenResponse{AccessToken: "should-not-be-returned"})
+	}))
+	defer server.Close()
+
+	origURL := tokenURL
+	tokenURL = server.URL
+	defer func() { tokenURL = origURL }()
+
+	// Attacker-supplied state that won't match the freshly generated one.
+	in := strings.NewReader("http://localhost:8080/callback?code=abc&state=attacker-state\n")
+	var out bytes.Buffer
+
+	_, err := LoginManual(context.Background(), "client-id", "client-secret", in, &out)
+	if err == nil {
+		t.Fatal("LoginManual should reject a mismatched state")
+	}
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok {
+		t.Fatalf("expected NotionCLIError, got %T: %v", err, err)
+	}
+	if cliErr.Code != clierrors.CodeOAuthStateMismatch {
+		t.Errorf("error code = %q, want %q", cliErr.Code, clierrors.CodeOAuthStateMismatch)
+	}
+	// The real-mismatch path must keep using the original CSRF message —
+	// the bare-code diagnostic must not bleed into this branch.
+	if !strings.Contains(cliErr.Message, "CSRF") {
+		t.Errorf("error message = %q, want it to mention %q", cliErr.Message, "CSRF")
+	}
+	if tokenServerHit {
+		t.Error("token endpoint was called \u2014 mismatched state should have been rejected")
+	}
+}
+
 func TestExchangeCode_ContextCancelled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Delay longer than the context timeout.
@@ -321,5 +488,100 @@ func TestExchangeCode_ContextCancelled(t *testing.T) {
 	_, err := exchangeCode(ctx, "id", "secret", "http://localhost:8080/callback", "code")
 	if err == nil {
 		t.Fatal("exchangeCode() should return error when context is cancelled")
+	}
+}
+
+// TestCallback_RejectsNonGet verifies the OAuth callback handler returns 405
+// for any method other than GET, sets Allow: GET, and does not enqueue a
+// callback result. Without this guard a CSRF-like POST from a malicious origin
+// could be processed.
+func TestCallback_RejectsNonGet(t *testing.T) {
+	resultCh := make(chan callbackResult, 1)
+	h := newCallbackHandler(8080, resultCh)
+
+	req := httptest.NewRequest(http.MethodPost, "/callback?code=xyz&state=expected", nil)
+	req.Host = "localhost:8080"
+	w := httptest.NewRecorder()
+
+	h(w, req)
+
+	if w.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusMethodNotAllowed)
+	}
+	if got := w.Header().Get("Allow"); got != "GET" {
+		t.Errorf("Allow header = %q, want %q", got, "GET")
+	}
+	select {
+	case r := <-resultCh:
+		t.Errorf("unexpected callback result sent: %+v", r)
+	default:
+	}
+}
+
+// TestCallback_RejectsMismatchedHost verifies the DNS-rebinding defense:
+// requests whose Host header is neither localhost:PORT nor 127.0.0.1:PORT must
+// receive 421 Misdirected Request and never reach the result channel.
+func TestCallback_RejectsMismatchedHost(t *testing.T) {
+	resultCh := make(chan callbackResult, 1)
+	h := newCallbackHandler(8080, resultCh)
+
+	req := httptest.NewRequest(http.MethodGet, "/callback?code=xyz&state=expected", nil)
+	req.Host = "evil.example.com:8080"
+	w := httptest.NewRecorder()
+
+	h(w, req)
+
+	if w.Code != http.StatusMisdirectedRequest {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusMisdirectedRequest)
+	}
+	select {
+	case r := <-resultCh:
+		t.Errorf("unexpected callback result sent: %+v", r)
+	default:
+	}
+}
+
+// TestCallback_AcceptsValidHosts verifies the handler accepts the two Host
+// values Go's HTTP server can present for a listener bound to 127.0.0.1 with
+// a redirect URI of http://localhost:PORT/callback: literal "localhost:PORT"
+// (what the browser sends after following the Notion redirect) and the IPv4
+// form "127.0.0.1:PORT". Both must enqueue the code and state on resultCh.
+func TestCallback_AcceptsValidHosts(t *testing.T) {
+	tests := []struct {
+		name string
+		host string
+	}{
+		{"localhost form", "localhost:8080"},
+		{"ipv4 form", "127.0.0.1:8080"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resultCh := make(chan callbackResult, 1)
+			h := newCallbackHandler(8080, resultCh)
+
+			req := httptest.NewRequest(http.MethodGet, "/callback?code=xyz&state=expected", nil)
+			req.Host = tt.host
+			w := httptest.NewRecorder()
+
+			h(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
+			}
+			select {
+			case r := <-resultCh:
+				if r.code != "xyz" {
+					t.Errorf("result.code = %q, want %q", r.code, "xyz")
+				}
+				if r.state != "expected" {
+					t.Errorf("result.state = %q, want %q", r.state, "expected")
+				}
+				if r.err != "" {
+					t.Errorf("result.err = %q, want empty", r.err)
+				}
+			default:
+				t.Error("expected callback result on channel, got none")
+			}
+		})
 	}
 }

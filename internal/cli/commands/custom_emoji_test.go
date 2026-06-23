@@ -123,3 +123,25 @@ func TestCustomEmojiRetrieve_Success(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestCustomEmojiList_All(t *testing.T) {
+	callCount := 0
+	_, cleanup := testCustomEmojiServer(t, func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		if callCount == 1 {
+			_, _ = w.Write([]byte(`{"results":[{"id":"e1","name":"party","url":"https://example.com"}],"has_more":true,"next_cursor":"c1"}`))
+		} else {
+			_, _ = w.Write([]byte(`{"results":[{"id":"e2","name":"tada","url":"https://example.com"}],"has_more":false}`))
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runCustomEmojiRoot(t, "custom-emoji", "list", "--all")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if callCount < 2 {
+		t.Errorf("expected at least 2 calls for --all pagination, got %d", callCount)
+	}
+}

@@ -66,15 +66,40 @@ The project has automated npm publishing via the workflow at `.github/workflows/
 
 **Important**: The "Bypass 2FA" checkbox is essential. Without it, automated publishing will fail with OTP errors even if you have a valid token.
 
-#### 2. Add Token to GitHub Secrets
+#### 2. Add Token to the `npm-publish` GitHub Environment
 
-1. Go to https://github.com/Coastal-Programs/notion-cli/settings/secrets/actions
-2. Click "New repository secret"
-3. Name: `NPM_TOKEN`
-4. Value: Paste your npm token
-5. Click "Add secret"
+The `publish-npm` job in `.github/workflows/publish.yml` declares `environment: npm-publish`. That gate means GitHub Actions will **only** inject secrets that live inside the `npm-publish` environment when the job runs — repository-level secrets are not auto-inherited into environment-gated jobs. The job will also pause for manual approval if "Required reviewers" is configured on the environment.
+
+Follow these steps exactly. Do **not** add `NPM_TOKEN` as a repository secret — a repo-level `NPM_TOKEN` will be invisible to the gated job and `npm publish` will fail with an authentication error.
+
+1. Go to https://github.com/Coastal-Programs/notion-cli/settings/environments
+2. Click **"New environment"**.
+3. Name it exactly `npm-publish` (must match the `environment:` value in `publish.yml` character-for-character — no typos, no trailing spaces).
+4. Click **"Configure environment"**.
+5. Under **"Deployment protection rules"**, check **"Required reviewers"** and add the maintainer's GitHub username (and any co-maintainers who should be able to approve a release). Click **"Save protection rules"**.
+   - This is intentional: every release will now pause and wait for a one-click manual approval in the Actions UI before any `npm publish` runs. The reviewer gets an email and a button in the workflow run page.
+6. Scroll down to **"Environment secrets"** and click **"Add secret"**.
+7. Name: `NPM_TOKEN`
+8. Value: Paste the npm automation token you generated in step 1 (the one starting with `npm_...`).
+9. Click **"Add secret"**.
 
 That is the entire one-time setup.
+
+#### Why the environment gate?
+
+Without the `npm-publish` environment, anyone who can push a commit that modifies `.github/workflows/publish.yml` — or anyone who can trigger the workflow via a compromised dependency, a malicious PR from a fork that somehow runs against `main`, or a stolen contributor credential — could publish an arbitrary package to npm under the `@coastal-programs` scope using the stored token. Gating the `publish-npm` job on a protected environment with required reviewers means an actual human has to click "Approve and deploy" in the GitHub UI for every release, and that human will see the exact workflow run and tag they are approving. The token itself is also scoped to the environment, so a workflow file that does not target `environment: npm-publish` cannot read it at all. This is the same pattern recommended by GitHub's ["securing deployments"](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) guidance for any job that publishes to a public registry.
+
+#### Repository secrets vs. environment secrets in this repo
+
+To avoid confusion later: this repository uses **both** kinds of secrets, and they are not interchangeable.
+
+| Secret | Scope | Used by | Why |
+| --- | --- | --- | --- |
+| `NPM_TOKEN` | **Environment secret** on `npm-publish` | The `publish-npm` job (has `environment: npm-publish`) | High-impact publish credential; gated behind manual approval. |
+| `NOTION_OAUTH_CLIENT_ID` | **Repository secret** | The `build` job and the `publish-npm` job's build step (neither job's reads of these are environment-gated for compile-time embedding) | Build-time constants; no manual gate needed. |
+| `NOTION_OAUTH_SECRET` | **Repository secret** | Same as above | Build-time constants; no manual gate needed. |
+
+If you add `NPM_TOKEN` at the repository level it will silently not be read by the gated job. If you add `NOTION_OAUTH_CLIENT_ID` / `NOTION_OAUTH_SECRET` only at the environment level, the un-gated `build` job will fail its "Verify OAuth secrets" step. Put each secret where the table says.
 
 ---
 
@@ -136,7 +161,7 @@ EOF
   build/notion-cli-linux-arm64 \
   build/notion-cli-windows-amd64.exe
 
-# 8. GitHub Actions automatically publishes to npm
+# 8. GitHub Actions builds, then waits for your approval, then publishes to npm
 ```
 
 ### What Happens Automatically
@@ -146,9 +171,12 @@ When you create a GitHub Release, the publish workflow:
 - Checks out the code
 - Runs `make test` (Go test suite)
 - Runs `make build` (Go binary build)
-- Checks if the version already exists on npm
-- Publishes the main wrapper package to npm with provenance
+- **Pauses on the `publish-npm` job and waits for a required reviewer to approve the `npm-publish` environment deployment.** You will get an email; the workflow run page will show an "Approve and deploy" button. Nothing publishes until you click it.
+- After approval: checks if the version already exists on npm
 - Publishes each platform package with its respective binary
+- Publishes the main wrapper package to npm with provenance
+
+If the `publish-npm` job is stuck in a yellow "Waiting" state, that is the manual approval gate — not a bug. Open the run, click the job, and approve.
 
 ### Manual Workflow Trigger
 
@@ -157,6 +185,7 @@ You can also trigger the publish workflow manually:
 1. Go to Actions tab: https://github.com/Coastal-Programs/notion-cli/actions/workflows/publish.yml
 2. Click "Run workflow"
 3. Click "Run workflow" button
+4. The `publish-npm` job will still wait for environment approval — manual triggers do not bypass the gate.
 
 ---
 

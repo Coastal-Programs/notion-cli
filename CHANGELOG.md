@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`db create` and `db update` can now set/modify the database column schema** (fixes #97). Both commands accept `--properties` (a JSON object of Notion property definitions) and `--properties-file` (the same JSON from a file).
+  - `db create` sends the schema under `initial_data_source.properties` per Notion API version 2025-09-03+ (replacing the previously hard-coded, now-deprecated top-level `properties` payload). A default `Name` title column is injected only when the supplied schema has no title-type property.
+  - `db update` applies schema changes via `PATCH /data_sources/{id}`, resolving the primary data source automatically (or an explicit `--data-source`). A property value of JSON `null` deletes that column. `--title` still updates the database object and can be combined with `--properties`.
+
+### CI
+- **Dependabot PRs now auto-merge.** New `.github/workflows/dependabot-auto-merge.yml` reads update metadata via `dependabot/fetch-metadata` (SHA-pinned) and runs `gh pr merge --auto --squash` for non-major updates; the merge only completes once required checks pass. Requires repo settings: "Allow auto-merge" enabled and a branch-protection rule on `main` requiring the `CI Success` check.
+- **Dependabot PR churn reduced** by grouping minor/patch updates for both `gomod` and `github-actions` in `.github/dependabot.yml`.
+
+## [6.3.3] - 2026-05-15
+
+### Tests
+- **OAuth `/callback` handler now has direct coverage** for its DNS-rebinding and method guards. `internal/oauth/oauth.go` extracts the handler into `newCallbackHandler` (no behavior change) so `internal/oauth/oauth_test.go` can assert: non-GET → 405 with `Allow: GET`, mismatched `Host` → 421, and valid `localhost:PORT` / `127.0.0.1:PORT` hosts → 200 with the code+state delivered on `resultCh`. Each test was confirmed to fail when its corresponding guard is removed.
+
+### Fixed
+- **OAuth `--manual` bare-code paste now returns an actionable error.** When a user pastes only the authorization code (no `state=`) into `auth login --manual`, `LoginManual` now surfaces `"OAuth state parameter is missing from the pasted input"` with suggestions that tell the user to paste the FULL redirected URL — instead of the generic "OAuth state mismatch (possible CSRF attack)" text, which left users in a loop on SSH. The real state-mismatch path keeps the original CSRF message. See `internal/oauth/oauth.go` `LoginManual`.
+
+### Security
+- **OAuth `LoginManual` now requires state.** Pasting a bare authorization code into the manual flow is rejected with `OAUTH_STATE_MISMATCH`; users must paste the FULL redirected URL so the CSRF state can be verified. The local callback flow (`auth login` without `--manual`) was already verifying state.
+- **OAuth `/callback` server adds method and Host pinning.** Only `GET` is accepted (405 otherwise) and the `Host` header must match `localhost:PORT` or `127.0.0.1:PORT`. Defeats DNS-rebinding even with state in place.
+- **Refresh-token rotation guard.** `internal/notion/client.go` now only overwrites the stored `oauth_refresh_token` when the token endpoint returns a non-empty `refresh_token`. Prevents Notion's non-rotating-refresh responses from silently blanking the stored credential.
+- **`oauth_refresh_token` is now masked by default** in `config get` and `config list`. Use `--show-secret` to reveal.
+- **npm postinstall verifies SHA-256 checksums.** `install.js` fetches `SHA256SUMS` from the GitHub release, streams the binary while hashing, and refuses to install if the hash does not match. Hash mismatch is a hard error (non-zero exit) — not a silent skip. Redirects are pinned to `github.com` and `*.githubusercontent.com`, https-only, with a 50 MB body cap.
+- **GitHub Actions hardening.** Every `uses:` is pinned to a commit SHA with a version comment for Dependabot. `gh release upload --clobber` removed (release assets are immutable). `--provenance` added to the platform-package publish loop. The `publish-npm` job is now gated on the `npm-publish` GitHub Environment so `NPM_TOKEN` requires manual approval per release.
+- **`SHA256SUMS` is generated and uploaded** as a release asset alongside the binaries.
+- **`make release` refuses to ship the known-leaked OAuth client secret** as a defense against re-shipping a credential that was previously exposed. See `SECURITY.md` → "Credential rotation".
+- **Maintainer dev secret moved out of the repo tree** to `~/.config/notion-cli-dev/.env`. The Makefile reads from there; CI is unaffected.
+
+## [6.3.2] - 2026-05-15
+
+### Fixed
+- OAuth token endpoint requests now include `Notion-Version` and `Accept: application/json` headers, matching the official Notion JS SDK (`makenotion/notion-sdk-js`) and developer-docs spec. Applied to `exchangeCode`, `TokenRefresh`, `TokenIntrospect`, and `TokenRevoke` in `internal/oauth/oauth.go`.
+
 ## [6.3.1] - 2026-05-11
 
 ### Breaking

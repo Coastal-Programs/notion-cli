@@ -734,9 +734,53 @@ func newDBCreateCmd() *cobra.Command {
 
 	cmd.Flags().String("title", "", "Database title (required)")
 	_ = cmd.MarkFlagRequired("title")
+	cmd.Flags().String("properties", "", "Property schema as a JSON string (Notion property definitions)")
+	cmd.Flags().String("properties-file", "", "Path to a JSON file containing the property schema")
 	addOutputFlags(cmd)
 
 	return cmd
+}
+
+// loadPropertiesSchema reads a property schema from the --properties string or
+// --properties-file path. It returns (nil, nil) when neither flag is set.
+func loadPropertiesSchema(cmd *cobra.Command) (map[string]any, error) {
+	props, _ := cmd.Flags().GetString("properties")
+	file, _ := cmd.Flags().GetString("properties-file")
+
+	var data []byte
+	switch {
+	case props != "":
+		data = []byte(props)
+	case file != "":
+		b, err := os.ReadFile(file)
+		if err != nil {
+			return nil, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: fmt.Sprintf("Cannot read properties file: %s", err),
+			}
+		}
+		data = b
+	default:
+		return nil, nil
+	}
+
+	var schema map[string]any
+	if err := json.Unmarshal(data, &schema); err != nil {
+		return nil, clierrors.InvalidJSON(fmt.Sprintf("--properties: %s", err))
+	}
+	return schema, nil
+}
+
+// hasTitleProperty reports whether the schema already defines a title-type property.
+func hasTitleProperty(schema map[string]any) bool {
+	for _, v := range schema {
+		if def, ok := v.(map[string]any); ok {
+			if _, isTitle := def["title"]; isTitle {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func runDBCreate(cmd *cobra.Command, args []string) error {
@@ -754,6 +798,21 @@ func runDBCreate(cmd *cobra.Command, args []string) error {
 
 	title, _ := cmd.Flags().GetString("title")
 
+	schema, err := loadPropertiesSchema(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	if schema == nil {
+		schema = map[string]any{}
+	}
+	// Notion requires exactly one title property. Inject the default "Name"
+	// title column only when the user-supplied schema lacks a title property.
+	if !hasTitleProperty(schema) {
+		schema["Name"] = map[string]any{"title": map[string]any{}}
+	}
+
+	// Under Notion API 2025-09-03+, create-database expects the column schema
+	// nested under initial_data_source.properties, not a top-level properties.
 	body := map[string]any{
 		"parent": map[string]any{
 			"type":    "page_id",
@@ -762,10 +821,8 @@ func runDBCreate(cmd *cobra.Command, args []string) error {
 		"title": []map[string]any{
 			{"type": "text", "text": map[string]any{"content": title}},
 		},
-		"properties": map[string]any{
-			"Name": map[string]any{
-				"title": map[string]any{},
-			},
+		"initial_data_source": map[string]any{
+			"properties": schema,
 		},
 	}
 
@@ -791,8 +848,10 @@ func newDBUpdateCmd() *cobra.Command {
 		RunE:    runDBUpdate,
 	}
 
-	cmd.Flags().String("title", "", "New database title (required)")
-	_ = cmd.MarkFlagRequired("title")
+	cmd.Flags().String("title", "", "New database title")
+	cmd.Flags().String("properties", "", "Property schema changes as a JSON string (use null to delete a property)")
+	cmd.Flags().String("properties-file", "", "Path to a JSON file containing property schema changes")
+	cmd.Flags().String("data-source", "", "Target a specific data_source ID for schema changes (required for multi-source databases)")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -813,18 +872,62 @@ func runDBUpdate(cmd *cobra.Command, args []string) error {
 
 	title, _ := cmd.Flags().GetString("title")
 
-	body := map[string]any{
-		"title": []map[string]any{
-			{"type": "text", "text": map[string]any{"content": title}},
-		},
-	}
-
-	result, err := client.DatabaseUpdate(cmd.Context(), dbID, body)
+	schema, err := loadPropertiesSchema(cmd)
 	if err != nil {
 		return handleError(cmd, err)
 	}
 
+	if title == "" && schema == nil {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: "db update requires --title and/or --properties",
+			Suggestions: []string{
+				"Pass --title to rename the database",
+				"Pass --properties or --properties-file to modify the column schema",
+			},
+		})
+	}
+
 	p := output.NewPrinter(outputFormat(cmd))
+
+	// Title/parent edits go to the database object. Under the 2025-09-03+ API,
+	// PATCH /databases/{id} handles title but not the column schema.
+	if title != "" {
+		body := map[string]any{
+			"title": []map[string]any{
+				{"type": "text", "text": map[string]any{"content": title}},
+			},
+		}
+		result, err := client.DatabaseUpdate(cmd.Context(), dbID, body)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+		if schema == nil {
+			p.PrintSuccess(result, "db update", start)
+			return nil
+		}
+	}
+
+	// Schema edits go through PATCH /data_sources/{id} with a properties body,
+	// per the 2025-09-03 Notion API. A JSON null value deletes a property.
+	var dataSourceID string
+	if ds, _ := cmd.Flags().GetString("data-source"); ds != "" {
+		dataSourceID, err = resolveID(ds)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+	} else {
+		dataSourceID, err = resolver.PrimaryDataSourceID(cmd.Context(), client, dbID)
+		if err != nil {
+			return handleError(cmd, err)
+		}
+	}
+
+	result, err := client.DataSourceUpdate(cmd.Context(), dataSourceID, map[string]any{"properties": schema})
+	if err != nil {
+		return handleError(cmd, err)
+	}
+
 	p.PrintSuccess(result, "db update", start)
 	return nil
 }

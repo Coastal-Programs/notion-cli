@@ -185,6 +185,82 @@ Security considerations for code reviewers:
 - [ ] Token values are masked in all output paths
 - [ ] Atomic file writes used for persistent data
 
+## Credential Rotation
+
+The OAuth client secret used to sign authorization-code exchanges is embedded
+in every released binary via `-ldflags -X`. If it leaks (committed to a repo,
+pasted into a chat, etc.), every released binary becomes a liability until the
+secret is rotated AND a new release is published.
+
+### When to rotate
+
+Rotate immediately if any of the following has happened:
+
+- The secret was committed to a public or private repo (search history with
+  `git log -p -S 'secret_'`).
+- The secret was pasted into a chat, ticket, screenshot, or screen share.
+- A maintainer who had access to the secret has left the team.
+- More than 12 months have passed since the last rotation.
+
+### Rotation procedure
+
+1. **Generate a new secret in the Notion dev portal.**
+   - Open https://www.notion.so/my-integrations
+   - Select the `notion-cli` integration
+   - Under "OAuth Domain & URIs" → "Client secret", click "Regenerate"
+   - Copy the new secret (Notion shows it only once — store it now)
+
+2. **Update the maintainer dev dotfile** at
+   `~/.config/notion-cli-dev/.env`:
+
+   ```
+   NOTION_OAUTH_CLIENT_ID=<unchanged client id>
+   NOTION_OAUTH_SECRET=<new secret here>
+   ```
+
+   Permissions must be `0600`:
+
+   ```bash
+   chmod 600 ~/.config/notion-cli-dev/.env
+   ```
+
+3. **Update the CI repository secret:**
+
+   ```bash
+   gh secret set NOTION_OAUTH_SECRET --repo Coastal-Programs/notion-cli
+   ```
+
+   Paste the new secret when prompted.
+
+4. **Publish a new release** so end users get a binary built with the new
+   secret. `make release` will refuse to build if the SHA-256 of
+   `OAUTH_CLIENT_SECRET` matches the historically-leaked value (see
+   `LEAKED_OAUTH_SECRET_SHA256` in the Makefile). The check uses a hash
+   instead of the literal value so the tripwire itself doesn't trip
+   GitHub's secret-scanning push protection.
+
+5. **Revoke the old secret** in the Notion dev portal once the new release
+   is live and adopted. The portal allows multiple active secrets briefly
+   during rollover.
+
+### Where the maintainer dev secret lives
+
+As of 2026-05, the maintainer's local dev secret lives at:
+
+```
+~/.config/notion-cli-dev/.env
+```
+
+*outside* the repo tree, on purpose. The previous location, `.env.local` in
+the repo root, is legacy and should be deleted once you have migrated:
+
+```bash
+shred -u .env.local   # or `rm -P` on macOS
+```
+
+The Makefile reads from the new path automatically; CI is unaffected because
+it injects the same variables via repository secrets.
+
 ## Vulnerability Disclosure Timeline
 
 **Example Timeline for Critical Vulnerability:**

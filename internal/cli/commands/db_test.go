@@ -460,7 +460,7 @@ func TestDBSchema_Success(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"object": "database",
 			"id":     "db-1",
-			"title": []any{map[string]any{"plain_text": "My DB"}},
+			"title":  []any{map[string]any{"plain_text": "My DB"}},
 			"properties": map[string]any{
 				"Name": map[string]any{"type": "title"},
 			},
@@ -504,6 +504,236 @@ func TestDBUpdate_Success(t *testing.T) {
 	_, _, err := runDBRoot(t, "db", "update", "11111111111111111111111111111111", "--title", "Renamed")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+// TestDBCreate_UsesInitialDataSource verifies the create body nests the schema
+// under initial_data_source.properties (2025-09-03+ API), not a top-level
+// properties, and injects a default Name title column.
+func TestDBCreate_UsesInitialDataSource(t *testing.T) {
+	var capturedBody map[string]any
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "database", "id": "new-db"})
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "create", "11111111111111111111111111111111", "--title", "Test DB")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, ok := capturedBody["properties"]; ok {
+		t.Error("create body must not use top-level properties (deprecated shape)")
+	}
+	ids, ok := capturedBody["initial_data_source"].(map[string]any)
+	if !ok {
+		t.Fatalf("initial_data_source missing or wrong type: %v", capturedBody["initial_data_source"])
+	}
+	props, ok := ids["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("initial_data_source.properties missing: %v", ids)
+	}
+	if _, ok := props["Name"]; !ok {
+		t.Error("expected default Name title property when none supplied")
+	}
+}
+
+// TestDBCreate_WithProperties merges a user-supplied schema and does not inject
+// Name when a title property is already present.
+func TestDBCreate_WithProperties(t *testing.T) {
+	var capturedBody map[string]any
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "database", "id": "new-db"})
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "create", "11111111111111111111111111111111",
+		"--title", "Test DB",
+		"--properties", `{"Task":{"title":{}},"Priority":{"number":{}}}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	props := capturedBody["initial_data_source"].(map[string]any)["properties"].(map[string]any)
+	if _, ok := props["Name"]; ok {
+		t.Error("Name should not be injected when a title property is supplied")
+	}
+	if _, ok := props["Priority"]; !ok {
+		t.Error("expected user-supplied Priority property")
+	}
+}
+
+// TestDBUpdate_PropertiesRoutesToDataSource verifies schema edits resolve the
+// primary data source and PATCH /data_sources/{id}.
+func TestDBUpdate_PropertiesRoutesToDataSource(t *testing.T) {
+	const dbID = "11111111111111111111111111111111"
+	const dsID = "22222222222222222222222222222222"
+	var propsPath string
+	var capturedBody map[string]any
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/databases/"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object": "database", "id": dbID,
+				"data_sources": []any{map[string]any{"id": dsID}},
+			})
+		case r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/data_sources/"):
+			propsPath = r.URL.Path
+			_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "data_source", "id": dsID})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "update", dbID,
+		"--properties", `{"NewCol":{"number":{}},"OldCol":null}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(propsPath, dsID) {
+		t.Errorf("properties PATCH path %q does not contain data source id %q", propsPath, dsID)
+	}
+	props, ok := capturedBody["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties missing in body: %v", capturedBody)
+	}
+	if v, ok := props["OldCol"]; !ok || v != nil {
+		t.Errorf("expected OldCol:null to pass through for deletion, got %v (present=%v)", v, ok)
+	}
+}
+
+// TestDBUpdate_TitleOnlyHitsDatabase ensures a title-only update never touches
+// the data source properties endpoint.
+func TestDBUpdate_TitleOnlyHitsDatabase(t *testing.T) {
+	const dbID = "11111111111111111111111111111111"
+	var patchedDB bool
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/databases/") {
+			patchedDB = true
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "database", "id": dbID})
+			return
+		}
+		if strings.Contains(r.URL.Path, "/data_sources/") {
+			t.Errorf("title-only update must not hit data sources: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "update", dbID, "--title", "Renamed")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !patchedDB {
+		t.Error("expected PATCH /databases/{id} for title-only update")
+	}
+}
+
+// TestDBUpdate_RequiresTitleOrProperties errors when neither flag is set.
+func TestDBUpdate_RequiresTitleOrProperties(t *testing.T) {
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "database", "id": "db-1"})
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "update", "11111111111111111111111111111111")
+	if err == nil {
+		t.Fatal("expected error when neither --title nor --properties given")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// outputFormat pure-function tests
+// ---------------------------------------------------------------------------
+
+func TestOutputFormat_Flags(t *testing.T) {
+	for _, tc := range []struct {
+		flag string
+		want string
+	}{
+		{"--compact-json", "compact-json"},
+		{"--raw", "raw"},
+		{"--csv", "csv"},
+		{"--markdown", "markdown"},
+		{"--pretty", "pretty"},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "test"}
+			addOutputFlags(cmd)
+			_ = cmd.ParseFlags([]string{tc.flag})
+			got := string(outputFormat(cmd))
+			if got != tc.want {
+				t.Errorf("outputFormat(%s) = %q, want %q", tc.flag, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDBQuery_PageSizeTooLarge(t *testing.T) {
+	_, _, err := runDBRoot(t, "db", "query", "11111111111111111111111111111111", "--page-size", "200")
+	if err == nil {
+		t.Fatal("expected error for --page-size > 100")
+	}
+}
+
+func TestDBQuery_InvalidSortDirection(t *testing.T) {
+	const dbID = "11111111111111111111111111111111"
+	const dsID = "22222222222222222222222222222222"
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "GET" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object": "database", "id": dbID,
+				"data_sources": []any{map[string]any{"id": dsID}},
+			})
+		} else {
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": []any{}, "has_more": false})
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "query", dbID, "--sort-property", "Name", "--sort-direction", "invalid")
+	if err == nil {
+		t.Fatal("expected error for invalid --sort-direction")
+	}
+}
+
+func TestDBQuery_WithFilter(t *testing.T) {
+	const dbID = "11111111111111111111111111111111"
+	const dsID = "22222222222222222222222222222222"
+	var capturedBody map[string]any
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "GET" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"object": "database", "id": dbID,
+				"data_sources": []any{map[string]any{"id": dsID}},
+			})
+		} else {
+			_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": []any{}, "has_more": false})
+		}
+	})
+	defer cleanup()
+
+	_, _, err := runDBRoot(t, "db", "query", dbID,
+		"--filter", `{"property":"Status","select":{"equals":"Done"}}`,
+		"--quiet")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedBody["filter"] == nil {
+		t.Error("expected filter in request body")
 	}
 }
 

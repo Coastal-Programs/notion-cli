@@ -365,3 +365,47 @@ func TestCommentDelete_Roundtrip(t *testing.T) {
 		t.Errorf("expected 1 DELETE, got %d", hit)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// loadRichText pure-function tests
+// ---------------------------------------------------------------------------
+
+func TestLoadRichText_Success(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rt-*.json")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, _ = tmpFile.WriteString(`[{"type":"text","text":{"content":"hi"}}]`)
+	_ = tmpFile.Close()
+
+	arr, err := loadRichText(tmpFile.Name())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(arr) != 1 {
+		t.Errorf("got %d items, want 1", len(arr))
+	}
+}
+
+func TestLoadRichText_FileNotFound(t *testing.T) {
+	_, err := loadRichText("/nonexistent/file.json")
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestLoadRichText_InvalidJSON(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rt-bad-*.json")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_, _ = tmpFile.WriteString(`not json`)
+	_ = tmpFile.Close()
+
+	_, err = loadRichText(tmpFile.Name())
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}

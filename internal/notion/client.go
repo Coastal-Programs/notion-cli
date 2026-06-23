@@ -218,12 +218,6 @@ func (c *Client) DataSourceTemplatesList(ctx context.Context, dataSourceID strin
 	return c.get(ctx, "/data_sources/"+dataSourceID+"/templates", query.Values())
 }
 
-// DataSourcePropertiesUpdate updates the properties schema of a data source.
-// body should contain the properties map per the Notion API schema.
-func (c *Client) DataSourcePropertiesUpdate(ctx context.Context, dataSourceID string, body map[string]any) (map[string]any, error) {
-	return c.patch(ctx, "/data_sources/"+dataSourceID+"/properties", body)
-}
-
 // --- Pages ---
 
 // PageCreate creates a new page.
@@ -514,7 +508,12 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 
 	c.token = newToken.AccessToken
 	c.cfg.OAuthAccessToken = newToken.AccessToken
-	c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	// Only overwrite the stored refresh token if the server returned a new one.
+	// Notion does not always rotate refresh tokens; an empty response field
+	// must not blank out the credential we already have on disk.
+	if newToken.RefreshToken != "" {
+		c.cfg.OAuthRefreshToken = newToken.RefreshToken
+	}
 	if newToken.ExpiresIn > 0 {
 		c.cfg.OAuthTokenExpiresAt = time.Now().Add(
 			time.Duration(newToken.ExpiresIn) * time.Second).UTC().Format(time.RFC3339)

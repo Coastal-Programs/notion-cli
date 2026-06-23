@@ -5,12 +5,19 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/spf13/cobra"
 )
+
+func newDataSourceRoot() *cobra.Command {
+	root := &cobra.Command{Use: "notion-cli", SilenceErrors: true, SilenceUsage: true}
+	RegisterDataSourceCommands(root)
+	return root
+}
 
 func TestRegisterDataSourceCommands(t *testing.T) {
 	root := &cobra.Command{Use: "notion-cli"}
@@ -245,7 +252,7 @@ func TestDataSourcePropertiesUpdate_HappyPath(t *testing.T) {
 
 	srv, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method == "PATCH" && strings.Contains(r.URL.Path, "/data_sources/") && strings.HasSuffix(r.URL.Path, "/properties") {
+		if r.Method == "PATCH" && strings.Contains(r.URL.Path, "/data_sources/") {
 			body, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(body, &receivedBody)
 			_ = json.NewEncoder(w).Encode(map[string]any{
@@ -279,5 +286,84 @@ func TestDataSourcePropertiesUpdate_HappyPath(t *testing.T) {
 	}
 	if props["Status"] == nil {
 		t.Errorf("expected Status property, got: %#v", props)
+	}
+}
+
+func TestDataSourceQuery_WithFilter(t *testing.T) {
+	const dsID = "11111111111111111111111111111111"
+	var receivedBody map[string]any
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&receivedBody)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": []any{}, "has_more": false})
+	})
+	defer cleanup()
+
+	root := newDataSourceRoot()
+	root.SetArgs([]string{"data-source", "query", dsID, "--filter", `{"property":"Status"}`, "--json"})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if receivedBody["filter"] == nil {
+		t.Error("expected filter in request body")
+	}
+}
+
+func TestDataSourceQuery_WithSorts(t *testing.T) {
+	const dsID = "11111111111111111111111111111111"
+	_, cleanup := testDBServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": []any{}, "has_more": false})
+	})
+	defer cleanup()
+
+	root := newDataSourceRoot()
+	root.SetArgs([]string{"data-source", "query", dsID, "--sorts", `[{"property":"Name","direction":"ascending"}]`, "--json"})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+}
+
+func TestDataSourceQuery_InvalidFilter(t *testing.T) {
+	const dsID = "11111111111111111111111111111111"
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Setenv("NOTION_TOKEN", "secret_test_token")
+	t.Cleanup(func() {
+		if origToken == "" {
+			_ = os.Unsetenv("NOTION_TOKEN")
+		} else {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+	root := newDataSourceRoot()
+	root.SetArgs([]string{"data-source", "query", dsID, "--filter", `not json`})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected error for invalid --filter JSON")
+	}
+}
+
+func TestDataSourceQuery_PageSizeTooLarge(t *testing.T) {
+	const dsID = "11111111111111111111111111111111"
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Setenv("NOTION_TOKEN", "secret_test_token")
+	t.Cleanup(func() {
+		if origToken == "" {
+			_ = os.Unsetenv("NOTION_TOKEN")
+		} else {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+	root := newDataSourceRoot()
+	root.SetArgs([]string{"data-source", "query", dsID, "--page-size", "200"})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	if err := root.Execute(); err == nil {
+		t.Fatal("expected error for page-size > 100")
 	}
 }

@@ -364,6 +364,31 @@ func TestAuthStatus_NoToken(t *testing.T) {
 	}
 }
 
+func TestAuthStatus_ManualToken(t *testing.T) {
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Unsetenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+
+	// Save a manual token to config.
+	if err := config.SaveConfig(&config.Config{Token: "secret_manual"}); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+
+	_, _, err := runAuthRoot(t, "auth", "status")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestAuthStatus_OAuthToken(t *testing.T) {
 	tmpDir := t.TempDir()
 	origHome := os.Getenv("HOME")
@@ -469,5 +494,51 @@ func TestAuthRefresh_NoRefreshToken(t *testing.T) {
 	_, _, err := runAuthRoot(t, "auth", "refresh")
 	if err == nil {
 		t.Fatal("expected error when no refresh token")
+	}
+}
+
+func TestAuthRefresh_Success(t *testing.T) {
+	// Mock token endpoint.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{
+			"access_token":  "new_ntn_access",
+			"refresh_token": "new_refresh",
+			"token_type":    "bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenSrv.Close()
+	oauth.SetTokenURL(tokenSrv.URL)
+	defer resetOAuthURLs()
+
+	origID, origSecret := config.OAuthClientID, config.OAuthClientSecret
+	config.OAuthClientID = "test-cid"
+	config.OAuthClientSecret = "test-secret"
+	defer func() {
+		config.OAuthClientID = origID
+		config.OAuthClientSecret = origSecret
+	}()
+
+	tmpDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	_ = os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { _ = os.Setenv("HOME", origHome) })
+
+	origToken := os.Getenv("NOTION_TOKEN")
+	_ = os.Unsetenv("NOTION_TOKEN")
+	t.Cleanup(func() {
+		if origToken != "" {
+			_ = os.Setenv("NOTION_TOKEN", origToken)
+		}
+	})
+
+	cfg := &config.Config{OAuthRefreshToken: "old_refresh", OAuthAccessToken: "ntn_old"}
+	if err := config.SaveConfig(cfg); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+
+	_, _, err := runAuthRoot(t, "auth", "refresh")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

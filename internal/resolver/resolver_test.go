@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	cliErrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
@@ -350,6 +351,46 @@ func isNotionCLIError(err error, out **cliErrors.NotionCLIError) bool {
 		return true
 	}
 	return false
+}
+
+// TestPrimaryDataSourceID_TransportError verifies that when the underlying
+// HTTP transport fails (server closed before request), the call returns a
+// non-nil error without panicking.
+func TestPrimaryDataSourceID_TransportError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close() // immediately close so URL is dead
+
+	c := newTestClient(srv.URL)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("unexpected panic: %v", r)
+		}
+	}()
+
+	_, err := PrimaryDataSourceID(context.Background(), c, "db-anything")
+	if err == nil {
+		t.Fatal("expected non-nil error for dead server, got nil")
+	}
+}
+
+// TestExtractID_MalformedURL verifies that an input containing an invalid
+// percent-escape sequence does not panic and returns the "could not extract"
+// error from ExtractID.
+func TestExtractID_MalformedURL(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("unexpected panic: %v", r)
+		}
+	}()
+
+	got, err := ExtractID("https://notion.so/%ZZ")
+	if err == nil {
+		t.Fatalf("expected error, got %q", got)
+	}
+	if !strings.Contains(err.Error(), "could not extract") {
+		t.Errorf("error = %v, want to contain %q", err, "could not extract")
+	}
 }
 
 func TestExtractID_DataSourceQueryParam(t *testing.T) {

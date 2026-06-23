@@ -7,13 +7,16 @@ import (
 	"encoding/json"
 	"io"
 	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	"github.com/Coastal-Programs/notion-cli/v6/internal/oauth"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/retry"
 )
 
@@ -361,35 +364,6 @@ func TestDataSourceTemplatesList(t *testing.T) {
 	results, _ := result["results"].([]any)
 	if len(results) != 1 {
 		t.Errorf("results count = %d, want 1", len(results))
-	}
-}
-
-func TestDataSourcePropertiesUpdate(t *testing.T) {
-	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
-			t.Errorf("method = %s, want PATCH", r.Method)
-		}
-		if r.URL.Path != "/data_sources/ds-123/properties" {
-			t.Errorf("path = %s", r.URL.Path)
-		}
-		body := readBody(t, r)
-		props, ok := body["properties"].(map[string]any)
-		if !ok {
-			t.Errorf("expected properties map in body")
-		}
-		if props["Status"] == nil {
-			t.Errorf("expected Status property")
-		}
-		writeJSON(t, w, 200, map[string]any{"object": "data_source", "id": "ds-123"})
-	})
-
-	_, err := c.DataSourcePropertiesUpdate(context.Background(), "ds-123", map[string]any{
-		"properties": map[string]any{
-			"Status": map[string]any{"select": map[string]any{}},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -1863,6 +1837,371 @@ func TestDo_401NoRefreshToken(t *testing.T) {
 	}
 }
 
+func TestDo_AutoRefreshOn401(t *testing.T) {
+	// Mock OAuth token endpoint.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, 200, map[string]any{
+			"access_token":  "new_access_token",
+			"refresh_token": "new_refresh_token",
+			"token_type":    "bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenSrv.Close()
+
+	oauth.SetTokenURL(tokenSrv.URL)
+	defer oauth.SetTokenURL("https://api.notion.com/v1/oauth/token")
+
+	origClientID := config.OAuthClientID
+	config.OAuthClientID = "test-client-id"
+	defer func() { config.OAuthClientID = origClientID }()
+
+	var callCount int32
+	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&callCount, 1)
+		if n == 1 {
+			writeJSON(t, w, 401, map[string]any{"code": "unauthorized", "message": "token expired"})
+		} else {
+			writeJSON(t, w, 200, map[string]any{"object": "user", "id": "u1"})
+		}
+	})
+
+	cfg := &config.Config{
+		OAuthRefreshToken: "old_refresh_token",
+	}
+	c.cfg = cfg
+
+	result, err := c.UsersMe(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error after auto-refresh: %v", err)
+	}
+	if atomic.LoadInt32(&callCount) != 2 {
+		t.Errorf("expected 2 API calls (401 + retry), got %d", callCount)
+	}
+	if result["id"] != "u1" {
+		t.Errorf("id = %v, want u1", result["id"])
+	}
+	if c.token != "new_access_token" {
+		t.Errorf("token = %q, want updated to new_access_token", c.token)
+	}
+}
+
+func TestDo_AutoRefreshFails_Returns401(t *testing.T) {
+	// Token refresh fails → original 401 should be returned.
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer tokenSrv.Close()
+
+	oauth.SetTokenURL(tokenSrv.URL)
+	defer oauth.SetTokenURL("https://api.notion.com/v1/oauth/token")
+
+	origClientID := config.OAuthClientID
+	config.OAuthClientID = "test-client-id"
+	defer func() { config.OAuthClientID = origClientID }()
+
+	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, 401, map[string]any{"code": "unauthorized", "message": "expired"})
+	})
+	c.cfg = &config.Config{OAuthRefreshToken: "refresh_token"}
+
+	_, err := c.UsersMe(context.Background())
+	if err == nil {
+		t.Fatal("expected error when refresh fails")
+	}
+}
+
 // Anchor the mime and strings imports used in upload tests.
 var _ = strings.TrimSpace
 var _ = mime.FormatMediaType
+
+// --- additional parseDuration cases ---
+
+// parseDuration uses strconv.Atoi internally, which accepts negative integers.
+// Therefore parseDuration("-5") yields -5 * time.Second (no clamping).
+// parseDuration("1.5") yields 0 because Atoi rejects float strings.
+func TestParseDuration_TableExtras(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want time.Duration
+	}{
+		// Atoi accepts "-5"; the impl multiplies by time.Second without clamping.
+		{"negative int", "-5", -5 * time.Second},
+		// Atoi rejects "1.5"; impl returns 0 on parse error.
+		{"float string", "1.5", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseDuration(tt.in)
+			if got != tt.want {
+				t.Errorf("parseDuration(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseDuration_NegativeInt is a focused single-case test: Atoi accepts
+// negative integers, and the implementation does not clamp, so "-5" maps
+// to -5 * time.Second.
+func TestParseDuration_NegativeInt(t *testing.T) {
+	got := parseDuration("-5")
+	want := -5 * time.Second
+	if got != want {
+		t.Errorf("parseDuration(%q) = %v, want %v", "-5", got, want)
+	}
+}
+
+// TestParseDuration_FloatString verifies that a float-looking string is
+// rejected by strconv.Atoi and parseDuration returns 0.
+func TestParseDuration_FloatString(t *testing.T) {
+	got := parseDuration("1.5")
+	if got != 0 {
+		t.Errorf("parseDuration(%q) = %v, want 0", "1.5", got)
+	}
+}
+
+// TestDo_GETNetworkErrorRetried points the client at a closed httptest server
+// and verifies that a GET (UsersMe) returns a non-nil error and does not panic.
+// With MaxRetries=1 the retry layer will be exercised, but because network
+// errors from a closed listener are not wrapped in *retry.RetryableError by
+// the client, only one attempt is made — that's fine: the contract being
+// tested is "error returned without panic".
+func TestDo_GETNetworkErrorRetried(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+
+	c := NewClient("test-token",
+		WithBaseURL(srv.URL),
+		WithRetryConfig(retry.RetryConfig{
+			MaxRetries: 1,
+			BaseDelay:  time.Millisecond,
+			MaxDelay:   10 * time.Millisecond,
+		}),
+	)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("unexpected panic: %v", r)
+		}
+	}()
+
+	_, err := c.UsersMe(context.Background())
+	if err == nil {
+		t.Fatal("expected non-nil error from closed server, got nil")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Retry behavior: 429 / 503 / multipart replay
+// ---------------------------------------------------------------------------
+
+// TestDo_429RetryAfterHeader_Honored verifies that when the server returns 429
+// with a Retry-After: 0 header on the first attempt and 200 on the second,
+// the client retries exactly once and succeeds. We assert exactly 2 attempts
+// and a nil error; we deliberately do not assert on elapsed time to avoid
+// timing flakiness.
+func TestDo_429RetryAfterHeader_Honored(t *testing.T) {
+	var attempts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&attempts, 1)
+		if n == 1 {
+			w.Header().Set("Retry-After", "0")
+			writeJSON(t, w, 429, map[string]any{
+				"object":  "error",
+				"status":  429,
+				"code":    "rate_limited",
+				"message": "slow down",
+			})
+			return
+		}
+		writeJSON(t, w, 200, map[string]any{
+			"object": "user",
+			"id":     "bot-retry",
+			"type":   "bot",
+			"bot": map[string]any{
+				"owner": map[string]any{"type": "workspace", "workspace": true},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token",
+		WithBaseURL(srv.URL),
+		WithRetryConfig(retry.RetryConfig{
+			MaxRetries: 3,
+			BaseDelay:  time.Millisecond,
+			MaxDelay:   10 * time.Millisecond,
+		}),
+	)
+
+	result, err := c.UsersMe(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error after retry: %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
+	}
+	if result["id"] != "bot-retry" {
+		t.Errorf("id = %v, want bot-retry", result["id"])
+	}
+}
+
+// TestDo_503RetriedThenSucceeds verifies that a 503 Service Unavailable is
+// retried and that the second attempt succeeds. Exactly two attempts must
+// be observed.
+func TestDo_503RetriedThenSucceeds(t *testing.T) {
+	var attempts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&attempts, 1)
+		if n == 1 {
+			writeJSON(t, w, 503, map[string]any{
+				"object":  "error",
+				"status":  503,
+				"code":    "service_unavailable",
+				"message": "try again",
+			})
+			return
+		}
+		writeJSON(t, w, 200, map[string]any{
+			"object": "user",
+			"id":     "bot-503",
+			"type":   "bot",
+			"bot": map[string]any{
+				"owner": map[string]any{"type": "workspace", "workspace": true},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token",
+		WithBaseURL(srv.URL),
+		WithRetryConfig(retry.RetryConfig{
+			MaxRetries: 3,
+			BaseDelay:  time.Millisecond,
+			MaxDelay:   10 * time.Millisecond,
+		}),
+	)
+
+	result, err := c.UsersMe(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error after retry: %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
+	}
+	if result["id"] != "bot-503" {
+		t.Errorf("id = %v, want bot-503", result["id"])
+	}
+}
+
+// TestDoFormData_RetryOn5xx verifies the multipart body is replayable across
+// retries: the file bytes received on attempt 2 must equal those received on
+// attempt 1 (byte-for-byte). doFormData is unexported but reachable here
+// because this test lives in package notion.
+func TestDoFormData_RetryOn5xx(t *testing.T) {
+	const fileFieldName = "file"
+	const fileName = "hello.txt"
+	filePayload := []byte("hello, multipart replay test \x00\x01\x02\x03")
+
+	var attempts int32
+	var firstFileBytes []byte
+	var secondFileBytes []byte
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := atomic.AddInt32(&attempts, 1)
+
+		// Parse the multipart body on every attempt to extract the file part.
+		ct := r.Header.Get("Content-Type")
+		_, params, err := mime.ParseMediaType(ct)
+		if err != nil {
+			t.Errorf("parse content-type %q: %v", ct, err)
+			w.WriteHeader(500)
+			return
+		}
+		boundary, ok := params["boundary"]
+		if !ok {
+			t.Errorf("no boundary in content-type %q", ct)
+			w.WriteHeader(500)
+			return
+		}
+		mr := multipart.NewReader(r.Body, boundary)
+		for {
+			part, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				t.Errorf("next part: %v", err)
+				break
+			}
+			if part.FormName() == fileFieldName {
+				data, rerr := io.ReadAll(part)
+				if rerr != nil {
+					t.Errorf("read file part: %v", rerr)
+				}
+				if n == 1 {
+					firstFileBytes = data
+				} else {
+					secondFileBytes = data
+				}
+			}
+			_ = part.Close()
+		}
+
+		if n == 1 {
+			writeJSON(t, w, 503, map[string]any{
+				"object":  "error",
+				"status":  503,
+				"code":    "service_unavailable",
+				"message": "try again",
+			})
+			return
+		}
+		writeJSON(t, w, 200, map[string]any{
+			"object": "file_upload",
+			"id":     "upload-1",
+			"status": "uploaded",
+		})
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token",
+		WithBaseURL(srv.URL),
+		WithRetryConfig(retry.RetryConfig{
+			MaxRetries: 3,
+			BaseDelay:  time.Millisecond,
+			MaxDelay:   10 * time.Millisecond,
+		}),
+	)
+
+	result, err := c.doFormData(
+		context.Background(),
+		"/file_uploads/upload-1/send",
+		map[string]string{}, // no extra form fields
+		fileFieldName,
+		fileName,
+		"application/octet-stream",
+		filePayload,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error after retry: %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
+	}
+	if result["id"] != "upload-1" {
+		t.Errorf("id = %v, want upload-1", result["id"])
+	}
+
+	if !bytes.Equal(firstFileBytes, filePayload) {
+		t.Errorf("first attempt file bytes mismatch: got %q want %q", firstFileBytes, filePayload)
+	}
+	if !bytes.Equal(secondFileBytes, filePayload) {
+		t.Errorf("second attempt file bytes mismatch: got %q want %q", secondFileBytes, filePayload)
+	}
+	if !bytes.Equal(firstFileBytes, secondFileBytes) {
+		t.Errorf("file bytes differ between attempts: first=%q second=%q", firstFileBytes, secondFileBytes)
+	}
+}

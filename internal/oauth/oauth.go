@@ -39,6 +39,12 @@ const (
 
 	// maxResponseBody limits the token exchange response to 1 MB.
 	maxResponseBody = 1 << 20
+
+	// notionVersion is the Notion API version sent on OAuth requests.
+	// Matches the default in internal/notion/client.go and the official
+	// makenotion/notion-sdk-js, which sends Notion-Version on every request
+	// including OAuth endpoints. Keep in sync with defaultNotionVersion.
+	notionVersion = "2026-03-11"
 )
 
 // redirectURIFor returns the canonical redirect URI for the given port. It
@@ -98,6 +104,60 @@ type callbackResult struct {
 	err   string
 }
 
+// newCallbackHandler returns the HTTP handler for the OAuth /callback path.
+// It is extracted from Login so its DNS-rebinding and method guards can be
+// exercised in unit tests without spinning up the full login flow.
+//
+// The handler accepts only GET, and only requests whose Host header matches
+// localhost:port or 127.0.0.1:port — Go's HTTP server will accept connections
+// to 127.0.0.1 on the same listener bound for "localhost", and on dual-stack
+// systems "localhost" can resolve to ::1. Anything else is rejected to defeat
+// DNS-rebinding attacks even though the state parameter already guards CSRF.
+//
+// Successful and error results are delivered on resultCh with a non-blocking
+// send so a slow consumer (or an unexpected duplicate request) cannot wedge
+// the handler.
+func newCallbackHandler(port int, resultCh chan<- callbackResult) http.HandlerFunc {
+	wantHostLocalhost := fmt.Sprintf("localhost:%d", port)
+	wantHostIPv4 := fmt.Sprintf("127.0.0.1:%d", port)
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Only GET is valid on the OAuth callback.
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		// Reject mismatched Host headers (DNS rebinding defense).
+		if r.Host != wantHostLocalhost && r.Host != wantHostIPv4 {
+			http.Error(w, "misdirected request", http.StatusMisdirectedRequest)
+			return
+		}
+
+		q := r.URL.Query()
+
+		if errParam := q.Get("error"); errParam != "" {
+			select {
+			case resultCh <- callbackResult{err: errParam}:
+			default:
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = fmt.Fprint(w, callbackHTML(false, "Authorization denied", "You denied the authorization request. You can safely close this tab."))
+			return
+		}
+
+		select {
+		case resultCh <- callbackResult{
+			code:  q.Get("code"),
+			state: q.Get("state"),
+		}:
+		default:
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprint(w, callbackHTML(true, "You're all set", "Authorization complete. Return to your terminal — notion-cli is ready to use."))
+	}
+}
+
 // Login performs the full OAuth authorization flow:
 //  1. Generate a random state parameter
 //  2. Start a localhost HTTP server on callbackPort
@@ -135,30 +195,7 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 	resultCh := make(chan callbackResult, 1)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query()
-
-		if errParam := q.Get("error"); errParam != "" {
-			select {
-			case resultCh <- callbackResult{err: errParam}:
-			default:
-			}
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = fmt.Fprint(w, callbackHTML(false, "Authorization denied", "You denied the authorization request. You can safely close this tab."))
-			return
-		}
-
-		select {
-		case resultCh <- callbackResult{
-			code:  q.Get("code"),
-			state: q.Get("state"),
-		}:
-		default:
-		}
-
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = fmt.Fprint(w, callbackHTML(true, "You're all set", "Authorization complete. Return to your terminal — notion-cli is ready to use."))
-	})
+	mux.HandleFunc("/callback", newCallbackHandler(port, resultCh))
 
 	server := &http.Server{
 		Handler:      mux,
@@ -215,9 +252,11 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 // LoginManual performs the OAuth flow without binding a localhost callback
 // server. It prints the authorize URL, the user opens it manually (useful
 // over SSH, in containers, or behind firewalls), authorizes in their
-// browser, then pastes the full redirected URL (or just the code) back into
-// the terminal. The redirect URI is chosen from CallbackPorts[0] to keep
-// it inside the integration's whitelist.
+// browser, then pastes the FULL redirected URL back into the terminal. The
+// full URL is required because it carries the `state` query parameter the
+// CLI uses to defeat CSRF; a bare authorization code is no longer accepted.
+// The redirect URI is chosen from CallbackPorts[0] to keep it inside the
+// integration's whitelist.
 func LoginManual(ctx context.Context, clientID, clientSecret string, in io.Reader, out io.Writer) (*TokenResponse, error) {
 	if clientID == "" || clientSecret == "" {
 		return nil, clierrors.OAuthNotConfigured()
@@ -245,9 +284,10 @@ func LoginManual(ctx context.Context, clientID, clientSecret string, in io.Reade
 	_, _ = fmt.Fprintf(out, "     to %s (which will fail to load \u2014 that is expected).\n", redirectURI)
 	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, "  3. Copy the FULL URL from your browser's address bar and paste")
-	_, _ = fmt.Fprintln(out, "     it below, then press Enter.")
+	_, _ = fmt.Fprintln(out, "     it below, then press Enter. The full URL is required \u2014 the")
+	_, _ = fmt.Fprintln(out, "     authorization code alone is not sufficient.")
 	_, _ = fmt.Fprintln(out)
-	_, _ = fmt.Fprint(out, "Paste redirected URL: ")
+	_, _ = fmt.Fprint(out, "Paste FULL redirected URL (the code alone is not sufficient): ")
 
 	reader := bufio.NewReader(in)
 	line, err := reader.ReadString('\n')
@@ -263,7 +303,25 @@ func LoginManual(ctx context.Context, clientID, clientSecret string, in io.Reade
 	if err != nil {
 		return nil, err
 	}
-	if gotState != "" && gotState != state {
+	// Require state on the manual flow. parseCallbackInput is permissive (it
+	// accepts a bare code) but the manual flow demands the full redirected URL
+	// so we can verify the state parameter — there's no other CSRF defense in
+	// the manual path.
+	if gotState == "" {
+		// Most common cause: user pasted only the bare code. Give them the
+		// specific diagnostic; the generic CSRF message is reserved for the
+		// real mismatch path below.
+		return nil, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeOAuthStateMismatch,
+			Message: "OAuth state parameter is missing from the pasted input",
+			Suggestions: []string{
+				"Paste the FULL redirected URL, not just the authorization code.",
+				"Look for ...&state=... at the end of the URL in your browser's address bar.",
+				"Then run 'notion-cli auth login --manual' again.",
+			},
+		}
+	}
+	if gotState != state {
 		return nil, clierrors.OAuthStateMismatch()
 	}
 
@@ -330,6 +388,8 @@ func exchangeCode(ctx context.Context, clientID, clientSecret, redirectURI, code
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -392,6 +452,8 @@ func TokenRefresh(ctx context.Context, clientID, clientSecret, refreshToken stri
 		return nil, clierrors.OAuthFailed(err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -440,6 +502,8 @@ func TokenIntrospect(ctx context.Context, clientID, clientSecret, token string) 
 		return nil, clierrors.OAuthFailed(err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
@@ -485,6 +549,8 @@ func TokenRevoke(ctx context.Context, clientID, clientSecret, token string) erro
 		return clierrors.OAuthFailed(err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Notion-Version", notionVersion)
 	req.SetBasicAuth(clientID, clientSecret)
 
 	httpClient := &http.Client{Timeout: 30 * time.Second}
