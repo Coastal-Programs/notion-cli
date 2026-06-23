@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-06-23
+
 ### Added
 - **Workspace-scoped OAuth credentials.** `auth login` now stores OAuth credentials per Notion workspace using a slug derived from the workspace name, with `--slug` for overrides. Added `auth list`, `auth default [workspace]`, `auth logout [workspace]`, global `--auth-workspace`, and `NOTION_WORKSPACE` selection.
   - Keychain-backed secret storage for named workspace credentials. Non-secret workspace metadata is stored in `~/.config/notion-cli/credentials.json`; OAuth access and refresh tokens are stored in the OS keychain.
