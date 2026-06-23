@@ -60,7 +60,24 @@ EXAMPLES
   Create a database with an initial data source and output raw json
 
     $ notion-cli db create PAGE_ID -t 'My Database' -r
+
+  Create a database with a custom column schema
+
+    $ notion-cli db create PAGE_ID --title 'Tasks' \
+        --properties '{"Name":{"title":{}},"Priority":{"number":{}},"Status":{"select":{}}}'
+
+  Create a database from a schema file
+
+    $ notion-cli db create PAGE_ID --title 'Tasks' --properties-file schema.json
 ```
+
+SCHEMA NOTES
+
+- `--properties` takes a JSON object of Notion property definitions; `--properties-file`
+  reads the same JSON from a file. The schema is sent under `initial_data_source.properties`
+  per Notion API version 2025-09-03+.
+- A default `Name` title column is added automatically unless your schema already
+  defines a title-type property.
 
 
 
@@ -218,8 +235,7 @@ DESCRIPTION
 
 ALIASES
   $ notion-cli db r
-  $ notion-cli ds retrieve
-  $ notion-cli ds r
+  $ notion-cli db get
 
 EXAMPLES
   Retrieve a data source with full schema (recommended for AI assistants)
@@ -271,8 +287,6 @@ DESCRIPTION
 
 ALIASES
   $ notion-cli db s
-  $ notion-cli ds schema
-  $ notion-cli ds s
 
 EXAMPLES
   Get full schema in JSON format (recommended for AI agents)
@@ -356,8 +370,6 @@ DESCRIPTION
 
 ALIASES
   $ notion-cli db u
-  $ notion-cli ds update
-  $ notion-cli ds u
 
 EXAMPLES
   Update a data source with a specific data_source_id and title
@@ -371,6 +383,27 @@ EXAMPLES
   Update a data source with a specific data_source_id and output raw json
 
     $ notion-cli db update DATA_SOURCE_ID -t 'My Table' -r
+
+  Add or modify columns on an existing database
+
+    $ notion-cli db update DATABASE_ID --properties '{"Priority":{"number":{}}}'
+
+  Delete a column by setting its value to null
+
+    $ notion-cli db update DATABASE_ID --properties '{"Priority":null}'
+
+  Target a specific data source on a multi-source database
+
+    $ notion-cli db update DATABASE_ID --data-source DATA_SOURCE_ID --properties-file schema.json
 ```
+
+SCHEMA NOTES
+
+- `--title` renames the database via `PATCH /databases/{id}`.
+- `--properties` / `--properties-file` apply column-schema changes via
+  `PATCH /data_sources/{id}`. The primary data source is resolved
+  automatically; use `--data-source` to target a specific one on multi-source
+  databases. Set a property's value to JSON `null` to delete it.
+- `--title` and `--properties` can be combined in one invocation.
 
 

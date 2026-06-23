@@ -218,12 +218,6 @@ func (c *Client) DataSourceTemplatesList(ctx context.Context, dataSourceID strin
 	return c.get(ctx, "/data_sources/"+dataSourceID+"/templates", query.Values())
 }
 
-// DataSourcePropertiesUpdate updates the properties schema of a data source.
-// body should contain the properties map per the Notion API schema.
-func (c *Client) DataSourcePropertiesUpdate(ctx context.Context, dataSourceID string, body map[string]any) (map[string]any, error) {
-	return c.patch(ctx, "/data_sources/"+dataSourceID+"/properties", body)
-}
-
 // --- Pages ---
 
 // PageCreate creates a new page.

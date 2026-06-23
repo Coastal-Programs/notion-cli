@@ -367,35 +367,6 @@ func TestDataSourceTemplatesList(t *testing.T) {
 	}
 }
 
-func TestDataSourcePropertiesUpdate(t *testing.T) {
-	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
-			t.Errorf("method = %s, want PATCH", r.Method)
-		}
-		if r.URL.Path != "/data_sources/ds-123/properties" {
-			t.Errorf("path = %s", r.URL.Path)
-		}
-		body := readBody(t, r)
-		props, ok := body["properties"].(map[string]any)
-		if !ok {
-			t.Errorf("expected properties map in body")
-		}
-		if props["Status"] == nil {
-			t.Errorf("expected Status property")
-		}
-		writeJSON(t, w, 200, map[string]any{"object": "data_source", "id": "ds-123"})
-	})
-
-	_, err := c.DataSourcePropertiesUpdate(context.Background(), "ds-123", map[string]any{
-		"properties": map[string]any{
-			"Status": map[string]any{"select": map[string]any{}},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // --- Page tests ---
 
 func TestPageCreate(t *testing.T) {
