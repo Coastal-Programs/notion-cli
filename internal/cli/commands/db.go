@@ -104,6 +104,22 @@ func outputFormat(cmd *cobra.Command) output.Format {
 	return output.FormatTable
 }
 
+// outputFormatExplicit reports whether the user explicitly requested a
+// non-default output mode.
+func outputFormatExplicit(cmd *cobra.Command) bool {
+	if flag := cmd.Flags().Lookup("output"); flag != nil {
+		if value, _ := cmd.Flags().GetString("output"); flag.Changed || value != "" {
+			return true
+		}
+	}
+	for _, name := range []string{"json", "compact-json", "raw", "csv", "markdown", "pretty"} {
+		if flag := cmd.Flags().Lookup(name); flag != nil && flag.Changed {
+			return true
+		}
+	}
+	return false
+}
+
 // validateOutputFlag checks the --output flag value upfront and returns an error
 // for invalid values. Call this at the start of RunE handlers.
 func validateOutputFlag(cmd *cobra.Command) error {
@@ -131,7 +147,7 @@ func handleError(cmd *cobra.Command, err error) error {
 
 	// Check for NotionCLIError first.
 	if cliErr, ok := err.(*clierrors.NotionCLIError); ok {
-		p.PrintError(cliErr.Code, cliErr.Message, cliErr.Details, cliErr.Suggestions)
+		p.PrintError(cliErr.Code, cliErr.DisplayMessage(), cliErr.Details, cliErr.Suggestions)
 		return err
 	}
 

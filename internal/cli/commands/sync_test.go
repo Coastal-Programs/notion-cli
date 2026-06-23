@@ -146,14 +146,20 @@ func TestSync_Force(t *testing.T) {
 		}
 	})
 
+	var capturedBody map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"results": []any{
 				map[string]any{
-					"object":           "database",
-					"id":               "db-1",
+					"object": "data_source",
+					"id":     "db-1",
+					"parent": map[string]any{
+						"type":        "database_id",
+						"database_id": "parent-db-1",
+					},
 					"title":            []any{map[string]any{"plain_text": "My DB"}},
 					"last_edited_time": time.Now().Format(time.RFC3339),
 				},
@@ -175,5 +181,28 @@ func TestSync_Force(t *testing.T) {
 	_, _, err := runSyncRoot(t, "sync", "--force")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	filter, ok := capturedBody["filter"].(map[string]any)
+	if !ok {
+		t.Fatal("filter field missing from sync request")
+	}
+	if filter["value"] != "data_source" {
+		t.Errorf("filter.value = %v, want data_source", filter["value"])
+	}
+
+	raw, err := os.ReadFile(tmpDir + "/.notion-cli/databases.json")
+	if err != nil {
+		t.Fatalf("cache file not written: %v", err)
+	}
+	var saved map[string]any
+	if err := json.Unmarshal(raw, &saved); err != nil {
+		t.Fatalf("cache file invalid JSON: %v", err)
+	}
+	if got := len(saved["databases"].([]any)); got != 1 {
+		t.Fatalf("cached databases = %d, want 1", got)
+	}
+	if got := len(saved["data_sources"].([]any)); got != 1 {
+		t.Fatalf("cached data sources = %d, want 1", got)
 	}
 }

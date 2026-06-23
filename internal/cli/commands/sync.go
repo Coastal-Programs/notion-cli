@@ -43,10 +43,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 
 	wc := cache.NewWorkspaceCache()
 	if err := wc.Load(); err != nil {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInternalError,
-			Message: fmt.Sprintf("Failed to load workspace cache: %s", err),
-		})
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load workspace cache", err))
 	}
 
 	force, _ := cmd.Flags().GetBool("force")
@@ -77,7 +74,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 
 		body := map[string]any{
 			"filter": map[string]any{
-				"value":    "database",
+				"value":    "data_source",
 				"property": "object",
 			},
 			"page_size": 100,
@@ -93,62 +90,16 @@ func runSync(cmd *cobra.Command, _ []string) error {
 
 		results, _ := result["results"].([]any)
 		for _, r := range results {
-			db, ok := r.(map[string]any)
+			resultMap, ok := r.(map[string]any)
 			if !ok {
 				continue
 			}
-
-			entry := cache.DatabaseEntry{
-				ID: fmt.Sprintf("%v", db["id"]),
+			entry, dataSources, ok := cacheEntriesFromSearchResult(resultMap)
+			if !ok {
+				continue
 			}
-
-			// Extract title.
-			if titleArr, ok := db["title"].([]any); ok {
-				var parts []string
-				for _, t := range titleArr {
-					if tm, ok := t.(map[string]any); ok {
-						if pt, ok := tm["plain_text"].(string); ok {
-							parts = append(parts, pt)
-						}
-					}
-				}
-				entry.Title = strings.Join(parts, "")
-			}
-
-			if url, ok := db["url"].(string); ok {
-				entry.URL = url
-			}
-
-			if let, ok := db["last_edited_time"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, let); err == nil {
-					entry.LastEdited = t
-				}
-			}
-
-			// Generate aliases from title.
-			entry.Aliases = generateAliases(entry.Title)
-
 			allDatabases = append(allDatabases, entry)
-
-			// Extract embedded data_sources if present.
-			if dsArr, ok := db["data_sources"].([]any); ok {
-				for _, rawDS := range dsArr {
-					dsMap, ok := rawDS.(map[string]any)
-					if !ok {
-						continue
-					}
-					dsEntry := cache.DataSourceEntry{
-						ID:         fmt.Sprintf("%v", dsMap["id"]),
-						DatabaseID: entry.ID,
-						Title:      entry.Title,
-						URL:        entry.URL,
-						LastEdited: entry.LastEdited,
-					}
-					if dsEntry.ID != "" && dsEntry.ID != "<nil>" {
-						allDataSources = append(allDataSources, dsEntry)
-					}
-				}
-			}
+			allDataSources = append(allDataSources, dataSources...)
 		}
 
 		_, _ = fmt.Fprintf(cmd.OutOrStderr(), "  Found %d databases so far...\n", len(allDatabases))
@@ -164,10 +115,7 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	wc.SetDatabases(allDatabases)
 	wc.SetDataSources(allDataSources)
 	if err := wc.Save(); err != nil {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInternalError,
-			Message: fmt.Sprintf("Failed to save workspace cache: %s", err),
-		})
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to save workspace cache", err))
 	}
 
 	elapsed := time.Since(start)
@@ -181,6 +129,150 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		"elapsed_ms":   elapsed.Milliseconds(),
 	}, "sync", start)
 	return nil
+}
+
+func cacheEntriesFromSearchResult(result map[string]any) (cache.DatabaseEntry, []cache.DataSourceEntry, bool) {
+	switch result["object"] {
+	case "data_source":
+		return cacheEntriesFromDataSourceSearchResult(result)
+	case "database":
+		return cacheEntriesFromDatabaseSearchResult(result)
+	default:
+		return cache.DatabaseEntry{}, nil, false
+	}
+}
+
+func cacheEntriesFromDataSourceSearchResult(ds map[string]any) (cache.DatabaseEntry, []cache.DataSourceEntry, bool) {
+	dataSourceID := stringField(ds, "id")
+	if dataSourceID == "" {
+		return cache.DatabaseEntry{}, nil, false
+	}
+
+	databaseID := parentDatabaseID(ds)
+	if databaseID == "" {
+		databaseID = dataSourceID
+	}
+
+	title := titleFromSearchResult(ds)
+	lastEdited := parseNotionEditedTime(ds)
+	url := stringField(ds, "url")
+	dbEntry := cache.DatabaseEntry{
+		ID:           databaseID,
+		Title:        title,
+		DataSourceID: dataSourceID,
+		URL:          url,
+		Aliases:      generateAliases(title),
+		LastEdited:   lastEdited,
+	}
+	dsEntry := cache.DataSourceEntry{
+		ID:         dataSourceID,
+		DatabaseID: databaseID,
+		Title:      title,
+		URL:        url,
+		LastEdited: lastEdited,
+	}
+	return dbEntry, []cache.DataSourceEntry{dsEntry}, true
+}
+
+func cacheEntriesFromDatabaseSearchResult(db map[string]any) (cache.DatabaseEntry, []cache.DataSourceEntry, bool) {
+	databaseID := stringField(db, "id")
+	if databaseID == "" {
+		return cache.DatabaseEntry{}, nil, false
+	}
+
+	title := titleFromSearchResult(db)
+	lastEdited := parseNotionEditedTime(db)
+	url := stringField(db, "url")
+	dbEntry := cache.DatabaseEntry{
+		ID:         databaseID,
+		Title:      title,
+		URL:        url,
+		Aliases:    generateAliases(title),
+		LastEdited: lastEdited,
+	}
+
+	var dataSources []cache.DataSourceEntry
+	if dsArr, ok := db["data_sources"].([]any); ok {
+		for _, rawDS := range dsArr {
+			dsMap, ok := rawDS.(map[string]any)
+			if !ok {
+				continue
+			}
+			dataSourceID := stringField(dsMap, "id")
+			if dataSourceID == "" {
+				continue
+			}
+			if dbEntry.DataSourceID == "" {
+				dbEntry.DataSourceID = dataSourceID
+			}
+			dsTitle := titleFromSearchResult(dsMap)
+			if dsTitle == "" {
+				dsTitle = title
+			}
+			dsURL := stringField(dsMap, "url")
+			if dsURL == "" {
+				dsURL = url
+			}
+			dsLastEdited := parseNotionEditedTime(dsMap)
+			if dsLastEdited.IsZero() {
+				dsLastEdited = lastEdited
+			}
+			dataSources = append(dataSources, cache.DataSourceEntry{
+				ID:         dataSourceID,
+				DatabaseID: databaseID,
+				Title:      dsTitle,
+				URL:        dsURL,
+				LastEdited: dsLastEdited,
+			})
+		}
+	}
+	return dbEntry, dataSources, true
+}
+
+func titleFromSearchResult(item map[string]any) string {
+	titleArr, ok := item["title"].([]any)
+	if !ok {
+		return ""
+	}
+	var parts []string
+	for _, t := range titleArr {
+		tm, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		if plainText, ok := tm["plain_text"].(string); ok {
+			parts = append(parts, plainText)
+		}
+	}
+	return strings.Join(parts, "")
+}
+
+func parentDatabaseID(item map[string]any) string {
+	parent, ok := item["parent"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return stringField(parent, "database_id")
+}
+
+func parseNotionEditedTime(item map[string]any) time.Time {
+	edited := stringField(item, "last_edited_time")
+	if edited == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, edited)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+func stringField(item map[string]any, key string) string {
+	value, ok := item[key].(string)
+	if !ok {
+		return ""
+	}
+	return value
 }
 
 // generateAliases creates search aliases from a database title.

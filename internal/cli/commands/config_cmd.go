@@ -83,10 +83,7 @@ func runConfigSetToken(cmd *cobra.Command, args []string) error {
 			token = strings.TrimSpace(scanner.Text())
 		}
 		if err := scanner.Err(); err != nil {
-			return handleError(cmd, &clierrors.NotionCLIError{
-				Code:    clierrors.CodeInternalError,
-				Message: fmt.Sprintf("Failed to read stdin: %s", err),
-			})
+			return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to read stdin", err))
 		}
 		if token == "" {
 			return handleError(cmd, &clierrors.NotionCLIError{
@@ -102,18 +99,12 @@ func runConfigSetToken(cmd *cobra.Command, args []string) error {
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInternalError,
-			Message: fmt.Sprintf("Failed to load config: %s", err),
-		})
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load config", err))
 	}
 
 	cfg.Token = token
 	if err := config.SaveConfig(cfg); err != nil {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInternalError,
-			Message: fmt.Sprintf("Failed to save config: %s", err),
-		})
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to save config", err))
 	}
 
 	p := output.NewPrinter(outputFormat(cmd))
@@ -191,10 +182,7 @@ func runConfigList(cmd *cobra.Command, args []string) error {
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		return handleError(cmd, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInternalError,
-			Message: fmt.Sprintf("Failed to load config: %s", err),
-		})
+		return handleError(cmd, clierrors.Wrap(clierrors.CodeInternalError, "Failed to load config", err))
 	}
 
 	// Mask token.

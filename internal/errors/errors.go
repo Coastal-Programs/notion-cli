@@ -80,6 +80,14 @@ func (e *NotionCLIError) Error() string {
 	return fmt.Sprintf("[%s] %s", e.Code, e.Message)
 }
 
+// DisplayMessage returns the message shown in CLI error output.
+func (e *NotionCLIError) DisplayMessage() string {
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	}
+	return e.Message
+}
+
 // Unwrap returns the underlying error, supporting errors.Is/As chains.
 func (e *NotionCLIError) Unwrap() error {
 	return e.Err
@@ -96,6 +104,15 @@ func (e *NotionCLIError) ExitCode() int {
 // ---------------------------------------------------------------------------
 // Factory functions
 // ---------------------------------------------------------------------------
+
+// Wrap returns a NotionCLIError with an underlying cause.
+func Wrap(code, message string, err error) *NotionCLIError {
+	return &NotionCLIError{
+		Code:    code,
+		Message: message,
+		Err:     err,
+	}
+}
 
 // TokenMissing returns an error indicating no API token is configured.
 func TokenMissing() *NotionCLIError {

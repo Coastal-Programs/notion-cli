@@ -278,5 +278,32 @@ func TestSearchCmd_PropertyPageFilter(t *testing.T) {
 	}
 }
 
+func TestSearchCmd_PropertyDatabaseFilterUsesDataSource(t *testing.T) {
+	var capturedBody map[string]any
+	_, cleanup := testSearchServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		_, _ = w.Write([]byte(`{"results":[],"has_more":false}`))
+	})
+	defer cleanup()
+
+	_, _, err := runSearchRoot(t, "search", "--property", "database")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	filter, ok := capturedBody["filter"].(map[string]any)
+	if !ok {
+		t.Fatal("filter field missing from request body")
+	}
+	if filter["value"] != "data_source" {
+		t.Errorf("filter.value = %v, want data_source", filter["value"])
+	}
+	if filter["property"] != "object" {
+		t.Errorf("filter.property = %v, want object", filter["property"])
+	}
+}
+
 // Ensure strings is used.
 var _ = strings.TrimSpace
