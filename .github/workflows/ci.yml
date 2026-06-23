@@ -43,11 +43,15 @@ jobs:
       with:
         go-version-file: go.mod
 
-    - name: Build all platforms
-      env:
-        NOTION_OAUTH_CLIENT_ID: ${{ secrets.NOTION_OAUTH_CLIENT_ID }}
-        NOTION_OAUTH_SECRET: ${{ secrets.NOTION_OAUTH_SECRET }}
-      run: make release
+    # Verify the code compiles for every target platform. This deliberately
+    # does NOT run `make release`: that target requires the OAuth secrets and
+    # embeds them into the binary. GitHub does not expose repository secrets to
+    # pull requests from forks or Dependabot, so requiring them here produces a
+    # false-negative failure on every such PR. The real credential-embedding
+    # release build runs on tag/release in publish.yml. `make cross-compile`
+    # builds all platforms with no secrets, so these artifacts are secret-free.
+    - name: Cross-compile all platforms
+      run: make cross-compile
 
     - name: Upload binaries
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -24,7 +24,7 @@ LDFLAGS=-ldflags "-s -w \
 	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.OAuthClientID=$(OAUTH_CLIENT_ID) \
 	-X github.com/Coastal-Programs/notion-cli/v6/internal/config.OAuthClientSecret=$(OAUTH_CLIENT_SECRET)"
 
-.PHONY: build test test-race test-cover lint clean release release-check install fmt fmt-check tidy
+.PHONY: build test test-race test-cover lint clean release release-check cross-compile install fmt fmt-check tidy
 
 build:
 	@mkdir -p $(BUILD_DIR)
@@ -91,6 +91,27 @@ release: release-check clean
 		GOOS=$$os GOARCH=$$arch go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$$os-$$arch$$ext ./cmd/notion-cli >/dev/null; \
 	done
 	@echo "Release binaries built in $(BUILD_DIR)/"
+
+# cross-compile verifies the code builds for every target platform WITHOUT
+# embedding the OAuth credentials. It is the safe target for pull-request CI:
+# GitHub does not expose repository secrets to fork/Dependabot PRs, so a build
+# that requires them produces a false-negative failure. The real, credential-
+# embedding artifacts are produced by 'make release' on tag/release in
+# publish.yml. OAUTH_CLIENT_ID/SECRET are forced empty here so no secret is ever
+# baked into a downloadable CI artifact.
+cross-compile: OAUTH_CLIENT_ID :=
+cross-compile: OAUTH_CLIENT_SECRET :=
+cross-compile: clean
+	@mkdir -p $(BUILD_DIR)
+	@for platform in $(PLATFORMS); do \
+		os=$$(echo $$platform | cut -d/ -f1); \
+		arch=$$(echo $$platform | cut -d/ -f2); \
+		ext=""; \
+		if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
+		echo "Compiling $$os/$$arch..."; \
+		GOOS=$$os GOARCH=$$arch go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-$$os-$$arch$$ext ./cmd/notion-cli >/dev/null; \
+	done
+	@echo "Cross-compile verification passed for: $(PLATFORMS)"
 
 fmt:
 	gofmt -s -w .
