@@ -41,6 +41,44 @@ jobs:
         NOTION_OAUTH_SECRET: ${{ secrets.NOTION_OAUTH_SECRET }}
       run: make release
 
+    # Live credential guard. The "Verify OAuth secrets" step above only checks
+    # the secrets are non-empty; it cannot catch a rotated/mismatched secret
+    # that Notion rejects with invalid_client. Run the freshly built binary's
+    # doctor against Notion's token endpoint and fail the release if the
+    # embedded client_id/client_secret pair is rejected, so a botched rotation
+    # can never silently ship a binary that cannot complete `auth login`.
+    - name: Validate embedded OAuth credentials (live)
+      run: |
+        chmod +x build/notion-cli-linux-amd64
+        # The live probe to api.notion.com can be inconclusive (status "warn"/
+        # "missing") on a transient network blip, timeout, or 5xx/429 from
+        # Notion. Retry those cases so a momentary hiccup can't spuriously block
+        # an otherwise-valid release. A conclusive "fail" (invalid_client) must
+        # still fail closed immediately without retrying.
+        attempts=3
+        status=""
+        for attempt in $(seq 1 "$attempts"); do
+          result=$(./build/notion-cli-linux-amd64 doctor --json 2>/dev/null || true)
+          status=$(echo "$result" | jq -r '[(.error.details.checks[]?), (.data.checks[]?)] | map(select(.name=="OAuth Secret")) | .[0].status // "missing"')
+          echo "OAuth Secret check (attempt $attempt/$attempts): $status"
+          case "$status" in
+            pass)
+              echo "Embedded OAuth client_id/client_secret accepted by Notion."
+              break ;;
+            fail)
+              echo "::error::Notion rejected the embedded OAuth client_id/client_secret pair (invalid_client). The rotated secret does not match the Notion dev portal (or client_id/secret belong to different integrations). Re-copy the matching pair into the NOTION_OAUTH_CLIENT_ID/NOTION_OAUTH_SECRET GitHub secrets, then re-run this release. See SECURITY.md → Credential rotation."
+              exit 1 ;;
+            *)
+              if [ "$attempt" -lt "$attempts" ]; then
+                echo "::warning::Could not validate the embedded OAuth credentials (doctor reported '$status'); Notion may be briefly unreachable. Retrying in 5s..."
+                sleep 5
+              else
+                echo "::error::Could not validate the embedded OAuth credentials (doctor reported '$status'). Refusing to publish a release whose credentials cannot be confirmed."
+                exit 1
+              fi ;;
+          esac
+        done
+
     # Generate SHA-256 checksums for every release artifact. install.js fetches
     # this file before downloading any binary and refuses to install a binary
     # whose hash does not match. The file is also uploaded as a release asset

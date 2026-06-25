@@ -192,6 +192,19 @@ in every released binary via `-ldflags -X`. If it leaks (committed to a repo,
 pasted into a chat, etc.), every released binary becomes a liability until the
 secret is rotated AND a new release is published.
 
+> **⚠️ Rotation REQUIRES an immediate republish.** Because the secret is baked
+> into the binary at build time, regenerating it in the Notion dev portal
+> instantly breaks every already-published binary: the OAuth `authorize` step
+> keeps working (it only sends `client_id`), but the token exchange sends
+> `client_id:client_secret` and Notion rejects the stale pair with
+> `invalid_client`. Users see the browser say "You're all set" and then
+> `auth login` fails to store a token. **Do not rotate the secret unless you
+> can cut a new release in the same change.** After publishing, tell users to
+> upgrade: `npm i -g @coastal-programs/notion-cli@latest`. `notion-cli doctor`
+> validates the embedded secret (the "OAuth Secret" check) and the release
+> pipeline (`publish.yml`) fails the build if the embedded pair is rejected, so
+> a botched rotation cannot silently ship a broken binary.
+
 ### When to rotate
 
 Rotate immediately if any of the following has happened:
@@ -232,16 +245,27 @@ Rotate immediately if any of the following has happened:
 
    Paste the new secret when prompted.
 
-4. **Publish a new release** so end users get a binary built with the new
-   secret. `make release` will refuse to build if the SHA-256 of
-   `OAUTH_CLIENT_SECRET` matches the historically-leaked value (see
-   `LEAKED_OAUTH_SECRET_SHA256` in the Makefile). The check uses a hash
-   instead of the literal value so the tripwire itself doesn't trip
-   GitHub's secret-scanning push protection.
+4. **Publish a new release immediately** so end users get a binary built with
+   the new secret. This step is mandatory and time-critical: until it lands,
+   every installed binary returns `invalid_client` on `auth login`. `make
+   release` will refuse to build if the SHA-256 of `OAUTH_CLIENT_SECRET`
+   matches the historically-leaked value (see `LEAKED_OAUTH_SECRET_SHA256` in
+   the Makefile). The check uses a hash instead of the literal value so the
+   tripwire itself doesn't trip GitHub's secret-scanning push protection. The
+   `publish.yml` workflow additionally performs a live token-endpoint probe of
+   the embedded `client_id`/`client_secret` pair and fails the release on
+   `invalid_client`, so a mismatched or mis-pasted secret cannot ship.
 
-5. **Revoke the old secret** in the Notion dev portal once the new release
-   is live and adopted. The portal allows multiple active secrets briefly
-   during rollover.
+5. **Tell users to upgrade** once the release is live:
+   `npm i -g @coastal-programs/notion-cli@latest`, then `notion-cli auth login`.
+   A stale local install keeps embedding the old (now-revoked) secret and will
+   keep failing with `invalid_client` until upgraded. `notion-cli doctor`
+   surfaces this via the "OAuth Secret" check.
+
+6. **Revoke the old secret** in the Notion dev portal once the new release
+   is live and adopted. If the portal does not keep the old secret active
+   during rollover, expect existing installs to break the moment you
+   regenerate — which is exactly why step 4 must happen immediately.
 
 ### Where the maintainer dev secret lives
 

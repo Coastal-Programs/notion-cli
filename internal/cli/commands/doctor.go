@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -282,6 +284,41 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 				Name:    "OAuth Integration",
 				Status:  "fail",
 				Message: fmt.Sprintf("Notion returned HTTP %d for the authorize URL. The integration may have been deleted, made internal, or had its redirect URIs changed. Check https://www.notion.so/profile/integrations", resp.StatusCode),
+			})
+		}
+	}
+
+	// Check 6b2: validate the embedded client_secret. The authorize probe
+	// above only exercises client_id; the token endpoint (and introspection)
+	// require the full client_id:client_secret pair via HTTP Basic auth. A
+	// rotated or mismatched secret is rejected with invalid_client even though
+	// the authorize step keeps working. This is the gap that let a rotated
+	// secret pass doctor while breaking `auth login` token exchange.
+	if oauthAvailable {
+		_, secret, _ := config.OAuthClientCredentials()
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		secretErr := oauth.ValidateClientCredentials(ctx, clientID, secret)
+		cancel()
+		switch {
+		case secretErr == nil:
+			checks = append(checks, checkResult{
+				Name:    "OAuth Secret",
+				Status:  "pass",
+				Message: "Notion accepts the embedded client_id/client_secret pair",
+			})
+		case errors.Is(secretErr, oauth.ErrInvalidClient):
+			checks = append(checks, checkResult{
+				Name:   "OAuth Secret",
+				Status: "fail",
+				Message: "Notion rejected the embedded client_secret (invalid_client). The OAuth secret was likely rotated; " +
+					"this binary still carries the old value. Upgrade to the latest release: " +
+					"npm i -g @coastal-programs/notion-cli@latest (then re-run 'notion-cli auth login').",
+			})
+		default:
+			checks = append(checks, checkResult{
+				Name:    "OAuth Secret",
+				Status:  "warn",
+				Message: fmt.Sprintf("Could not validate the client_secret: %s", secretErr),
 			})
 		}
 	}

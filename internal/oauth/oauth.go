@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -45,7 +46,41 @@ const (
 	// makenotion/notion-sdk-js, which sends Notion-Version on every request
 	// including OAuth endpoints. Keep in sync with defaultNotionVersion.
 	notionVersion = "2026-03-11"
+
+	// credentialProbeToken is a throwaway token value used by
+	// ValidateClientCredentials. Notion's introspection endpoint authenticates
+	// the client (client_id:client_secret) before evaluating the token, so an
+	// unknown token still yields a successful (active:false) response when the
+	// credentials are valid.
+	credentialProbeToken = "notion-cli-credential-probe"
 )
+
+// ErrInvalidClient indicates Notion rejected the client_id/client_secret pair
+// during a token-endpoint request (an HTTP Basic auth failure). It is the error
+// surfaced when an OAuth secret has been rotated but the running binary still
+// embeds the old, now-revoked value.
+var ErrInvalidClient = errors.New("notion rejected the client_id/client_secret pair (invalid_client)")
+
+// ValidateClientCredentials reports whether clientID/clientSecret form a valid
+// OAuth client pair. It probes the token introspection endpoint, which requires
+// HTTP Basic auth with the full pair, using a throwaway token: valid
+// credentials yield a normal (active:false) response even for an unknown token,
+// while a rotated or mismatched secret is rejected with invalid_client.
+//
+// Returns nil when the credentials are accepted, ErrInvalidClient when Notion
+// rejects the pair, or a wrapped transport/other error when the result is
+// inconclusive (network failure, timeout, unexpected response). A non-
+// invalid_client API error still proves client authentication succeeded, but is
+// returned as-is so callers can treat it as inconclusive rather than green.
+func ValidateClientCredentials(ctx context.Context, clientID, clientSecret string) error {
+	if _, err := TokenIntrospect(ctx, clientID, clientSecret, credentialProbeToken); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "invalid_client") {
+			return ErrInvalidClient
+		}
+		return err
+	}
+	return nil
+}
 
 // redirectURIFor returns the canonical redirect URI for the given port. It
 // must match what is registered in the Notion integration settings.
@@ -408,6 +443,9 @@ func exchangeCode(ctx context.Context, clientID, clientSecret, redirectURI, code
 		var errResp map[string]any
 		if json.Unmarshal(respBody, &errResp) == nil {
 			if msg, ok := errResp["error"].(string); ok {
+				if msg == "invalid_client" {
+					return nil, clierrors.OAuthInvalidClient()
+				}
 				return nil, clierrors.OAuthFailed(msg)
 			}
 		}
@@ -472,6 +510,9 @@ func TokenRefresh(ctx context.Context, clientID, clientSecret, refreshToken stri
 		var errResp map[string]any
 		if json.Unmarshal(respBody, &errResp) == nil {
 			if msg, ok := errResp["error"].(string); ok {
+				if msg == "invalid_client" {
+					return nil, clierrors.OAuthInvalidClient()
+				}
 				return nil, clierrors.OAuthFailed(msg)
 			}
 		}

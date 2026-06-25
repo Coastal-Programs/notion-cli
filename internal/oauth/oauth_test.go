@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -245,6 +246,46 @@ func TestExchangeCode_HTTPError(t *testing.T) {
 	}
 }
 
+func TestExchangeCode_InvalidClient(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_client"})
+	}))
+	defer server.Close()
+
+	origURL := tokenURL
+	tokenURL = server.URL
+	defer func() { tokenURL = origURL }()
+
+	_, err := exchangeCode(context.Background(), "id", "stale-secret", "http://localhost:8080/callback", "code")
+	if err == nil {
+		t.Fatal("exchangeCode() should return error for invalid_client")
+	}
+
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok {
+		t.Fatalf("expected NotionCLIError, got %T", err)
+	}
+	if cliErr.Code != clierrors.CodeOAuthFailed {
+		t.Errorf("error code = %q, want %q", cliErr.Code, clierrors.CodeOAuthFailed)
+	}
+	// The actionable invalid_client error must guide the user to upgrade,
+	// not loop on a generic "try again" suggestion.
+	want := clierrors.OAuthInvalidClient()
+	if cliErr.Message != want.Message {
+		t.Errorf("message = %q, want actionable invalid_client message %q", cliErr.Message, want.Message)
+	}
+	foundUpgrade := false
+	for _, s := range cliErr.Suggestions {
+		if strings.Contains(s, "Upgrade to the latest release") {
+			foundUpgrade = true
+		}
+	}
+	if !foundUpgrade {
+		t.Errorf("suggestions = %v, want an upgrade suggestion", cliErr.Suggestions)
+	}
+}
+
 func TestExchangeCode_EmptyAccessToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"access_token": ""})
@@ -362,6 +403,66 @@ func TestTokenIntrospect_SendsHeaders(t *testing.T) {
 	_, err := TokenIntrospect(context.Background(), "id", "secret", "tok")
 	if err != nil {
 		t.Fatalf("TokenIntrospect() error: %v", err)
+	}
+}
+
+func TestValidateClientCredentials_Valid(t *testing.T) {
+	// Valid credentials: Notion authenticates the client and returns a normal
+	// (active:false) response even for the throwaway probe token.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertOAuthHeaders(t, r)
+		_ = json.NewEncoder(w).Encode(IntrospectResponse{Active: false})
+	}))
+	defer server.Close()
+
+	origURL := introspectURL
+	introspectURL = server.URL
+	defer func() { introspectURL = origURL }()
+
+	if err := ValidateClientCredentials(context.Background(), "id", "secret"); err != nil {
+		t.Fatalf("ValidateClientCredentials() error = %v, want nil", err)
+	}
+}
+
+func TestValidateClientCredentials_InvalidClient(t *testing.T) {
+	// Rotated/mismatched secret: Notion rejects the Basic-auth pair with
+	// invalid_client. This must map to the ErrInvalidClient sentinel.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_client"})
+	}))
+	defer server.Close()
+
+	origURL := introspectURL
+	introspectURL = server.URL
+	defer func() { introspectURL = origURL }()
+
+	err := ValidateClientCredentials(context.Background(), "id", "bad-secret")
+	if !errors.Is(err, ErrInvalidClient) {
+		t.Fatalf("ValidateClientCredentials() error = %v, want ErrInvalidClient", err)
+	}
+}
+
+func TestValidateClientCredentials_Inconclusive(t *testing.T) {
+	// A non-invalid_client API error proves client auth succeeded but leaves
+	// the secret check inconclusive; the error is returned as-is (not the
+	// ErrInvalidClient sentinel).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "internal_server_error"})
+	}))
+	defer server.Close()
+
+	origURL := introspectURL
+	introspectURL = server.URL
+	defer func() { introspectURL = origURL }()
+
+	err := ValidateClientCredentials(context.Background(), "id", "secret")
+	if err == nil {
+		t.Fatal("ValidateClientCredentials() error = nil, want non-nil")
+	}
+	if errors.Is(err, ErrInvalidClient) {
+		t.Fatalf("ValidateClientCredentials() error = %v, want a non-ErrInvalidClient error", err)
 	}
 }
 

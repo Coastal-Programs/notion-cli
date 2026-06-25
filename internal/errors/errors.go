@@ -319,6 +319,22 @@ func OAuthFailed(detail string) *NotionCLIError {
 	}
 }
 
+// OAuthInvalidClient returns an actionable error when Notion rejects the
+// binary's embedded OAuth client credentials (invalid_client). This typically
+// means the OAuth secret was rotated and this binary still carries the old
+// value, so the fix is to upgrade rather than retry.
+func OAuthInvalidClient() *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthFailed,
+		Message: "OAuth client authentication failed (invalid_client): this binary's embedded OAuth secret was rejected by Notion",
+		Suggestions: []string{
+			"Upgrade to the latest release: npm i -g @coastal-programs/notion-cli@latest",
+			"Then run 'notion-cli auth login' again",
+			"Run 'notion-cli doctor' to confirm the embedded OAuth secret is valid",
+		},
+	}
+}
+
 // OAuthTimeout returns an error when the OAuth callback is not received in time.
 func OAuthTimeout() *NotionCLIError {
 	return &NotionCLIError{

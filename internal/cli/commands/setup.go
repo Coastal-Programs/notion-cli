@@ -37,11 +37,11 @@ func shouldRunInitialSetup(workspaceSlug string, err error) bool {
 }
 
 func runInitialWorkspaceSetup(cmd *cobra.Command) error {
-	fmt.Fprintln(cmd.ErrOrStderr(), "No Notion workspace is configured. Starting first-time setup...")
+	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "No Notion workspace is configured. Starting first-time setup...")
 	data, err := performOAuthLogin(cmd, "", false, true)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "Default Notion workspace set to %q.\n", data["workspace"])
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Default Notion workspace set to %q.\n", data["workspace"])
 	return nil
 }
