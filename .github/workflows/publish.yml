@@ -55,10 +55,17 @@ jobs:
         # Notion. Retry those cases so a momentary hiccup can't spuriously block
         # an otherwise-valid release. A conclusive "fail" (invalid_client) must
         # still fail closed immediately without retrying.
+        #
+        # NOTE: capture BOTH streams (2>&1). When any doctor check fails
+        # (in CI the "API Connection" check always fails because no NOTION_TOKEN
+        # is set), doctor prints its JSON envelope to STDERR via PrintError and
+        # exits non-zero. Discarding stderr would leave jq with empty input and
+        # spuriously block the release. The error envelope carries the checks
+        # under .error.details.checks, which the jq filter below handles.
         attempts=3
         status=""
         for attempt in $(seq 1 "$attempts"); do
-          result=$(./build/notion-cli-linux-amd64 doctor --json 2>/dev/null || true)
+          result=$(./build/notion-cli-linux-amd64 doctor --json 2>&1 || true)
           status=$(echo "$result" | jq -r '[(.error.details.checks[]?), (.data.checks[]?)] | map(select(.name=="OAuth Secret")) | .[0].status // "missing"')
           echo "OAuth Secret check (attempt $attempt/$attempts): $status"
           case "$status" in
