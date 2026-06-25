@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-06-25
+
 ### Added
 - **`auth login` now gives actionable guidance on a rotated OAuth secret.** When Notion rejects the binary's embedded OAuth credentials with `invalid_client`, both `oauth.exchangeCode` (login) and `oauth.TokenRefresh` (refresh) now return a new `clierrors.OAuthInvalidClient()` error that tells the user to upgrade (`npm i -g @coastal-programs/notion-cli@latest`) and run `notion-cli doctor`, instead of the generic "try again / check your connection" loop. Previously this guidance only existed in `doctor`. Unit test added in `internal/oauth/oauth_test.go`.
 - **`doctor` now validates the embedded OAuth client secret.** A new "OAuth Secret" check probes Notion's token introspection endpoint with the embedded `client_id`/`client_secret` pair (HTTP Basic auth) and reports `fail` when Notion returns `invalid_client` — the exact failure mode caused by rotating the OAuth secret without republishing the binary. Previously `doctor` only probed the `authorize` endpoint with `client_id`, which keeps working even when the secret is stale, so a rotated/mismatched secret showed green while `auth login` failed at token exchange. New `oauth.ValidateClientCredentials` / `oauth.ErrInvalidClient` in `internal/oauth/oauth.go` back the check, with unit tests in `internal/oauth/oauth_test.go`.
