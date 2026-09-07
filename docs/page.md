@@ -44,12 +44,22 @@ FLAGS
       --icon-emoji=<value>             Page icon as emoji (e.g. 💰); mutually exclusive with --icon-url
       --icon-url=<value>               Page icon as external image URL (https://...)
       --cover-url=<value>              Page cover as external image URL (https://...)
+      --template=<value>               Apply a template: 'default', 'none', or a template page ID/URL (requires -d;
+                                       mutually exclusive with -f, the API rejects children alongside a template)
+      --template-timezone=<value>      IANA timezone for template @now/@today values (e.g. America/New_York)
+      --wait                           Wait for template content to be applied before returning (requires --template)
+      --wait-timeout=<value>           [default: 30s] Maximum time to wait with --wait (requires --template)
       --retry                          Auto-retry on rate limit (respects Retry-After header)
       --sort=<value>                   Property to sort by (prepend with - for descending)
       --timeout=<value>                [default: 30000] Request timeout in milliseconds
 
 DESCRIPTION
   Create a page
+
+  Templates are applied asynchronously by Notion, so a templated create returns a blank page and the
+  content lands moments later. Use --wait to poll for it; on timeout the command still exits 0 because
+  the page exists. Do not re-run the create to "retry" - that re-applies the template and duplicates
+  its content. List templates with: notion-cli data-source templates <DATA_SOURCE_ID>
 
 ALIASES
   $ notion-cli page c
@@ -70,6 +80,14 @@ EXAMPLES
   Create a page with properties
 
     $ notion-cli page create -d DATA_SOURCE_ID --properties '{"Name": {"title": [{"text": {"content": "My Task"}}]}}'
+
+  Create a page from the data source's default template
+
+    $ notion-cli page create -d DATA_SOURCE_ID --template default
+
+  Create a page from a specific template and wait for its content to be applied
+
+    $ notion-cli page create -d DATA_SOURCE_ID --template TEMPLATE_PAGE_ID --template-timezone America/New_York --wait
 
   Create a page with a specific source markdown file and parent_page_id
 

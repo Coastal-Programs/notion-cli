@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
@@ -193,6 +195,215 @@ func TestPageCreate_IconEmojiAndURLMutuallyExclusive(t *testing.T) {
 	combined := strings.ToLower(err.Error() + " " + out.String())
 	if !strings.Contains(combined, "icon-emoji") || !strings.Contains(combined, "icon-url") {
 		t.Errorf("expected error mentioning icon-emoji and icon-url, got %v / %s", err, out.String())
+	}
+}
+
+// --- page create --template tests ---
+
+func newTemplateFlagSet(t *testing.T, template, timezone string) *cobra.Command {
+	t.Helper()
+	c := &cobra.Command{Use: "test"}
+	c.Flags().String("template", "", "")
+	c.Flags().String("template-timezone", "", "")
+	_ = c.Flags().Set("template", template)
+	_ = c.Flags().Set("template-timezone", timezone)
+	return c
+}
+
+func TestBuildTemplateParam(t *testing.T) {
+	const dashed = "11111111-2222-3333-4444-555555555555"
+	const bare = "11111111222233334444555555555555"
+
+	tests := []struct {
+		name     string
+		template string
+		timezone string
+		wantSet  bool
+		want     map[string]any
+		wantErr  bool
+	}{
+		{name: "empty omits key", template: "", wantSet: false},
+		{name: "none omits key", template: "none", wantSet: false},
+		{name: "default", template: "default", wantSet: true, want: map[string]any{"type": "default"}},
+		{
+			name: "default with timezone", template: "default", timezone: "America/New_York", wantSet: true,
+			want: map[string]any{"type": "default", "timezone": "America/New_York"},
+		},
+		// resolveID normalises every accepted form to a dashed UUID.
+		{
+			name: "bare uuid", template: bare, wantSet: true,
+			want: map[string]any{"type": "template_id", "template_id": dashed},
+		},
+		{
+			name: "dashed uuid", template: dashed, wantSet: true,
+			want: map[string]any{"type": "template_id", "template_id": dashed},
+		},
+		{
+			name: "notion url", template: "https://www.notion.so/My-Template-" + bare, wantSet: true,
+			want: map[string]any{"type": "template_id", "template_id": dashed},
+		},
+		{name: "timezone without template errors", template: "", timezone: "America/New_York", wantErr: true},
+		{name: "invalid template id errors", template: "not-an-id", wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, set, err := buildTemplateParam(newTemplateFlagSet(t, tc.template, tc.timezone))
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if set != tc.wantSet {
+				t.Fatalf("set = %v, want %v", set, tc.wantSet)
+			}
+			if !tc.wantSet {
+				if got != nil {
+					t.Errorf("expected nil param, got %v", got)
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("param = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPageCreate_TemplateAndFilePathMutuallyExclusive(t *testing.T) {
+	root := &cobra.Command{Use: "notion-cli"}
+	RegisterPageCommands(root)
+
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"page", "create", "-d", testPageID, "--template", "default", "--file-path", "notes.md"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected mutually-exclusive error")
+	}
+	combined := strings.ToLower(err.Error() + " " + out.String())
+	if !strings.Contains(combined, "template") || !strings.Contains(combined, "file-path") {
+		t.Errorf("expected error mentioning template and file-path, got %v / %s", err, out.String())
+	}
+}
+
+func TestPageCreate_TemplateRequiresDataSourceParent(t *testing.T) {
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("no request should be sent")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer cleanup()
+
+	_, _, err := runPageRoot(t, "page", "create", "-p", testPageID, "--template", "default")
+	if err == nil {
+		t.Fatal("expected error when --template is used with -p")
+	}
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok {
+		t.Fatalf("expected NotionCLIError, got %T: %v", err, err)
+	}
+	if cliErr.Code != clierrors.CodeInvalidRequest {
+		t.Errorf("code = %q, want %q", cliErr.Code, clierrors.CodeInvalidRequest)
+	}
+}
+
+func TestPageCreate_TemplateSendsDataSourceParent(t *testing.T) {
+	const dsID = "22222222222222222222222222222222"
+	const dsIDDashed = "22222222-2222-2222-2222-222222222222"
+	var got map[string]any
+
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": testPageID})
+	})
+	defer cleanup()
+
+	if _, _, err := runPageRoot(t, "page", "create", "-d", dsID, "--template", "default"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	parent, ok := got["parent"].(map[string]any)
+	if !ok {
+		t.Fatalf("parent missing from body: %v", got)
+	}
+	if parent["type"] != "data_source_id" || parent["data_source_id"] != dsIDDashed {
+		t.Errorf("parent = %v, want data_source_id %s", parent, dsIDDashed)
+	}
+	if !reflect.DeepEqual(got["template"], map[string]any{"type": "default"}) {
+		t.Errorf("template = %v, want {type: default}", got["template"])
+	}
+}
+
+func TestPageCreate_WaitRequiresTemplate(t *testing.T) {
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("no request should be sent")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer cleanup()
+
+	_, _, err := runPageRoot(t, "page", "create", "-d", testPageID, "--wait")
+	if err == nil {
+		t.Fatal("expected error when --wait is used without --template")
+	}
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok {
+		t.Fatalf("expected NotionCLIError, got %T: %v", err, err)
+	}
+	if cliErr.Code != clierrors.CodeInvalidRequest {
+		t.Errorf("code = %q, want %q", cliErr.Code, clierrors.CodeInvalidRequest)
+	}
+}
+
+func TestPageCreate_WaitPollsUntilPopulated(t *testing.T) {
+	var mu sync.Mutex
+	var childCalls int
+
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if !strings.HasSuffix(r.URL.Path, "/children") {
+			_ = json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": testPageID})
+			return
+		}
+		mu.Lock()
+		childCalls++
+		first := childCalls == 1
+		mu.Unlock()
+
+		results := []any{map[string]any{"object": "block", "type": "paragraph"}}
+		if first {
+			results = []any{}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "list", "results": results})
+	})
+	defer cleanup()
+
+	// The printer writes to os.Stdout, not the cobra buffer, so capture it.
+	var err error
+	stdout := captureStdout(t, func() {
+		_, _, err = runPageRoot(t, "page", "create", "-d", "22222222222222222222222222222222",
+			"--template", "default", "--wait", "--wait-timeout", "10s", "--json")
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Polling stops as soon as children are non-empty: one empty response,
+	// then one populated response — never the full timeout.
+	mu.Lock()
+	defer mu.Unlock()
+	if childCalls != 2 {
+		t.Errorf("children polled %d times, want exactly 2", childCalls)
+	}
+	// Waiting must still print the created page.
+	if !strings.Contains(stdout, testPageID) {
+		t.Errorf("expected page id in stdout, got %s", stdout)
 	}
 }
 

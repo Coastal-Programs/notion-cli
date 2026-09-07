@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -60,14 +61,20 @@ func newPageCreateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringP("parent-page-id", "p", "", "Parent page ID")
-	cmd.Flags().StringP("parent-data-source-id", "d", "", "Parent database ID")
+	cmd.Flags().StringP("parent-data-source-id", "d", "", "Parent database ID (must be a data source ID when --template is used)")
 	cmd.Flags().StringP("file-path", "f", "", "Path to a markdown file for page content")
 	cmd.Flags().StringP("title-property", "t", "Name", "Title property name")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
 	cmd.Flags().String("icon-emoji", "", "Page icon as emoji (e.g. 💰)")
 	cmd.Flags().String("icon-url", "", "Page icon as external image URL (https://...)")
 	cmd.Flags().String("cover-url", "", "Page cover as external image URL (https://...)")
+	cmd.Flags().String("template", "", "Apply a template: 'default', 'none', or a template page ID/URL (requires -d)")
+	cmd.Flags().String("template-timezone", "", "IANA timezone for template @now/@today values (e.g. America/New_York)")
+	cmd.Flags().Bool("wait", false, "Wait for template content to be applied before returning")
+	cmd.Flags().Duration("wait-timeout", 30*time.Second, "Maximum time to wait with --wait")
 	cmd.MarkFlagsMutuallyExclusive("icon-emoji", "icon-url")
+	// The API rejects `children` alongside a template, so --file-path cannot be combined with it.
+	cmd.MarkFlagsMutuallyExclusive("template", "file-path")
 	addOutputFlags(cmd)
 
 	return cmd
@@ -95,6 +102,35 @@ func runPageCreate(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
+	templateParam, hasTemplate, err := buildTemplateParam(cmd)
+	if err != nil {
+		return handleError(cmd, err)
+	}
+	if hasTemplate && parentDBID == "" {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: "--template requires --parent-data-source-id (-d)",
+			Suggestions: []string{
+				"Templates belong to a data source; use -d <data_source_id>",
+				"List available templates with: notion-cli data-source templates <data_source_id>",
+			},
+		})
+	}
+
+	// --wait only has meaning while waiting for template content to be applied.
+	// Failing fast beats silently ignoring the flag.
+	wait, _ := cmd.Flags().GetBool("wait")
+	if (wait || cmd.Flags().Changed("wait-timeout")) && !hasTemplate {
+		return handleError(cmd, &clierrors.NotionCLIError{
+			Code:    clierrors.CodeInvalidRequest,
+			Message: "--wait and --wait-timeout require --template",
+			Suggestions: []string{
+				"Only templated creates apply content asynchronously; add --template default",
+				"Drop --wait to return as soon as the page is created",
+			},
+		})
+	}
+
 	body := map[string]any{}
 
 	// Set parent.
@@ -103,9 +139,19 @@ func runPageCreate(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return handleError(cmd, err)
 		}
-		body["parent"] = map[string]any{
-			"type":        "database_id",
-			"database_id": id,
+		// Templates are a per-data-source concept and Notion's templates guide
+		// requires a data_source_id parent when applying one. The non-template
+		// path keeps sending database_id so existing callers are unaffected.
+		if hasTemplate {
+			body["parent"] = map[string]any{
+				"type":           "data_source_id",
+				"data_source_id": id,
+			}
+		} else {
+			body["parent"] = map[string]any{
+				"type":        "database_id",
+				"database_id": id,
+			}
 		}
 	} else {
 		id, err := resolveID(parentPageID)
@@ -167,14 +213,57 @@ func runPageCreate(cmd *cobra.Command, _ []string) error {
 		body["cover"] = cover
 	}
 
+	if hasTemplate {
+		body["template"] = templateParam
+	}
+
 	result, err := client.PageCreate(cmd.Context(), body)
 	if err != nil {
 		return handleError(cmd, err)
 	}
 
+	if wait {
+		if id, ok := result["id"].(string); ok {
+			timeout, _ := cmd.Flags().GetDuration("wait-timeout")
+			waitForTemplateContent(cmd, client, id, timeout)
+		}
+	}
+
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(result, "page create", start)
 	return nil
+}
+
+// waitForTemplateContent polls a freshly created page until the template's
+// blocks appear. Notion applies templates asynchronously and offers no job
+// status endpoint, so polling is the only signal available.
+//
+// A timeout is never an error: the page exists either way, and re-issuing the
+// create would re-apply the template and duplicate its content.
+func waitForTemplateContent(cmd *cobra.Command, client *notion.Client, pageID string, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		children, err := client.BlockChildrenList(ctx, pageID, notion.QueryParams{})
+		if err == nil {
+			if results, ok := children["results"].([]any); ok && len(results) > 0 {
+				return
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			_, _ = fmt.Fprintf(cmd.ErrOrStderr(),
+				"warning: template content not visible after %s; Notion may still be applying it to page %s\n",
+				timeout, pageID)
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // --- page retrieve ---
@@ -549,6 +638,45 @@ func runPageMove(cmd *cobra.Command, args []string) error {
 	p := output.NewPrinter(outputFormat(cmd))
 	p.PrintSuccess(result, "page move", start)
 	return nil
+}
+
+// buildTemplateParam reads the --template and --template-timezone flags and
+// returns the `template` object for POST /v1/pages. The second return value
+// reports whether the key should be set on the request body at all: "none" and
+// an empty value both omit it, which is the API's implicit default.
+func buildTemplateParam(cmd *cobra.Command) (map[string]any, bool, error) {
+	template, _ := cmd.Flags().GetString("template")
+	timezone, _ := cmd.Flags().GetString("template-timezone")
+
+	if template == "" || template == "none" {
+		if timezone != "" {
+			return nil, false, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: "--template-timezone requires --template",
+				Suggestions: []string{
+					"Add --template default to apply the data source's default template",
+					"Add --template <template_page_id> to apply a specific template",
+				},
+			}
+		}
+		return nil, false, nil
+	}
+
+	param := map[string]any{}
+	if template == "default" {
+		param["type"] = "default"
+	} else {
+		id, err := resolveID(template)
+		if err != nil {
+			return nil, false, err
+		}
+		param["type"] = "template_id"
+		param["template_id"] = id
+	}
+	if timezone != "" {
+		param["timezone"] = timezone
+	}
+	return param, true, nil
 }
 
 // buildIconCover reads the --icon-emoji, --icon-url, and --cover-url flags and

@@ -144,7 +144,7 @@ notion-cli db schema <DATABASE_ID> --output json
 notion-cli db query <DATABASE_ID> --output json
 
 # Create a page
-notion-cli page create --database-id <DATABASE_ID> \
+notion-cli page create -d <DATA_SOURCE_ID> \
   --properties '{"Name": {"title": [{"text": {"content": "My Task"}}]}}'
 
 # Search the workspace
@@ -218,7 +218,7 @@ notion-cli db schema <DATABASE_ID> --output json
 ```bash
 # Create page in database
 notion-cli page create \
-  --database-id <DATABASE_ID> \
+  -d <DATA_SOURCE_ID> \
   --properties '{"Name": {"title": [{"text": {"content": "Task"}}]}}'
 
 # Retrieve page
@@ -230,7 +230,38 @@ notion-cli page update <PAGE_ID> \
 
 # Get page property item
 notion-cli page property-item <PAGE_ID> --property-id <PROPERTY_ID>
+
+# Create a page from the data source's default template
+notion-cli page create -d <DATA_SOURCE_ID> --template default \
+  --properties '{"Name": {"title": [{"text": {"content": "Task"}}]}}'
+
+# Create a page from a specific template, and wait for its content to appear
+notion-cli page create -d <DATA_SOURCE_ID> \
+  --template <TEMPLATE_PAGE_ID> \
+  --template-timezone America/New_York \
+  --wait --wait-timeout 30s
 ```
+
+#### `page create --template`
+
+Templates are the only way to create buttons and linked database views from the CLI —
+the block API cannot produce them. List available templates with
+`notion-cli data-source templates <DATA_SOURCE_ID>`.
+
+| Flag | Description |
+| --- | --- |
+| `--template` | `default` (the data source's default template), `none` (no template), or a template page ID/URL. Requires `-d`, which must be a **data source** ID. |
+| `--template-timezone` | IANA timezone (e.g. `America/New_York`) used to resolve `@now`/`@today` in the template. Requires `--template`. |
+| `--wait` | Poll until the template's blocks appear on the new page. Requires `--template`. |
+| `--wait-timeout` | Maximum time to wait (default `30s`). Requires `--template`. |
+
+Notion applies templates **asynchronously**, so `page create` returns a blank page and the
+content lands moments later. `--wait` polls for it; on timeout the command still exits `0`
+because the page genuinely exists. Never re-run the create to "retry" — that re-applies the
+template and duplicates its content.
+
+`--template` cannot be combined with `--file-path`: the API rejects `children` alongside a
+template.
 
 ### Block Commands
 
@@ -515,7 +546,7 @@ notion-cli config path
 # Create a task and mark it complete
 
 TASK_ID=$(notion-cli page create \
-  --database-id "$TASKS_DB_ID" \
+  -d "$TASKS_DB_ID" \
   --properties '{
     "Name": {"title": [{"text": {"content": "Review PR"}}]},
     "Status": {"select": {"name": "In Progress"}}
