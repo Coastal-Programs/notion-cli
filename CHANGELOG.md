@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [6.4.2] - 2026-09-07
+
 ### Added
 - **`page create --template` applies a data source template.** Completes the write side of `data-source templates <id>`, making it possible to create buttons and linked database views — content the block API cannot produce. `--template` accepts `default` (the data source's default template), `none`, or a template page ID/URL (URLs and dashless UUIDs are normalised via `resolveID`). `--template-timezone` sets the IANA timezone used to resolve `@now`/`@today` and errors if supplied without `--template`. Because Notion rejects `children` alongside a template, `--template` is mutually exclusive with `--file-path`; and because templates are a per-data-source concept, the parent is sent as `data_source_id` (not `database_id`) when a template is applied, so `-d` must be a data source ID in that case. Non-template creates are unchanged. New `--wait` / `--wait-timeout` (default `30s`) flags poll `GET /v1/blocks/{page_id}/children` until the asynchronously-applied template content appears; both require `--template` (only templated creates apply content asynchronously). A timeout prints a stderr warning and still exits `0`, and the create is never re-issued (re-applying a template duplicates its content). Tests in `internal/cli/commands/page_test.go`.
 
