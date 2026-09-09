@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Pinned Go toolchain `go1.26.6` in `go.mod`, closing 14 reachable standard-library vulnerabilities.** `govulncheck` reported 14 CVEs in `crypto/tls`, `crypto/x509`, `net/http`, `net/url`, `net`, `net/textproto`, and `encoding/asn1` as reachable from `internal/oauth` (the local OAuth callback server and the token refresh/revoke paths) under the previously-used `go1.26.1`. All are fixed by `go1.26.6`. Adding a `toolchain` directive rather than bumping the `go` directive keeps the language version at 1.26 — no new `go vet` diagnostics and no minimum-version bump for consumers — while `GOTOOLCHAIN=auto` (the default) and `actions/setup-go`'s `go-version-file: go.mod` both resolve the patched toolchain automatically. `govulncheck ./...` is now clean.
+
+### Chore
+- **Dependency audit: no updates required.** All direct dependencies (`spf13/cobra` v1.10.2, `zalando/go-keyring` v0.2.8, `golang.org/x/term` v0.45.0) and every module selected into the build are already at their latest releases; `go mod verify` passes. The remaining updates reported by `go list -m -u all` (`testify`, `objx`, `go-md2man`, `go.yaml.in/yaml/v3`, `check.v1`) are module-graph-only entries that `go mod tidy` does not keep in `go.mod`, so they are not built or linked. `Notion-Version` remains pinned at `2026-03-11`, still the latest dated version: the `archived` → `in_trash` and `after` → `position` migrations are already applied across `internal/notion` and `internal/cli/commands`, and the `transcription` → `meeting_notes` rename needs no action because the CLI never references either block type by name. The npm wrapper and all five platform packages remain in lockstep at 6.4.2 with no third-party runtime dependencies.
+
 ## [6.4.2] - 2026-09-07
 
 ### Added
