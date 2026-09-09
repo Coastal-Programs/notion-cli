@@ -214,6 +214,9 @@ func handleError(cmd *cobra.Command, err error) error {
 			"code":    apiErr.Code,
 			"message": apiErr.Message,
 		}
+		if len(apiErr.AdditionalData) > 0 {
+			body["additional_data"] = apiErr.AdditionalData
+		}
 		cliErr := clierrors.FromNotionAPI(apiErr.Status, body)
 		p.PrintError(cliErr.Code, cliErr.Message, cliErr.Details, cliErr.Suggestions)
 		return cliErr

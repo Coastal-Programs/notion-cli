@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"net/http"
 	"time"
 )
 
@@ -89,11 +90,31 @@ func Do(ctx context.Context, cfg RetryConfig, fn func() error) error {
 	return lastErr
 }
 
-// IsRetryable returns true if the given HTTP status code indicates a
-// retryable error: 408, 429, 500, 502, 503, 504.
-func IsRetryable(statusCode int) bool {
+// IsRetryable reports whether a response with the given HTTP status code
+// should be retried for a request made with the given method.
+//
+// Per Notion's request-limit guidance, 429 (rate_limited) and 529
+// (service_overload) are retried for every method, while 408 and 5xx
+// responses are retried only when the request is idempotent (GET, DELETE):
+// a POST/PATCH that hit a 502 may already have been applied server-side, and
+// replaying it can duplicate the write.
+// See https://developers.notion.com/reference/request-limits.
+func IsRetryable(method string, statusCode int) bool {
 	switch statusCode {
-	case 408, 429, 500, 502, 503, 504:
+	case 429, 529:
+		return true
+	case 408, 500, 502, 503, 504:
+		return IsIdempotent(method)
+	default:
+		return false
+	}
+}
+
+// IsIdempotent reports whether an HTTP method is safe to replay after a
+// transient failure.
+func IsIdempotent(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodDelete:
 		return true
 	default:
 		return false

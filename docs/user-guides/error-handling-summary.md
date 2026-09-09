@@ -149,7 +149,7 @@ Enhanced Error System
 
 ## Error Code Categories
 
-### Authentication & Authorization (6 Codes)
+### Authentication & Authorization (7 Codes)
 
 | Code | Scenario | User Action | Retry? |
 |------|----------|-------------|--------|
@@ -158,6 +158,7 @@ Enhanced Error System
 | `TOKEN_EXPIRED` | Token no longer valid | Refresh token | No |
 | `INTEGRATION_NOT_SHARED` | Resource not shared | Share with integration | No |
 | `PERMISSION_DENIED` | Insufficient permissions | Check workspace role | No |
+| `BLOCK_LIMIT_EXCEEDED` | Free workspace used its 1,000-block allowance (403 with `additional_data.block_limit`) | Workspace owner upgrades the plan; reads/edits/deletes still work | No |
 | `UNAUTHORIZED` | Generic auth failure | Verify credentials | No |
 
 ### Resource Errors (5 Codes)

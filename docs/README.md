@@ -19,6 +19,7 @@ Individual command documentation:
 - **[sync](sync.md)** - Workspace sync command
 - **[list](list.md)** - List cached databases
 - **[whoami](whoami.md)** - Connectivity check
+- **[api](api.md)** - Raw request to any Notion endpoint (escape hatch for new/beta APIs)
 - **[doctor](doctor.md)** - Health checks and diagnostics
 - **[config](config.md)** - Configuration management (set-token, get, path, list)
 - **[cache](cache.md)** - Cache info and statistics

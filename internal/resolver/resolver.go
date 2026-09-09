@@ -20,10 +20,24 @@ var hexPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 // uuidPattern matches a hyphenated UUID in 8-4-4-4-12 format.
 var uuidPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-// urlIDPattern extracts the last 32 hex characters from a Notion URL.
-// Notion URLs encode the ID as the last 32 hex chars of the path segment,
-// optionally preceded by a hyphen.
-var urlIDPattern = regexp.MustCompile(`([0-9a-f]{32})(?:\?|#|$)`)
+// urlIDPattern extracts the ID from a Notion URL. Notion URLs encode the ID
+// as the last 32 hex chars of the path segment (optionally preceded by a
+// title slug and hyphen); a hyphenated UUID is accepted too.
+var urlIDPattern = regexp.MustCompile(`([0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)`)
+
+// notionHosts are the domains Notion has used for record links. Links moved
+// from www.notion.so/{id} to app.notion.com/p/{id} in June 2026; both remain
+// in the wild. See https://developers.notion.com/reference/versioning.
+var notionHosts = []string{"notion.so", "notion.site", "notion.com"}
+
+func isNotionURL(lower string) bool {
+	for _, h := range notionHosts {
+		if strings.Contains(lower, h) {
+			return true
+		}
+	}
+	return false
+}
 
 // ExtractID extracts a Notion resource ID from various input formats:
 //   - Raw 32-char hex: "abc123def456..." -> formatted with hyphens
@@ -51,7 +65,7 @@ func ExtractID(input string) (string, error) {
 	}
 
 	// Case 3: Notion URL — check dataSource= query param first, then path ID.
-	if strings.Contains(lower, "notion.so") || strings.Contains(lower, "notion.site") {
+	if isNotionURL(lower) {
 		if u, err := url.Parse(input); err == nil {
 			// Try both casing variants of the dataSource param.
 			ds := u.Query().Get("dataSource")

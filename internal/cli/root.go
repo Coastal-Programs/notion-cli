@@ -75,6 +75,7 @@ func init() {
 	commands.RegisterSyncCommand(rootCmd)
 	commands.RegisterListCommand(rootCmd)
 	commands.RegisterWhoamiCommand(rootCmd)
+	commands.RegisterAPICommand(rootCmd)
 	commands.RegisterDoctorCommand(rootCmd)
 	commands.RegisterConfigCommands(rootCmd)
 	commands.RegisterCacheCommands(rootCmd)

@@ -69,6 +69,24 @@ func TestExtractID(t *testing.T) {
 			false,
 		},
 		{
+			"app.notion.com URL (June 2026 link format)",
+			"https://app.notion.com/p/Bug-bash-8c4d6e5fa1b23c4d5e6f7a8b9c0d1e2f",
+			"8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
+			false,
+		},
+		{
+			"app.notion.com URL with query string",
+			"https://app.notion.com/p/8c4d6e5fa1b23c4d5e6f7a8b9c0d1e2f?v=abc123",
+			"8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
+			false,
+		},
+		{
+			"Notion URL with hyphenated UUID in path",
+			"https://app.notion.com/p/8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
+			"8c4d6e5f-a1b2-3c4d-5e6f-7a8b9c0d1e2f",
+			false,
+		},
+		{
 			"empty input",
 			"",
 			"",

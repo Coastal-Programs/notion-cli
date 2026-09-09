@@ -43,6 +43,7 @@ const (
 	CodeInvalidRequest      = "INVALID_REQUEST"
 	CodePropertyNotFound    = "PROPERTY_NOT_FOUND"
 	CodePermissionDenied    = "PERMISSION_DENIED"
+	CodeBlockLimitExceeded  = "BLOCK_LIMIT_EXCEEDED"
 	CodeBadGateway          = "BAD_GATEWAY"
 	CodeInvalidFilter       = "INVALID_FILTER"
 	CodeInvalidSort         = "INVALID_SORT"
@@ -284,6 +285,18 @@ func FromNotionAPI(statusCode int, body map[string]any) *NotionCLIError {
 		e.Code = CodeUnauthorized
 	case "restricted_resource":
 		e.Code = CodePermissionDenied
+		// A Free workspace that has used its 1,000-block allowance also returns
+		// 403 restricted_resource; additional_data.block_limit identifies it
+		// without relying on message text. Sharing the page will not help.
+		// See https://developers.notion.com/reference/workspace-block-limits.
+		if ad, _ := body["additional_data"].(map[string]any); ad["block_limit"] != nil {
+			e.Code = CodeBlockLimitExceeded
+			e.Suggestions = []string{
+				"This workspace has used all of its Free-plan blocks; retrying will not help",
+				"Ask a workspace owner to upgrade the plan, or check usage at https://www.notion.com/help/understanding-block-usage",
+				"Reads, edits, and deletes still work; only block-creating writes are blocked",
+			}
+		}
 	case "object_not_found":
 		e.Code = CodeNotFound
 	case "rate_limited":

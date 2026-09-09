@@ -319,6 +319,25 @@ notion-cli list --output json
 notion-cli batch retrieve --ids <ID1>,<ID2>,<ID3>
 ```
 
+### Raw API Access
+
+`api` calls any Notion endpoint with the same auth, retries, and output
+envelope as every other command, so new or beta endpoints (agents, sessions,
+meeting notes, async tasks) are usable without waiting for a dedicated command.
+
+```bash
+# GET (default method)
+notion-cli api users/me
+
+# Body from a file or stdin implies POST; -f adds strings, -F adds JSON values
+notion-cli api data_sources/<ID>/query --input filter.json --paginate
+notion-cli api pages -f parent.page_id=<ID> -F 'properties={"title":[{"text":{"content":"Hi"}}]}'
+
+# Explicit method and beta header
+notion-cli api -X PATCH pages/<ID> -F in_trash=true
+notion-cli api -H 'Notion-Beta: <feature>' <endpoint>
+```
+
 ## Database Query Filtering
 
 Use `--filter` with JSON matching the Notion API filter format:
@@ -716,6 +735,7 @@ notion-cli/
 │   │       ├── list.go          # list cached databases
 │   │       ├── batch.go         # batch retrieve
 │   │       ├── whoami.go        # connectivity check
+│   │       ├── api.go           # raw request to any endpoint
 │   │       ├── doctor.go        # health checks
 │   │       ├── auth.go           # auth login, logout, status (OAuth)
 │   │       ├── config.go        # config get/set/path

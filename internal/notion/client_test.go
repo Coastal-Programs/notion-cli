@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -2105,7 +2106,9 @@ func TestDo_503RetriedThenSucceeds(t *testing.T) {
 // retries: the file bytes received on attempt 2 must equal those received on
 // attempt 1 (byte-for-byte). doFormData is unexported but reachable here
 // because this test lives in package notion.
-func TestDoFormData_RetryOn5xx(t *testing.T) {
+// A rate-limited (429) multipart upload is retried, and the buffered body
+// must be replayed byte-for-byte on the second attempt.
+func TestDoFormData_RetryOn429ReplaysBody(t *testing.T) {
 	const fileFieldName = "file"
 	const fileName = "hello.txt"
 	filePayload := []byte("hello, multipart replay test \x00\x01\x02\x03")
@@ -2156,10 +2159,10 @@ func TestDoFormData_RetryOn5xx(t *testing.T) {
 		}
 
 		if n == 1 {
-			writeJSON(t, w, 503, map[string]any{
+			writeJSON(t, w, 429, map[string]any{
 				"object":  "error",
-				"status":  503,
-				"code":    "service_unavailable",
+				"status":  429,
+				"code":    "rate_limited",
 				"message": "try again",
 			})
 			return
@@ -2208,5 +2211,104 @@ func TestDoFormData_RetryOn5xx(t *testing.T) {
 	}
 	if !bytes.Equal(firstFileBytes, secondFileBytes) {
 		t.Errorf("file bytes differ between attempts: first=%q second=%q", firstFileBytes, secondFileBytes)
+	}
+}
+
+// Non-idempotent requests must not be replayed on 5xx: the server may have
+// already applied the write. Policy from
+// https://developers.notion.com/reference/request-limits.
+func TestWriteRequests_NoRetryOn5xx(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		call func(c *Client) error
+	}{
+		{"POST page create", func(c *Client) error {
+			_, err := c.PageCreate(context.Background(), map[string]any{"parent": map[string]any{"page_id": "x"}})
+			return err
+		}},
+		{"PATCH page update", func(c *Client) error {
+			_, err := c.PageUpdate(context.Background(), "page-1", map[string]any{"archived": true})
+			return err
+		}},
+		{"multipart upload", func(c *Client) error {
+			_, err := c.doFormData(context.Background(), "/file_uploads/u/send", nil, "file", "a.txt", "text/plain", []byte("x"))
+			return err
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var attempts int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&attempts, 1)
+				writeJSON(t, w, 503, map[string]any{
+					"object": "error", "status": 503, "code": "service_unavailable", "message": "try again",
+				})
+			}))
+			defer srv.Close()
+
+			c := NewClient("test-token", WithBaseURL(srv.URL), WithRetryConfig(retry.RetryConfig{
+				MaxRetries: 3, BaseDelay: time.Millisecond, MaxDelay: 10 * time.Millisecond,
+			}))
+
+			err := tc.call(c)
+			var apiErr *APIError
+			if !errors.As(err, &apiErr) || apiErr.Status != 503 {
+				t.Fatalf("expected 503 APIError, got %v", err)
+			}
+			if got := atomic.LoadInt32(&attempts); got != 1 {
+				t.Errorf("attempts = %d, want 1 (no replay of a non-idempotent request)", got)
+			}
+		})
+	}
+}
+
+// additional_data on an error body is preserved so callers can tell a
+// plan-limit 403 from a sharing 403.
+func TestAPIError_AdditionalDataParsed(t *testing.T) {
+	c, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(t, w, 403, map[string]any{
+			"object": "error", "status": 403, "code": "restricted_resource",
+			"message":         "This workspace has used all of its free blocks.",
+			"additional_data": map[string]any{"block_limit": "block_creation"},
+		})
+	})
+
+	_, err := c.PageCreate(context.Background(), map[string]any{"parent": map[string]any{"page_id": "x"}})
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIError, got %v", err)
+	}
+	if apiErr.AdditionalData["block_limit"] != "block_creation" {
+		t.Errorf("AdditionalData = %v, want block_limit=block_creation", apiErr.AdditionalData)
+	}
+}
+
+// 529 service_overload is retried like 429, for every method.
+func TestRetryOn529ServiceOverload(t *testing.T) {
+	var attempts int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) == 1 {
+			w.Header().Set("Retry-After", "0")
+			writeJSON(t, w, 529, map[string]any{
+				"object": "error", "status": 529, "code": "service_overload", "message": "overloaded",
+			})
+			return
+		}
+		writeJSON(t, w, 200, map[string]any{"object": "page", "id": "page-1"})
+	}))
+	defer srv.Close()
+
+	c := NewClient("test-token", WithBaseURL(srv.URL), WithRetryConfig(retry.RetryConfig{
+		MaxRetries: 3, BaseDelay: time.Millisecond, MaxDelay: 10 * time.Millisecond,
+	}))
+
+	result, err := c.PageCreate(context.Background(), map[string]any{"parent": map[string]any{"page_id": "x"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "page-1" {
+		t.Errorf("id = %v, want page-1", result["id"])
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Errorf("attempts = %d, want 2", got)
 	}
 }

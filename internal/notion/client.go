@@ -33,11 +33,15 @@ func init() {
 	userAgent = "notion-cli/" + config.Version + " (Go/" + runtime.Version() + ")"
 }
 
-// APIError represents an error response from the Notion API.
+// APIError represents an error response from the Notion API. AdditionalData
+// carries endpoint-specific context Notion attaches to some errors, such as
+// {"block_limit": "block_creation"} on a plan-limit 403.
+// See https://developers.notion.com/reference/status-codes.
 type APIError struct {
-	Status  int    `json:"status"`
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Status         int            `json:"status"`
+	Code           string         `json:"code"`
+	Message        string         `json:"message"`
+	AdditionalData map[string]any `json:"additional_data,omitempty"`
 }
 
 func (e *APIError) Error() string {
@@ -478,23 +482,41 @@ func (c *Client) FileUploadList(ctx context.Context, query QueryParams) (map[str
 // --- Internal HTTP helpers ---
 
 func (c *Client) get(ctx context.Context, path string, params url.Values) (map[string]any, error) {
-	return c.do(ctx, http.MethodGet, path, params, nil)
+	return c.do(ctx, http.MethodGet, path, params, nil, nil)
 }
 
 func (c *Client) post(ctx context.Context, path string, body map[string]any) (map[string]any, error) {
-	return c.do(ctx, http.MethodPost, path, nil, body)
+	return c.do(ctx, http.MethodPost, path, nil, body, nil)
 }
 
 func (c *Client) patch(ctx context.Context, path string, body map[string]any) (map[string]any, error) {
-	return c.do(ctx, http.MethodPatch, path, nil, body)
+	return c.do(ctx, http.MethodPatch, path, nil, body, nil)
 }
 
 func (c *Client) delete(ctx context.Context, path string) (map[string]any, error) {
-	return c.do(ctx, http.MethodDelete, path, nil, nil)
+	return c.do(ctx, http.MethodDelete, path, nil, nil, nil)
 }
 
-func (c *Client) do(ctx context.Context, method, path string, params url.Values, body map[string]any) (map[string]any, error) {
-	result, err := c.doInternal(ctx, method, path, params, body)
+// RawRequest describes an arbitrary Notion API call. Path is relative to the
+// /v1 base (e.g. "users/me"); Headers are applied after the client's defaults,
+// so callers can add beta opt-ins (Notion-Beta) or pin a different
+// Notion-Version for one call.
+type RawRequest struct {
+	Method  string
+	Path    string
+	Params  url.Values
+	Body    map[string]any
+	Headers http.Header
+}
+
+// Request performs an arbitrary authenticated call with the client's usual
+// retry, gzip, and token-refresh handling. It backs the `api` escape hatch.
+func (c *Client) Request(ctx context.Context, r RawRequest) (map[string]any, error) {
+	return c.do(ctx, r.Method, "/"+strings.TrimLeft(r.Path, "/"), r.Params, r.Body, r.Headers)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, params url.Values, body map[string]any, headers http.Header) (map[string]any, error) {
+	result, err := c.doInternal(ctx, method, path, params, body, headers)
 	if err == nil {
 		return result, nil
 	}
@@ -532,10 +554,10 @@ func (c *Client) do(ctx context.Context, method, path string, params url.Values,
 		_ = config.SaveConfig(c.cfg) // best-effort
 	}
 
-	return c.doInternal(ctx, method, path, params, body) // retry once
+	return c.doInternal(ctx, method, path, params, body, headers) // retry once
 }
 
-func (c *Client) doInternal(ctx context.Context, method, path string, params url.Values, body map[string]any) (map[string]any, error) {
+func (c *Client) doInternal(ctx context.Context, method, path string, params url.Values, body map[string]any, headers http.Header) (map[string]any, error) {
 	u := c.baseURL + path
 	if len(params) > 0 {
 		u += "?" + params.Encode()
@@ -571,11 +593,15 @@ func (c *Client) doInternal(ctx context.Context, method, path string, params url
 		if bodyBytes != nil {
 			req.Header.Set("Content-Type", "application/json")
 		}
+		for k, vs := range headers {
+			req.Header[http.CanonicalHeaderKey(k)] = vs
+		}
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			// Network errors are retryable for GET requests.
-			if method == http.MethodGet {
+			// Network errors are only safe to replay for idempotent requests:
+			// a POST whose response was lost may already have been applied.
+			if retry.IsIdempotent(method) {
 				return &retry.RetryableError{Err: fmt.Errorf("execute request: %w", err)}
 			}
 			return fmt.Errorf("execute request: %w", err)
@@ -610,8 +636,8 @@ func (c *Client) doInternal(ctx context.Context, method, path string, params url
 			}
 			apiErr.Status = resp.StatusCode
 
-			// Retry on 429/5xx for any method, and all retryable status codes for GET.
-			if retry.IsRetryable(resp.StatusCode) {
+			// 429/529 retry for every method; 408/5xx only for idempotent ones.
+			if retry.IsRetryable(method, resp.StatusCode) {
 				retryAfter := parseDuration(resp.Header.Get("Retry-After"))
 				return &retry.RetryableError{
 					Err:        &apiErr,
@@ -727,7 +753,8 @@ func (c *Client) doFormData(ctx context.Context, path string, fields map[string]
 			}
 			apiErr.Status = resp.StatusCode
 
-			if retry.IsRetryable(resp.StatusCode) {
+			// Multipart uploads are POSTs: only 429/529 are safe to replay.
+			if retry.IsRetryable(http.MethodPost, resp.StatusCode) {
 				retryAfter := parseDuration(resp.Header.Get("Retry-After"))
 				return &retry.RetryableError{
 					Err:        &apiErr,

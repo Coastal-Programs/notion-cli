@@ -178,6 +178,17 @@ func TestFromNotionAPI(t *testing.T) {
 			CodePermissionDenied,
 		},
 		{
+			// https://developers.notion.com/reference/workspace-block-limits
+			"403 free-plan block limit",
+			403,
+			map[string]any{
+				"code":            "restricted_resource",
+				"message":         "This workspace has used all of its free blocks.",
+				"additional_data": map[string]any{"block_limit": "block_creation"},
+			},
+			CodeBlockLimitExceeded,
+		},
+		{
 			"404 not found",
 			404,
 			map[string]any{"code": "object_not_found", "message": "not found"},

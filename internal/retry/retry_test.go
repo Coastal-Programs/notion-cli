@@ -181,18 +181,35 @@ func TestDoRetryAfterHint(t *testing.T) {
 }
 
 func TestIsRetryable(t *testing.T) {
-	retryableCodes := []int{408, 429, 500, 502, 503, 504}
-	nonRetryableCodes := []int{200, 201, 400, 401, 403, 404, 405, 409, 422}
+	// Policy from https://developers.notion.com/reference/request-limits:
+	// 429/529 retry for every method; 408/5xx only for idempotent methods.
+	alwaysRetry := []int{429, 529}
+	idempotentOnly := []int{408, 500, 502, 503, 504}
+	neverRetry := []int{200, 201, 400, 401, 403, 404, 405, 409, 422}
 
-	for _, code := range retryableCodes {
-		if !IsRetryable(code) {
-			t.Errorf("expected status %d to be retryable", code)
+	for _, method := range []string{"GET", "DELETE", "POST", "PATCH"} {
+		for _, code := range alwaysRetry {
+			if !IsRetryable(method, code) {
+				t.Errorf("%s %d: expected retryable", method, code)
+			}
+		}
+		for _, code := range neverRetry {
+			if IsRetryable(method, code) {
+				t.Errorf("%s %d: expected NOT retryable", method, code)
+			}
 		}
 	}
 
-	for _, code := range nonRetryableCodes {
-		if IsRetryable(code) {
-			t.Errorf("expected status %d to NOT be retryable", code)
+	for _, code := range idempotentOnly {
+		for _, method := range []string{"GET", "DELETE"} {
+			if !IsRetryable(method, code) {
+				t.Errorf("%s %d: expected retryable (idempotent)", method, code)
+			}
+		}
+		for _, method := range []string{"POST", "PATCH"} {
+			if IsRetryable(method, code) {
+				t.Errorf("%s %d: expected NOT retryable (replay could duplicate the write)", method, code)
+			}
 		}
 	}
 }
