@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -338,6 +339,61 @@ func TestPageCreate_TemplateSendsDataSourceParent(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got["template"], map[string]any{"type": "default"}) {
 		t.Errorf("template = %v, want {type: default}", got["template"])
+	}
+}
+
+// --file-path is sent as the native `markdown` body parameter (which Notion
+// parses server-side and does not cap at 100 blocks), never as `children`.
+// See https://developers.notion.com/reference/post-page.
+func TestPageCreate_FilePathSendsNativeMarkdown(t *testing.T) {
+	const md = "# Plan\n\nSome **bold** text and a [link](https://example.com).\n\n| a | b |\n|---|---|\n| 1 | 2 |\n"
+	dir := t.TempDir()
+	path := filepath.Join(dir, "release-plan.md")
+	if err := os.WriteFile(path, []byte(md), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var got map[string]any
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"object": "page", "id": testPageID})
+	})
+	defer cleanup()
+
+	if _, _, err := runPageRoot(t, "page", "create", "-p", testPageID, "--file-path", path); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got["markdown"] != md {
+		t.Errorf("markdown = %q, want file content verbatim", got["markdown"])
+	}
+	if _, has := got["children"]; has {
+		t.Errorf("children must not be sent alongside markdown: %v", got["children"])
+	}
+	// Title still defaults to the humanised file name.
+	props, _ := got["properties"].(map[string]any)
+	title, _ := props["Name"].(map[string]any)
+	parts, _ := title["title"].([]any)
+	if len(parts) != 1 {
+		t.Fatalf("title parts = %v, want 1", parts)
+	}
+	text, _ := parts[0].(map[string]any)["text"].(map[string]any)
+	if text["content"] != "release plan" {
+		t.Errorf("title = %v, want %q", text["content"], "release plan")
+	}
+}
+
+func TestPageCreate_FilePathUnreadable(t *testing.T) {
+	_, cleanup := testPageServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("no request should be sent")
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	defer cleanup()
+
+	_, _, err := runPageRoot(t, "page", "create", "-p", testPageID, "--file-path", filepath.Join(t.TempDir(), "missing.md"))
+	cliErr, ok := err.(*clierrors.NotionCLIError)
+	if !ok || cliErr.Code != clierrors.CodeInvalidRequest {
+		t.Fatalf("expected INVALID_REQUEST for a missing file, got %T: %v", err, err)
 	}
 }
 

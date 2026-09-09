@@ -62,7 +62,7 @@ func newPageCreateCmd() *cobra.Command {
 
 	cmd.Flags().StringP("parent-page-id", "p", "", "Parent page ID")
 	cmd.Flags().StringP("parent-data-source-id", "d", "", "Parent database ID (must be a data source ID when --template is used)")
-	cmd.Flags().StringP("file-path", "f", "", "Path to a markdown file for page content")
+	cmd.Flags().StringP("file-path", "f", "", "Path to a markdown file for page content (sent as Notion-flavored Markdown)")
 	cmd.Flags().StringP("title-property", "t", "Name", "Title property name")
 	cmd.Flags().String("properties", "", "Properties as JSON string")
 	cmd.Flags().String("icon-emoji", "", "Page icon as emoji (e.g. 💰)")
@@ -73,7 +73,8 @@ func newPageCreateCmd() *cobra.Command {
 	cmd.Flags().Bool("wait", false, "Wait for template content to be applied before returning")
 	cmd.Flags().Duration("wait-timeout", 30*time.Second, "Maximum time to wait with --wait")
 	cmd.MarkFlagsMutuallyExclusive("icon-emoji", "icon-url")
-	// The API rejects `children` alongside a template, so --file-path cannot be combined with it.
+	// The API rejects page content alongside a template (the template's own
+	// content is applied asynchronously), so --file-path cannot be combined with it.
 	cmd.MarkFlagsMutuallyExclusive("template", "file-path")
 	addOutputFlags(cmd)
 
@@ -174,14 +175,22 @@ func runPageCreate(cmd *cobra.Command, _ []string) error {
 		body["properties"] = props
 	}
 
-	// Read markdown file and convert to blocks.
+	// Page content: Notion parses Notion-flavored Markdown natively on
+	// POST /v1/pages (inline formatting, tables, nested lists), and unlike the
+	// `children` array it is not capped at 100 blocks.
+	// See https://developers.notion.com/reference/post-page.
 	filePath, _ := cmd.Flags().GetString("file-path")
 	if filePath != "" {
-		blocks, err := markdownFileToBlocks(filePath)
+		content, err := os.ReadFile(filePath)
 		if err != nil {
-			return handleError(cmd, err)
+			return handleError(cmd, &clierrors.NotionCLIError{
+				Code:    clierrors.CodeInvalidRequest,
+				Message: fmt.Sprintf("Cannot read file: %s", err),
+			})
 		}
-		body["children"] = blocks
+		if strings.TrimSpace(string(content)) != "" {
+			body["markdown"] = string(content)
+		}
 
 		// If no properties set, create a title from the filename.
 		if propsJSON == "" {
@@ -745,196 +754,6 @@ func validateExternalURL(raw, flag string) error {
 		}
 	}
 	return nil
-}
-
-// --- Markdown to blocks converter ---
-
-// markdownFileToBlocks reads a markdown file and converts it to Notion blocks.
-func markdownFileToBlocks(path string) ([]map[string]any, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, &clierrors.NotionCLIError{
-			Code:    clierrors.CodeInvalidRequest,
-			Message: fmt.Sprintf("Cannot read file: %s", err),
-		}
-	}
-	defer f.Close() //nolint:errcheck
-
-	var blocks []map[string]any
-	scanner := bufio.NewScanner(f)
-	var inCodeBlock bool
-	var codeLines []string
-	var codeLang string
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Code block fences.
-		if strings.HasPrefix(line, "```") {
-			if inCodeBlock {
-				// End code block.
-				blocks = append(blocks, map[string]any{
-					"type": "code",
-					"code": map[string]any{
-						"rich_text": []map[string]any{
-							{"type": "text", "text": map[string]any{"content": strings.Join(codeLines, "\n")}},
-						},
-						"language": codeLang,
-					},
-				})
-				inCodeBlock = false
-				codeLines = nil
-				codeLang = ""
-			} else {
-				inCodeBlock = true
-				codeLang = strings.TrimPrefix(line, "```")
-				codeLang = strings.TrimSpace(codeLang)
-				if codeLang == "" {
-					codeLang = "plain text"
-				}
-			}
-			continue
-		}
-
-		if inCodeBlock {
-			codeLines = append(codeLines, line)
-			continue
-		}
-
-		// Horizontal rules.
-		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine == "---" || trimmedLine == "***" || trimmedLine == "___" {
-			blocks = append(blocks, map[string]any{
-				"type":    "divider",
-				"divider": map[string]any{},
-			})
-			continue
-		}
-
-		// Headings (Notion only supports h1-h3; deeper headings become paragraphs).
-		if strings.HasPrefix(line, "#### ") {
-			// Notion doesn't support h4+, render as bold paragraph.
-			blocks = append(blocks, map[string]any{
-				"type": "paragraph",
-				"paragraph": map[string]any{
-					"rich_text": richText(strings.TrimPrefix(line, "#### ")),
-				},
-			})
-			continue
-		}
-		if strings.HasPrefix(line, "### ") {
-			blocks = append(blocks, headingBlock(3, strings.TrimPrefix(line, "### ")))
-			continue
-		}
-		if strings.HasPrefix(line, "## ") {
-			blocks = append(blocks, headingBlock(2, strings.TrimPrefix(line, "## ")))
-			continue
-		}
-		if strings.HasPrefix(line, "# ") {
-			blocks = append(blocks, headingBlock(1, strings.TrimPrefix(line, "# ")))
-			continue
-		}
-
-		// Blockquotes.
-		if strings.HasPrefix(line, "> ") {
-			blocks = append(blocks, map[string]any{
-				"type": "quote",
-				"quote": map[string]any{
-					"rich_text": richText(strings.TrimPrefix(line, "> ")),
-				},
-			})
-			continue
-		}
-
-		// Unordered list items.
-		if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
-			blocks = append(blocks, map[string]any{
-				"type": "bulleted_list_item",
-				"bulleted_list_item": map[string]any{
-					"rich_text": richText(line[2:]),
-				},
-			})
-			continue
-		}
-
-		// Numbered list items.
-		if len(line) > 2 && line[0] >= '0' && line[0] <= '9' {
-			if idx := strings.Index(line, ". "); idx > 0 && idx < 4 {
-				blocks = append(blocks, map[string]any{
-					"type": "numbered_list_item",
-					"numbered_list_item": map[string]any{
-						"rich_text": richText(line[idx+2:]),
-					},
-				})
-				continue
-			}
-		}
-
-		// Empty lines and paragraphs.
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		blocks = append(blocks, map[string]any{
-			"type": "paragraph",
-			"paragraph": map[string]any{
-				"rich_text": richText(trimmed),
-			},
-		})
-	}
-
-	// If file ended mid code block, flush remaining code.
-	if inCodeBlock && len(codeLines) > 0 {
-		blocks = append(blocks, map[string]any{
-			"type": "code",
-			"code": map[string]any{
-				"rich_text": []map[string]any{
-					{"type": "text", "text": map[string]any{"content": strings.Join(codeLines, "\n")}},
-				},
-				"language": codeLang,
-			},
-		})
-	}
-
-	return blocks, scanner.Err()
-}
-
-// headingBlock creates a Notion heading block (1, 2, or 3).
-func headingBlock(level int, text string) map[string]any {
-	key := fmt.Sprintf("heading_%d", level)
-	return map[string]any{
-		"type": key,
-		key: map[string]any{
-			"rich_text": richText(text),
-		},
-	}
-}
-
-// splitRichText splits text into chunks of maxLen for Notion's 2000-char limit.
-func splitRichText(s string, maxLen int) []map[string]any {
-	if len(s) <= maxLen {
-		return []map[string]any{
-			{"type": "text", "text": map[string]any{"content": s}},
-		}
-	}
-	var segments []map[string]any
-	for len(s) > 0 {
-		end := maxLen
-		if end > len(s) {
-			end = len(s)
-		}
-		segments = append(segments, map[string]any{
-			"type": "text",
-			"text": map[string]any{"content": s[:end]},
-		})
-		s = s[end:]
-	}
-	return segments
-}
-
-// richText creates a simple rich text array from a plain string.
-func richText(s string) []map[string]any {
-	return splitRichText(s, 2000)
 }
 
 // fileBaseName extracts a human-readable name from a file path.

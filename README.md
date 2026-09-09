@@ -260,8 +260,13 @@ content lands moments later. `--wait` polls for it; on timeout the command still
 because the page genuinely exists. Never re-run the create to "retry" — that re-applies the
 template and duplicates its content.
 
-`--template` cannot be combined with `--file-path`: the API rejects `children` alongside a
+`--template` cannot be combined with `--file-path`: the API rejects page content alongside a
 template.
+
+`--file-path` sends the file as **Notion-flavored Markdown** (`markdown` body parameter), so
+headings, bold/italic/links, tables, nested lists, and code blocks arrive with full fidelity
+and there is no 100-block cap. Notion's flavour is documented at
+<https://developers.notion.com/guides/data-apis/working-with-markdown-content>.
 
 ### Block Commands
 

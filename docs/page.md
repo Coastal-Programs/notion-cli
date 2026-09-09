@@ -23,7 +23,7 @@ USAGE
 
 FLAGS
   -d, --parent_data_source_id=<value>  Parent data source ID or URL (to create a page in a table)
-  -f, --file_path=<value>              Path to a source markdown file
+  -f, --file_path=<value>              Path to a source markdown file (sent as Notion-flavored Markdown; no block cap)
   -j, --json                           Output as JSON (recommended for automation)
   -p, --parent_page_id=<value>         Parent page ID or URL (to create a sub-page)
   -r, --raw                            output raw json
