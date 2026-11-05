@@ -686,3 +686,24 @@ func TestCallback_AcceptsValidHosts(t *testing.T) {
 		})
 	}
 }
+
+func TestContextDoneError(t *testing.T) {
+	expired, cancelExpired := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancelExpired()
+	<-expired.Done()
+	if got := contextDoneError(expired); got.Code != clierrors.CodeOAuthTimeout {
+		t.Errorf("deadline exceeded: code = %q, want %q", got.Code, clierrors.CodeOAuthTimeout)
+	}
+
+	parent, interrupt := context.WithCancel(context.Background())
+	interrupted, cancelInterrupted := context.WithTimeout(parent, time.Minute)
+	defer cancelInterrupted()
+	interrupt() // what signal.NotifyContext does on SIGINT/SIGTERM
+	got := contextDoneError(interrupted)
+	if got.Code != clierrors.CodeOAuthCancelled {
+		t.Errorf("interrupted: code = %q, want %q", got.Code, clierrors.CodeOAuthCancelled)
+	}
+	if strings.Contains(got.Message, "timed out") {
+		t.Errorf("interrupted: message %q still claims a timeout", got.Message)
+	}
+}

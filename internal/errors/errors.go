@@ -354,7 +354,7 @@ func OAuthTimeout() *NotionCLIError {
 		Code:    CodeOAuthTimeout,
 		Message: "OAuth authorization timed out waiting for browser callback",
 		Suggestions: []string{
-			"Complete the authorization in your browser within 2 minutes",
+			"Complete the authorization in your browser within 5 minutes",
 			"Try running 'notion-cli auth login' again",
 		},
 	}
@@ -368,6 +368,18 @@ func OAuthCancelled() *NotionCLIError {
 		Suggestions: []string{
 			"Run 'notion-cli auth login' and click 'Allow access'",
 			"Or set NOTION_TOKEN manually for non-interactive use",
+		},
+	}
+}
+
+// OAuthInterrupted returns an error when Ctrl-C or SIGTERM stops the OAuth flow before it completes.
+func OAuthInterrupted() *NotionCLIError {
+	return &NotionCLIError{
+		Code:    CodeOAuthCancelled,
+		Message: "OAuth authorization was interrupted (Ctrl-C or SIGTERM) before it completed",
+		Suggestions: []string{
+			"Run 'notion-cli auth login' to finish authorizing",
+			"Or set NOTION_TOKEN for non-interactive use",
 		},
 	}
 }

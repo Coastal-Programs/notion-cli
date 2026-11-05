@@ -5,16 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/Coastal-Programs/notion-cli/v6/internal/config"
+	clierrors "github.com/Coastal-Programs/notion-cli/v6/internal/errors"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
 	"github.com/Coastal-Programs/notion-cli/v6/internal/oauth"
 	"github.com/spf13/cobra"
@@ -915,5 +918,13 @@ func TestAuthStatus_ManualToken(t *testing.T) {
 	_, _, err := runAuthRoot(t, "auth", "status")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestOAuthTimeoutSuggestionMatchesLoginTimeout(t *testing.T) {
+	want := fmt.Sprintf("within %d minutes", int(oauthLoginTimeout.Minutes()))
+	suggestions := strings.Join(clierrors.OAuthTimeout().Suggestions, "\n")
+	if !strings.Contains(suggestions, want) {
+		t.Errorf("OAuthTimeout() suggestions = %q, want them to say %q", suggestions, want)
 	}
 }

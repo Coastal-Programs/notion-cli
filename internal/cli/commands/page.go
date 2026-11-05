@@ -15,16 +15,14 @@ import (
 	"github.com/Coastal-Programs/notion-cli/v6/internal/notion"
 	"github.com/Coastal-Programs/notion-cli/v6/pkg/output"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // isTerminal reports whether stdin is an interactive terminal.
 // It is a variable so tests can override it.
 var isTerminal = func() bool {
-	stat, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-	return (stat.Mode() & os.ModeCharDevice) != 0
+	// Not a ModeCharDevice check: /dev/null is a character device but not a terminal.
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
 
 // RegisterPageCommands registers all page subcommands under root.

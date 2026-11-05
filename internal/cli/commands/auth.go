@@ -68,6 +68,10 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// oauthLoginTimeout bounds the full OAuth flow. Generous to accommodate 2FA,
+// account switching, workspace selection, and slow networks.
+const oauthLoginTimeout = 5 * time.Minute
+
 func performOAuthLogin(cmd *cobra.Command, explicitSlug string, manual bool, printProgress bool) (map[string]any, error) {
 	clientID, clientSecret, ok := config.OAuthClientCredentials()
 	if !ok {
@@ -81,9 +85,7 @@ func performOAuthLogin(cmd *cobra.Command, explicitSlug string, manual bool, pri
 		manual = true
 	}
 
-	// 5-minute timeout for the full OAuth flow. Generous to accommodate 2FA,
-	// account switching, workspace selection, and slow networks.
-	ctx, cancel := context.WithTimeout(cmd.Context(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(cmd.Context(), oauthLoginTimeout)
 	defer cancel()
 
 	var (
@@ -95,7 +97,7 @@ func performOAuthLogin(cmd *cobra.Command, explicitSlug string, manual bool, pri
 	} else {
 		if printProgress {
 			fmt.Fprintln(os.Stderr, "Opening your browser to authorize with Notion...")
-			fmt.Fprintln(os.Stderr, "Waiting for authorization (timeout: 5 minutes)...")
+			fmt.Fprintf(os.Stderr, "Waiting for authorization (timeout: %d minutes)...\n", int(oauthLoginTimeout.Minutes()))
 		}
 		token, err = oauth.Login(ctx, clientID, clientSecret)
 	}

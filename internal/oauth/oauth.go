@@ -262,7 +262,7 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 	// Wait for callback, context cancellation, or timeout.
 	select {
 	case <-ctx.Done():
-		return nil, clierrors.OAuthTimeout()
+		return nil, contextDoneError(ctx)
 	case result := <-resultCh:
 		if result.err != "" {
 			if result.err == "access_denied" {
@@ -282,6 +282,14 @@ func Login(ctx context.Context, clientID, clientSecret string) (*TokenResponse, 
 		// Exchange code for token.
 		return exchangeCode(ctx, clientID, clientSecret, redirectURI, result.code)
 	}
+}
+
+// Signals (Ctrl-C, SIGTERM) cancel ctx before its deadline, so only DeadlineExceeded is a timeout.
+func contextDoneError(ctx context.Context) *clierrors.NotionCLIError {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return clierrors.OAuthTimeout()
+	}
+	return clierrors.OAuthInterrupted()
 }
 
 // LoginManual performs the OAuth flow without binding a localhost callback

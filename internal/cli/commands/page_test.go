@@ -622,7 +622,7 @@ func TestPageTrash_Success(t *testing.T) {
 	})
 	defer cleanup()
 
-	_, _, err := runPageRoot(t, "page", "trash", testPageID)
+	_, _, err := runPageRoot(t, "page", "trash", testPageID, "--yes")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

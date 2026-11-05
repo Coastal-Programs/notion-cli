@@ -108,3 +108,23 @@ func TestShouldRunInitialSetup_FalseCases(t *testing.T) {
 		}
 	})
 }
+
+func TestShouldRunInitialSetup_DevNullStdin(t *testing.T) {
+	realIsTerminal := isTerminal
+	withInitialSetupTestEnv(t)
+	isTerminal = realIsTerminal
+
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("open %s: %v", os.DevNull, err)
+	}
+	t.Cleanup(func() { _ = devNull.Close() })
+	origStdin := os.Stdin
+	os.Stdin = devNull
+	t.Cleanup(func() { os.Stdin = origStdin })
+
+	// Cron, CI and agent harnesses run commands with stdin from /dev/null (#132).
+	if shouldRunInitialSetup("", clierrors.TokenMissing()) {
+		t.Fatal("shouldRunInitialSetup() = true with stdin from /dev/null, want false")
+	}
+}
